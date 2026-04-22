@@ -34,7 +34,6 @@ service cloud.firestore {
 
     match /chatRooms/{chatRoomId} {
       // Allow list and get if user is in the members map
-      // For listing, the query must include a where('members.' + uid, '==', true) filter
       allow list, get: if isRoomMember(resource.data);
       
       // Allow creation if the user is including themselves as a member
@@ -53,8 +52,14 @@ service cloud.firestore {
           && request.resource.data.chatRoomMembers[request.auth.uid] == true 
           && request.resource.data.senderId == request.auth.uid;
           
-        allow update, delete: if isMessageCollaborator(resource.data) 
-          && resource.data.senderId == request.auth.uid;
+        // Allow update if user is the sender (for edits) OR if they are a member updating specific fields
+        allow update: if isMessageCollaborator(resource.data) && (
+          resource.data.senderId == request.auth.uid ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'reactions'])
+        );
+        
+        // Only sender can delete their own message
+        allow delete: if isMessageCollaborator(resource.data) && resource.data.senderId == request.auth.uid;
       }
     }
   }
