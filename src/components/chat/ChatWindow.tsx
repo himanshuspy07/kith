@@ -122,14 +122,15 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-xs text-muted-foreground animate-pulse">Syncing messages...</p>
           </div>
-        ) : messages?.length === 0 ? (
+        ) : !messages || messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full opacity-30">
             <p className="text-sm italic">No messages yet. Say hello!</p>
           </div>
         ) : (
           messages.map((msg, i) => {
             const isMe = msg.senderId === user?.uid;
-            const showDateHeader = i === 0 || format(messages[i-1].createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd') !== format(msg.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd');
+            const prevMsg = i > 0 ? messages[i - 1] : null;
+            const showDateHeader = i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd') !== format(msg.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd');
             const timestamp = msg.createdAt?.toDate?.() || new Date();
 
             return (

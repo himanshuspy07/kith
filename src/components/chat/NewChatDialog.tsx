@@ -92,7 +92,7 @@ export default function NewChatDialog({ onChatCreated }: NewChatDialogProps) {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-            ) : users?.filter(u => u.id !== currentUser?.uid).map((user) => (
+            ) : users?.filter(u => u.id !== currentUser?.uid)?.map((user) => (
               <div 
                 key={user.id}
                 className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors"
