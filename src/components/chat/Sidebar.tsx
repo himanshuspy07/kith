@@ -24,21 +24,31 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
   const db = useFirestore();
   const auth = useAuth();
 
-  // Query chat rooms where the user is a member
+  // Query chat rooms where the user is a member. 
+  // We use a simple query first to avoid permission/index errors.
   const roomsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
+    if (!db || !user?.uid) return null;
     return query(
       collection(db, 'chatRooms'),
-      where(`members.${user.uid}`, '==', true),
-      orderBy('updatedAt', 'desc')
+      where(`members.${user.uid}`, '==', true)
     );
-  }, [db, user]);
+  }, [db, user?.uid]);
 
   const { data: rooms, isLoading } = useCollection(roomsQuery);
 
-  const filteredConversations = rooms?.filter(room => {
+  // Sorting client-side for now to ensure reliability without needing custom indexes immediately
+  const sortedRooms = React.useMemo(() => {
+    if (!rooms) return [];
+    return [...rooms].sort((a, b) => {
+      const timeA = a.updatedAt?.toDate?.()?.getTime() || 0;
+      const timeB = b.updatedAt?.toDate?.()?.getTime() || 0;
+      return timeB - timeA;
+    });
+  }, [rooms]);
+
+  const filteredConversations = sortedRooms.filter(room => {
     return room.name?.toLowerCase().includes(searchQuery.toLowerCase());
-  }) || [];
+  });
 
   return (
     <div className="w-80 h-full border-r border-border flex flex-col bg-background/50 backdrop-blur-sm">
