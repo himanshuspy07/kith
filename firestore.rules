@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * Kith Chat Application Security Rules
+     * 
+     * Core Philosophy:
+     * This ruleset enforces a strict identity-based and collaborative access model. 
+     * It leverages denormalized membership data to ensure that authorization 
+     * decisions are performant and independent of cross-document lookups.
+     * 
+     * Data Structure:
+     * - /users/{userId}: Private user profiles and presence data.
+     * - /chatRooms/{chatRoomId}: Conversation metadata with a 'members' map for access control.
+     * - /chatRooms/{chatRoomId}/messages/{messageId}: Chat content with a 'chatRoomMembers' map.
+     * 
+     * Key Security Decisions:
+     * - User Profiles: Readable by any authenticated user to facilitate discovery, but writable only by the owner.
+     * - Chat Rooms: Access is strictly limited to users present in the document's 'members' map.
+     * - Messages: Access is restricted to users present in the 'chatRoomMembers' map, which is 
+     *   denormalized from the parent room to avoid costly 'get()' calls.
+     * - Prototyping Mode: Rules enforce who can access data and maintain relational integrity 
+     *   (e.g., senderId consistency), but do not enforce strict field types or presence of 
+     *   non-security-critical fields.
+     */
+
+    // --- Helper Functions ---
+
+    /** @description Checks if the request is from an authenticated user. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** @description Checks if the authenticated user matches the provided userId. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** @description Checks if the user is the owner of an existing document. */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    /** @description Checks if the user is a member of a ChatRoom based on a map. */
+    function isRoomMember(data) {
+      return isSignedIn() && data.members[request.auth.uid] == true;
+    }
+
+    /** @description Checks if the user is a member of a Message's room based on a map. */
+    function isMessageCollaborator(data) {
+      return isSignedIn() && data.chatRoomMembers[request.auth.uid] == true;
+    }
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Rules for User profiles. Allows self-creation and updates. Publicly readable for discovery.
+     * @path /users/{userId}
+     * @allow (get) Any signed-in user fetching a profile.
+     * @allow (create) User 'abc' creating /users/abc.
+     * @deny (update) User 'abc' trying to update /users/xyz.
+     * @principle Ownership and Path-based consistency.
+     */
+    match /users/{userId} {
+      allow get, list: if isSignedIn();
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rules for ChatRooms. Access is controlled by the denormalized 'members' map.
+     * @path /chatRooms/{chatRoomId}
+     * @allow (get) User 'abc' if resource.data.members['abc'] == true.
+     * @allow (create) User 'abc' if request.resource.data.members['abc'] == true.
+     * @deny (list) User 'abc' attempting to list rooms where they are not a member.
+     * @principle Shared Access (Closed Collaborators) using denormalized membership maps.
+     */
+    match /chatRooms/{chatRoomId} {
+      allow get, list: if isRoomMember(resource.data);
+      allow create: if isRoomMember(request.resource.data);
+      allow update: if isRoomMember(resource.data);
+      allow delete: if isRoomMember(resource.data);
+
+      /**
+       * @description Rules for Messages. Uses denormalized 'chatRoomMembers' for fast authorization.
+       * @path /chatRooms/{chatRoomId}/messages/{messageId}
+       * @allow (list) User 'abc' listing messages in a room they belong to.
+       * @allow (create) User 'abc' sending a message where senderId is 'abc'.
+       * @deny (update) User 'abc' trying to edit a message sent by user 'xyz'.
+       * @principle Authorization Independence and Relational Integrity.
+       */
+      match /messages/{messageId} {
+        allow get, list: if isMessageCollaborator(resource.data);
+        allow create: if isMessageCollaborator(request.resource.data) && request.resource.data.senderId == request.auth.uid;
+        allow update: if isMessageCollaborator(resource.data) && resource.data.senderId == request.auth.uid && request.resource.data.senderId == resource.data.senderId;
+        allow delete: if isMessageCollaborator(resource.data) && resource.data.senderId == request.auth.uid;
+      }
+    }
+  }
+}
