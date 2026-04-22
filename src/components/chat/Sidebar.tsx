@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Search, MoreVertical, Plus, Users, LogOut } from 'lucide-react';
+import { Search, LogOut, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useCollection, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import NewChatDialog from './NewChatDialog';
 
 interface SidebarProps {
   onSelectConversation: (id: string) => void;
@@ -56,9 +57,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => signOut(auth)}>
             <LogOut className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-            <Plus className="h-4 w-4" />
-          </Button>
+          <NewChatDialog onChatCreated={onSelectConversation} />
         </div>
       </div>
 
@@ -88,7 +87,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
             ))}
           </div>
         ) : filteredConversations.length === 0 ? (
-          <div className="p-8 text-center">
+          <div className="p-8 text-center flex flex-col items-center gap-4">
+            <MessageSquare className="h-8 w-8 text-muted-foreground opacity-20" />
             <p className="text-sm text-muted-foreground">No conversations yet.</p>
           </div>
         ) : (
@@ -107,13 +107,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
               >
                 <div className="relative shrink-0">
                   <Avatar className="h-12 w-12 border border-border/50">
-                    <AvatarFallback><Users className="h-6 w-6" /></AvatarFallback>
+                    <AvatarFallback>{room.name?.[0] || 'C'}</AvatarFallback>
                   </Avatar>
                 </div>
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-0.5">
-                    <h3 className="text-sm font-medium truncate pr-2">{room.name || 'Group Chat'}</h3>
+                    <h3 className="text-sm font-medium truncate pr-2">{room.name || 'Chat'}</h3>
                     <span className="text-[10px] text-muted-foreground">
                       {formatDistanceToNow(updatedAt, { addSuffix: false })}
                     </span>
