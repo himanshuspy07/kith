@@ -2,64 +2,77 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, Image as ImageIcon, Phone, Video, Info, Check, CheckCheck } from 'lucide-react';
-import { MOCK_MESSAGES, MOCK_CONVERSATIONS, CURRENT_USER, Message } from '@/lib/mock-data';
+import { Send, Paperclip, Smile, Image as ImageIcon, Phone, Video, Info, Check, CheckCheck, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, serverTimestamp, doc } from 'firebase/firestore';
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 interface ChatWindowProps {
   conversationId?: string;
 }
 
 export default function ChatWindow({ conversationId }: ChatWindowProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user } = useUser();
+  const db = useFirestore();
 
-  const conversation = MOCK_CONVERSATIONS.find(c => c.id === conversationId);
-  const partner = conversation?.participants.find(p => p.id !== CURRENT_USER.id);
-  const chatName = conversation?.type === 'group' ? conversation.name : partner?.name;
+  // Fetch room details
+  const roomRef = useMemoFirebase(() => {
+    if (!db || !conversationId) return null;
+    return doc(db, 'chatRooms', conversationId);
+  }, [db, conversationId]);
+  const { data: room } = useDoc(roomRef);
 
-  useEffect(() => {
-    if (conversationId) {
-      setMessages(MOCK_MESSAGES[conversationId] || []);
-    }
-  }, [conversationId]);
+  // Fetch messages
+  const messagesQuery = useMemoFirebase(() => {
+    if (!db || !conversationId) return null;
+    return query(
+      collection(db, 'chatRooms', conversationId, 'messages'),
+      orderBy('createdAt', 'asc')
+    );
+  }, [db, conversationId]);
+  const { data: messages, isLoading } = useCollection(messagesQuery);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = () => {
-    if (!inputValue.trim() || !conversationId) return;
+    if (!inputValue.trim() || !conversationId || !user || !room) return;
 
-    const newMessage: Message = {
-      id: Math.random().toString(36).substr(2, 9),
-      senderId: CURRENT_USER.id,
-      text: inputValue,
-      timestamp: new Date().toISOString(),
-      status: 'sent',
+    const messageData = {
+      chatRoomId: conversationId,
+      senderId: user.uid,
+      senderName: user.displayName || user.email,
+      senderAvatar: user.photoURL,
+      content: inputValue,
       type: 'text',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      isEdited: false,
+      isDeleted: false,
+      readBy: [user.uid],
+      chatRoomMembers: room.members, // Denormalized for security rules
     };
 
-    setMessages([...messages, newMessage]);
-    setInputValue('');
+    // Add message to subcollection
+    const msgColRef = collection(db, 'chatRooms', conversationId, 'messages');
+    addDocumentNonBlocking(msgColRef, messageData);
 
-    // Simulate reply
-    setTimeout(() => {
-      const reply: Message = {
-        id: Math.random().toString(36).substr(2, 9),
-        senderId: partner?.id || 'bot',
-        text: "I'm working on that right now!",
-        timestamp: new Date().toISOString(),
-        status: 'delivered',
-        type: 'text',
-      };
-      setMessages(prev => [...prev, reply]);
-    }, 1500);
+    // Update room with last message preview
+    const roomDocRef = doc(db, 'chatRooms', conversationId);
+    updateDocumentNonBlocking(roomDocRef, {
+      lastMessageText: inputValue,
+      updatedAt: serverTimestamp(),
+    });
+
+    setInputValue('');
   };
 
   if (!conversationId) {
@@ -82,13 +95,12 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       <div className="h-16 px-6 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={conversation?.type === 'group' ? undefined : partner?.avatar} />
-            <AvatarFallback>{chatName?.[0]}</AvatarFallback>
+            <AvatarFallback>{room?.name?.[0] || 'C'}</AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="text-sm font-semibold">{chatName}</h3>
+            <h3 className="text-sm font-semibold">{room?.name || 'Group Chat'}</h3>
             <p className="text-[10px] text-muted-foreground">
-              {conversation?.type === 'group' ? `${conversation.participants.length} members` : partner?.status === 'online' ? 'Online' : partner?.lastSeen ? `Last seen ${partner.lastSeen}` : 'Offline'}
+              {room?.isGroupChat ? 'Group Conversation' : 'Private Conversation'}
             </p>
           </div>
         </div>
@@ -101,10 +113,14 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide">
-        {messages.map((msg, i) => {
-          const isMe = msg.senderId === CURRENT_USER.id;
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : messages?.map((msg, i) => {
+          const isMe = msg.senderId === user?.uid;
           const showAvatar = i === 0 || messages[i-1].senderId !== msg.senderId;
-          const sender = conversation?.participants.find(p => p.id === msg.senderId);
+          const timestamp = msg.createdAt?.toDate?.() || new Date();
 
           return (
             <div key={msg.id} className={cn("flex items-end gap-2 animate-fade-in", isMe ? "flex-row-reverse" : "flex-row")}>
@@ -112,8 +128,8 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                 <div className="w-8 shrink-0">
                   {showAvatar && (
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={sender?.avatar} />
-                      <AvatarFallback>{sender?.name[0]}</AvatarFallback>
+                      <AvatarImage src={msg.senderAvatar} />
+                      <AvatarFallback>{msg.senderName?.[0] || 'U'}</AvatarFallback>
                     </Avatar>
                   )}
                 </div>
@@ -125,18 +141,18 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                   ? "bg-primary text-primary-foreground rounded-br-none" 
                   : "bg-secondary text-foreground rounded-bl-none"
               )}>
-                {!isMe && conversation?.type === 'group' && showAvatar && (
-                  <p className="text-[10px] font-bold text-accent mb-1 uppercase tracking-tight">{sender?.name}</p>
+                {!isMe && showAvatar && (
+                  <p className="text-[10px] font-bold text-accent mb-1 uppercase tracking-tight">{msg.senderName}</p>
                 )}
-                <p className="leading-relaxed">{msg.text}</p>
+                <p className="leading-relaxed">{msg.content}</p>
                 <div className={cn(
                   "flex items-center justify-end gap-1 mt-1 text-[9px]",
                   isMe ? "text-primary-foreground/70" : "text-muted-foreground"
                 )}>
-                  <span>{format(new Date(msg.timestamp), 'HH:mm')}</span>
+                  <span>{format(timestamp, 'HH:mm')}</span>
                   {isMe && (
                     <span>
-                      {msg.status === 'read' ? <CheckCheck className="h-3 w-3 text-accent" /> : <Check className="h-3 w-3" />}
+                      <CheckCheck className="h-3 w-3" />
                     </span>
                   )}
                 </div>
@@ -176,21 +192,5 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         </div>
       </div>
     </div>
-  );
-}
-
-function MessageSquare({ className }: { className?: string }) {
-  return (
-    <svg 
-      className={className} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    </svg>
   );
 }
