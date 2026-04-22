@@ -1,0 +1,29 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "user-avatar-1",
+      "description": "Professional avatar for a user",
+      "imageUrl": "https://picsum.photos/seed/user1/100/100",
+      "imageHint": "profile avatar"
+    },
+    {
+      "id": "user-avatar-2",
+      "description": "Friendly avatar for a user",
+      "imageUrl": "https://picsum.photos/seed/user2/100/100",
+      "imageHint": "human face"
+    },
+    {
+      "id": "user-avatar-3",
+      "description": "Creative avatar for a user",
+      "imageUrl": "https://picsum.photos/seed/user3/100/100",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "chat-image-1",
+      "description": "Sample shared image in chat",
+      "imageUrl": "https://picsum.photos/seed/chatimg/600/400",
+      "imageHint": "landscape nature"
+    }
+  ]
+}
