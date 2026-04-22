@@ -1,8 +1,7 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2 } from 'lucide-react';
+import { Send, Paperclip, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { generateSmartReplies } from '@/ai/flows/smart-reply-flow';
 
 interface ChatWindowProps {
   conversationId?: string;
@@ -18,6 +18,8 @@ interface ChatWindowProps {
 
 export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
+  const [smartReplies, setSmartReplies] = useState<string[]>([]);
+  const [isGeneratingReplies, setIsGeneratingReplies] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const db = useFirestore();
@@ -42,16 +44,19 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   useEffect(() => {
     if (messages) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Reset smart replies when new messages arrive
+      setSmartReplies([]);
     }
   }, [messages]);
 
-  const handleSend = () => {
-    if (!inputValue.trim() || !conversationId || !user || !room) return;
+  const handleSend = (text: string = inputValue) => {
+    const content = text.trim();
+    if (!content || !conversationId || !user || !room) return;
 
     const messageData = {
       chatRoomId: conversationId,
       senderId: user.uid,
-      content: inputValue,
+      content: content,
       type: 'text',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -59,21 +64,39 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       isDeleted: false,
       readBy: [user.uid],
       reactions: [],
-      chatRoomMembers: room.members || {}, // Denormalized for security rules
+      chatRoomMembers: room.members || {},
     };
 
-    // Add message to subcollection
     const msgColRef = collection(db, 'chatRooms', conversationId, 'messages');
     addDocumentNonBlocking(msgColRef, messageData);
 
-    // Update room with last message preview
     const roomDocRef = doc(db, 'chatRooms', conversationId);
     updateDocumentNonBlocking(roomDocRef, {
-      lastMessageText: inputValue,
+      lastMessageText: content,
       updatedAt: serverTimestamp(),
     });
 
     setInputValue('');
+    setSmartReplies([]);
+  };
+
+  const handleMagicReply = async () => {
+    if (!messages || messages.length === 0) return;
+    
+    setIsGeneratingReplies(true);
+    try {
+      const history = messages.slice(-5).map(m => ({
+        role: m.senderId === user?.uid ? 'user' : 'model' as 'user' | 'model',
+        content: m.content
+      }));
+      
+      const response = await generateSmartReplies({ history });
+      setSmartReplies(response.suggestions);
+    } catch (error) {
+      console.error("Magic Reply error:", error);
+    } finally {
+      setIsGeneratingReplies(false);
+    }
   };
 
   if (!conversationId) {
@@ -96,12 +119,12 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       <div className="h-16 px-6 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 border border-border">
-            <AvatarFallback className="bg-primary/10 text-primary font-bold">
+            <AvatarFallback className="bg-primary/10 text-primary font-bold uppercase">
               {room?.name?.[0] || 'C'}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <h3 className="text-sm font-semibold tracking-tight">{room?.name || 'Loading...'}</h3>
+            <h3 className="text-sm font-semibold tracking-tight truncate max-w-[200px]">{room?.name || 'Loading...'}</h3>
             <div className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
               <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
@@ -131,11 +154,9 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         ) : (
           messages.map((msg, i) => {
             const isMe = msg.senderId === user?.uid;
-            const prevMsg = i > 0 ? messages[i - 1] : null;
             const msgDate = msg.createdAt?.toDate?.() || new Date();
-            const prevMsgDate = prevMsg?.createdAt?.toDate?.() || new Date();
-            
-            const showDateHeader = i === 0 || format(prevMsgDate, 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd');
+            const prevMsg = i > 0 ? messages[i - 1] : null;
+            const showDateHeader = i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd');
 
             return (
               <React.Fragment key={msg.id}>
@@ -153,6 +174,11 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                       ? "bg-primary text-primary-foreground rounded-br-none" 
                       : "bg-card border border-border/50 text-foreground rounded-bl-none"
                   )}>
+                    {!isMe && room?.isGroupChat && (
+                      <p className="text-[10px] font-bold text-accent mb-1 opacity-80 uppercase tracking-tighter">
+                        User {msg.senderId.slice(0, 4)}
+                      </p>
+                    )}
                     <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                     <div className={cn(
                       "flex items-center justify-end gap-1.5 mt-1.5 text-[9px] font-medium opacity-70",
@@ -170,11 +196,39 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Smart Replies */}
+      {smartReplies.length > 0 && (
+        <div className="px-6 py-2 flex flex-wrap gap-2 animate-in slide-in-from-bottom-2 fade-in duration-300">
+          {smartReplies.map((reply, idx) => (
+            <Button
+              key={idx}
+              variant="outline"
+              size="sm"
+              onClick={() => handleSend(reply)}
+              className="rounded-full bg-background/50 hover:bg-primary/10 hover:border-primary/50 text-xs font-medium border-border"
+            >
+              {reply}
+            </Button>
+          ))}
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setSmartReplies([])}>
+            <Wand2 className="h-3 w-3 text-muted-foreground" />
+          </Button>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-4 border-t border-border bg-background/95 backdrop-blur-md">
         <div className="flex items-center gap-3 max-w-5xl mx-auto">
           <div className="flex gap-0.5">
-            <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-accent rounded-full"><Paperclip className="h-5 w-5" /></Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleMagicReply}
+              disabled={isGeneratingReplies || !messages?.length}
+              className={cn("h-10 w-10 rounded-full text-muted-foreground hover:text-primary transition-all", isGeneratingReplies && "animate-pulse")}
+            >
+              {isGeneratingReplies ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+            </Button>
             <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-accent rounded-full"><ImageIcon className="h-5 w-5" /></Button>
           </div>
           <div className="flex-1 relative">
@@ -190,7 +244,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             </button>
           </div>
           <Button 
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={!inputValue.trim()}
             className="rounded-2xl h-12 px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold transition-all active:scale-95"
           >
