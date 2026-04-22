@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -28,9 +29,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get, list: if isSignedIn();
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isOwner(userId);
+      allow create, update, delete: if isOwner(userId);
     }
 
     match /chatRooms/{chatRoomId} {
@@ -46,8 +45,6 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         // Allow listing messages if the user is a member of the parent room.
-        // We use get() here because filtering subcollections by dynamic keys in a Map 
-        // would require complex composite indexes that can't be easily automated.
         allow list: if isSignedIn() && get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
         
         allow get: if isMessageCollaborator(resource.data);
