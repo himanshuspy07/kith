@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2, Sparkles, Wand2 } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { generateSmartReplies } from '@/ai/flows/smart-reply-flow';
 
 interface ChatWindowProps {
   conversationId?: string;
@@ -18,8 +17,6 @@ interface ChatWindowProps {
 
 export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
-  const [smartReplies, setSmartReplies] = useState<string[]>([]);
-  const [isGeneratingReplies, setIsGeneratingReplies] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const db = useFirestore();
@@ -44,8 +41,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   useEffect(() => {
     if (messages) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      // Reset smart replies when new messages arrive
-      setSmartReplies([]);
     }
   }, [messages]);
 
@@ -77,26 +72,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     });
 
     setInputValue('');
-    setSmartReplies([]);
-  };
-
-  const handleMagicReply = async () => {
-    if (!messages || messages.length === 0) return;
-    
-    setIsGeneratingReplies(true);
-    try {
-      const history = messages.slice(-5).map(m => ({
-        role: m.senderId === user?.uid ? 'user' : 'model' as 'user' | 'model',
-        content: m.content
-      }));
-      
-      const response = await generateSmartReplies({ history });
-      setSmartReplies(response.suggestions);
-    } catch (error) {
-      console.error("Magic Reply error:", error);
-    } finally {
-      setIsGeneratingReplies(false);
-    }
   };
 
   if (!conversationId) {
@@ -196,39 +171,10 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Smart Replies */}
-      {smartReplies.length > 0 && (
-        <div className="px-6 py-2 flex flex-wrap gap-2 animate-in slide-in-from-bottom-2 fade-in duration-300">
-          {smartReplies.map((reply, idx) => (
-            <Button
-              key={idx}
-              variant="outline"
-              size="sm"
-              onClick={() => handleSend(reply)}
-              className="rounded-full bg-background/50 hover:bg-primary/10 hover:border-primary/50 text-xs font-medium border-border"
-            >
-              {reply}
-            </Button>
-          ))}
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setSmartReplies([])}>
-            <Wand2 className="h-3 w-3 text-muted-foreground" />
-          </Button>
-        </div>
-      )}
-
       {/* Input */}
       <div className="p-4 border-t border-border bg-background/95 backdrop-blur-md">
         <div className="flex items-center gap-3 max-w-5xl mx-auto">
           <div className="flex gap-0.5">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={handleMagicReply}
-              disabled={isGeneratingReplies || !messages?.length}
-              className={cn("h-10 w-10 rounded-full text-muted-foreground hover:text-primary transition-all", isGeneratingReplies && "animate-pulse")}
-            >
-              {isGeneratingReplies ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-            </Button>
             <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-accent rounded-full"><ImageIcon className="h-5 w-5" /></Button>
           </div>
           <div className="flex-1 relative">
