@@ -1,22 +1,28 @@
+
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Send, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2, Plus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, query, orderBy, serverTimestamp, doc, arrayUnion } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 interface ChatWindowProps {
   conversationId?: string;
 }
 
+const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
 export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [showImageInput, setShowImageInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const db = useFirestore();
@@ -38,21 +44,36 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   }, [db, conversationId]);
   const { data: messages, isLoading } = useCollection(messagesQuery);
 
+  // Mark as read logic
+  useEffect(() => {
+    if (messages && user && conversationId && db) {
+      messages.forEach((msg) => {
+        if (!msg.readBy?.includes(user.uid)) {
+          const msgRef = doc(db, 'chatRooms', conversationId, 'messages', msg.id);
+          updateDocumentNonBlocking(msgRef, {
+            readBy: arrayUnion(user.uid)
+          });
+        }
+      });
+    }
+  }, [messages, user, conversationId, db]);
+
   useEffect(() => {
     if (messages) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
-  const handleSend = (text: string = inputValue) => {
-    const content = text.trim();
+  const handleSend = (type: 'text' | 'image' = 'text') => {
+    const content = type === 'text' ? inputValue.trim() : imageUrl.trim();
     if (!content || !conversationId || !user || !room) return;
 
     const messageData = {
       chatRoomId: conversationId,
       senderId: user.uid,
-      content: content,
-      type: 'text',
+      content: type === 'text' ? content : 'Sent an image',
+      fileUrl: type === 'image' ? content : null,
+      type: type,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       isEdited: false,
@@ -67,11 +88,23 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
     const roomDocRef = doc(db, 'chatRooms', conversationId);
     updateDocumentNonBlocking(roomDocRef, {
-      lastMessageText: content,
+      lastMessageText: type === 'text' ? content : '📷 Image',
       updatedAt: serverTimestamp(),
     });
 
-    setInputValue('');
+    if (type === 'text') setInputValue('');
+    else {
+      setImageUrl('');
+      setShowImageInput(false);
+    }
+  };
+
+  const addReaction = (messageId: string, emoji: string) => {
+    if (!conversationId || !db || !user) return;
+    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', messageId);
+    updateDocumentNonBlocking(msgRef, {
+      reactions: arrayUnion(`${user.uid}:${emoji}`)
+    });
   };
 
   if (!conversationId) {
@@ -154,13 +187,58 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                         User {msg.senderId.slice(0, 4)}
                       </p>
                     )}
-                    <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    
+                    {msg.type === 'image' && msg.fileUrl ? (
+                      <img src={msg.fileUrl} alt="shared" className="rounded-lg mb-2 max-h-60 w-full object-cover border border-border/20 shadow-sm" />
+                    ) : (
+                      <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    )}
+
                     <div className={cn(
                       "flex items-center justify-end gap-1.5 mt-1.5 text-[9px] font-medium opacity-70",
                       isMe ? "text-primary-foreground/90" : "text-muted-foreground"
                     )}>
                       <span>{format(msgDate, 'HH:mm')}</span>
-                      {isMe && <CheckCheck className="h-3 w-3" />}
+                      {isMe && <CheckCheck className={cn("h-3 w-3", msg.readBy?.length > 1 ? "text-accent" : "")} />}
+                    </div>
+
+                    {/* Reaction Display */}
+                    {msg.reactions?.length > 0 && (
+                      <div className={cn(
+                        "absolute -bottom-3 flex gap-1",
+                        isMe ? "right-0" : "left-0"
+                      )}>
+                        {Array.from(new Set(msg.reactions.map((r: string) => r.split(':')[1]))).map((emoji: any) => (
+                          <span key={emoji} className="bg-background border border-border rounded-full px-1.5 py-0.5 text-[10px] shadow-sm">
+                            {emoji}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Reaction Trigger */}
+                    <div className={cn(
+                      "absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                      isMe ? "-left-10" : "-right-10"
+                    )}>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50">
+                            <Smile className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-1 rounded-full flex gap-1 border-border">
+                          {EMOJIS.map(emoji => (
+                            <button 
+                              key={emoji} 
+                              onClick={() => addReaction(msg.id, emoji)}
+                              className="hover:scale-125 transition-transform p-1 text-lg"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
                 </div>
@@ -173,9 +251,30 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
       {/* Input */}
       <div className="p-4 border-t border-border bg-background/95 backdrop-blur-md">
+        {showImageInput && (
+          <div className="max-w-5xl mx-auto mb-4 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex gap-2">
+              <Input 
+                placeholder="Paste image URL..." 
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                className="bg-muted/40 border-none h-10 rounded-xl"
+              />
+              <Button onClick={() => handleSend('image')} size="sm" className="rounded-xl h-10">Add</Button>
+              <Button onClick={() => setShowImageInput(false)} variant="ghost" size="sm" className="rounded-xl h-10">Cancel</Button>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-3 max-w-5xl mx-auto">
           <div className="flex gap-0.5">
-            <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-accent rounded-full"><ImageIcon className="h-5 w-5" /></Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setShowImageInput(!showImageInput)}
+              className={cn("h-10 w-10 rounded-full transition-colors", showImageInput ? "text-accent bg-accent/10" : "text-muted-foreground hover:text-accent")}
+            >
+              <ImageIcon className="h-5 w-5" />
+            </Button>
           </div>
           <div className="flex-1 relative">
             <Input 
@@ -185,9 +284,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
               placeholder="Start typing..."
               className="pr-12 bg-muted/40 border-none h-12 focus-visible:ring-2 focus-visible:ring-primary/20 rounded-2xl"
             />
-            <button className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-accent transition-colors">
-              <Smile className="h-5 w-5" />
-            </button>
           </div>
           <Button 
             onClick={() => handleSend()}

@@ -1,16 +1,19 @@
 
 "use client";
 
-import React, { useState } from 'react';
-import { Search, LogOut, MessageSquare } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, LogOut, MessageSquare, Settings, User } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { useCollection, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import NewChatDialog from './NewChatDialog';
 
 interface SidebarProps {
@@ -20,12 +23,16 @@ interface SidebarProps {
 
 export default function Sidebar({ onSelectConversation, selectedConversationId }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { user } = useUser();
   const db = useFirestore();
   const auth = useAuth();
 
-  // Query chat rooms where the user is a member. 
-  // We use a simple query first to avoid permission/index errors.
+  // Settings State
+  const [newUsername, setNewUsername] = useState('');
+  const [newAvatar, setNewAvatar] = useState('');
+
+  // Query chat rooms where the user is a member
   const roomsQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(
@@ -36,8 +43,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
 
   const { data: rooms, isLoading } = useCollection(roomsQuery);
 
-  // Sorting client-side for now to ensure reliability without needing custom indexes immediately
-  const sortedRooms = React.useMemo(() => {
+  const sortedRooms = useMemo(() => {
     if (!rooms) return [];
     return [...rooms].sort((a, b) => {
       const timeA = a.updatedAt?.toDate?.()?.getTime() || 0;
@@ -49,6 +55,17 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
   const filteredConversations = sortedRooms.filter(room => {
     return room.name?.toLowerCase().includes(searchQuery.toLowerCase());
   });
+
+  const handleUpdateProfile = () => {
+    if (!user || !db) return;
+    const userRef = doc(db, 'users', user.uid);
+    updateDocumentNonBlocking(userRef, {
+      username: newUsername || user.displayName || user.email?.split('@')[0],
+      profilePictureUrl: newAvatar || user.photoURL,
+      updatedAt: new Date().toISOString()
+    });
+    setIsSettingsOpen(false);
+  };
 
   return (
     <div className="w-80 h-full border-r border-border flex flex-col bg-background/50 backdrop-blur-sm">
@@ -64,9 +81,52 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
           </div>
         </div>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => signOut(auth)}>
-            <LogOut className="h-4 w-4" />
-          </Button>
+          <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle>Profile Settings</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="flex justify-center mb-4">
+                  <Avatar className="h-20 w-20 border-2 border-primary/20">
+                    <AvatarImage src={newAvatar || user?.photoURL || undefined} />
+                    <AvatarFallback className="text-2xl font-bold">{user?.email?.[0].toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="set-username">Display Name</Label>
+                  <Input 
+                    id="set-username" 
+                    placeholder="Enter new username" 
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    className="bg-muted/30 border-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="set-avatar">Avatar URL</Label>
+                  <Input 
+                    id="set-avatar" 
+                    placeholder="https://..." 
+                    value={newAvatar}
+                    onChange={(e) => setNewAvatar(e.target.value)}
+                    className="bg-muted/30 border-none"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => signOut(auth)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                  <LogOut className="h-4 w-4 mr-2" /> Sign Out
+                </Button>
+                <Button onClick={handleUpdateProfile}>Save Changes</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <NewChatDialog onChatCreated={onSelectConversation} />
         </div>
       </div>
@@ -105,6 +165,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
           filteredConversations.map((room) => {
             const isSelected = selectedConversationId === room.id;
             const updatedAt = room.updatedAt?.toDate?.() || new Date();
+            // Check for unread
+            const isUnread = room.lastMessageText && room.lastMessageSenderId !== user?.uid && (!room.readBy?.includes(user?.uid));
 
             return (
               <button
@@ -119,17 +181,22 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                   <Avatar className="h-12 w-12 border border-border/50">
                     <AvatarFallback>{room.name?.[0] || 'C'}</AvatarFallback>
                   </Avatar>
+                  {isUnread && (
+                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-accent rounded-full border-2 border-background shadow-sm" />
+                  )}
                 </div>
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-0.5">
-                    <h3 className="text-sm font-medium truncate pr-2">{room.name || 'Chat'}</h3>
-                    <span className="text-[10px] text-muted-foreground">
+                    <h3 className={cn("text-sm truncate pr-2", isUnread ? "font-bold" : "font-medium")}>
+                      {room.name || 'Chat'}
+                    </h3>
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                       {formatDistanceToNow(updatedAt, { addSuffix: false })}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <p className="text-xs text-muted-foreground truncate italic">
+                    <p className={cn("text-xs truncate", isUnread ? "text-foreground font-medium" : "text-muted-foreground italic")}>
                       {room.lastMessageText || 'No messages yet'}
                     </p>
                   </div>
