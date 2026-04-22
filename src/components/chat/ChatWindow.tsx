@@ -40,7 +40,9 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const { data: messages, isLoading } = useCollection(messagesQuery);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const handleSend = () => {
@@ -57,7 +59,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       isDeleted: false,
       readBy: [user.uid],
       reactions: [],
-      chatRoomMembers: room.members, // Denormalized for security rules
+      chatRoomMembers: room.members || {}, // Denormalized for security rules
     };
 
     // Add message to subcollection
@@ -130,15 +132,17 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           messages.map((msg, i) => {
             const isMe = msg.senderId === user?.uid;
             const prevMsg = i > 0 ? messages[i - 1] : null;
-            const showDateHeader = i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd') !== format(msg.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd');
-            const timestamp = msg.createdAt?.toDate?.() || new Date();
+            const msgDate = msg.createdAt?.toDate?.() || new Date();
+            const prevMsgDate = prevMsg?.createdAt?.toDate?.() || new Date();
+            
+            const showDateHeader = i === 0 || format(prevMsgDate, 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd');
 
             return (
               <React.Fragment key={msg.id}>
                 {showDateHeader && (
                   <div className="flex justify-center my-6">
                     <span className="px-3 py-1 rounded-full bg-muted/50 text-[10px] text-muted-foreground font-bold uppercase tracking-widest border border-border/30">
-                      {format(timestamp, 'MMMM d, yyyy')}
+                      {format(msgDate, 'MMMM d, yyyy')}
                     </span>
                   </div>
                 )}
@@ -154,7 +158,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                       "flex items-center justify-end gap-1.5 mt-1.5 text-[9px] font-medium opacity-70",
                       isMe ? "text-primary-foreground/90" : "text-muted-foreground"
                     )}>
-                      <span>{format(timestamp, 'HH:mm')}</span>
+                      <span>{format(msgDate, 'HH:mm')}</span>
                       {isMe && <CheckCheck className="h-3 w-3" />}
                     </div>
                   </div>

@@ -35,6 +35,7 @@ service cloud.firestore {
 
     match /chatRooms/{chatRoomId} {
       // Allow list and get if user is in the members map
+      // For listing, the query must include a where('members.' + uid, '==', true) filter
       allow list, get: if isRoomMember(resource.data);
       
       // Allow creation if the user is including themselves as a member
@@ -44,10 +45,17 @@ service cloud.firestore {
       allow update, delete: if isRoomMember(resource.data);
 
       match /messages/{messageId} {
-        allow get, list: if isMessageCollaborator(resource.data);
+        // Allow listing messages if the user is a member of the parent room.
+        // We use get() here because filtering subcollections by dynamic keys in a Map 
+        // would require complex composite indexes that can't be easily automated.
+        allow list: if isSignedIn() && get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
+        
+        allow get: if isMessageCollaborator(resource.data);
+        
         allow create: if isSignedIn() 
           && request.resource.data.chatRoomMembers[request.auth.uid] == true 
           && request.resource.data.senderId == request.auth.uid;
+          
         allow update, delete: if isMessageCollaborator(resource.data) 
           && resource.data.senderId == request.auth.uid;
       }
