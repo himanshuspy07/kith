@@ -5,6 +5,7 @@ import Sidebar from '@/components/chat/Sidebar';
 import ChatWindow from '@/components/chat/ChatWindow';
 import AuthScreen from '@/components/auth/AuthScreen';
 import UserProfileSync from '@/components/chat/UserProfileSync';
+import BrandLogo from '@/components/ui/brand-logo';
 import { useUser } from '@/firebase';
 
 export default function Home() {
@@ -14,9 +15,12 @@ export default function Home() {
   if (isUserLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="animate-pulse flex flex-col items-center gap-4">
-          <div className="h-12 w-12 rounded-full bg-primary/20 border-2 border-primary animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading Kith...</p>
+        <div className="flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-500">
+          <BrandLogo size="lg" showText={false} className="animate-bounce" />
+          <div className="flex flex-col items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tighter">Kith</h1>
+            <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] font-medium animate-pulse">Initializing...</p>
+          </div>
         </div>
       </div>
     );

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -8,8 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { useAuth, useFirestore } from '@/firebase';
 import { initiateEmailSignIn, initiateEmailSignUp } from '@/firebase/non-blocking-login';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { MessageSquare } from 'lucide-react';
+import BrandLogo from '@/components/ui/brand-logo';
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -25,69 +23,76 @@ export default function AuthScreen() {
       initiateEmailSignIn(auth, email, password);
     } else {
       initiateEmailSignUp(auth, email, password);
-      // Note: User creation in Firestore is usually handled by an auth listener or after sign up
-      // For MVP, we assume the user profile will be initialized on their first visit/login if it doesn't exist
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md border-border bg-card shadow-2xl">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto h-12 w-12 rounded-xl bg-primary flex items-center justify-center mb-2">
-            <MessageSquare className="h-6 w-6 text-primary-foreground" />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.05),transparent_50%)]" />
+      
+      <Card className="w-full max-w-md border-border/50 bg-card/50 backdrop-blur-xl shadow-2xl relative z-10">
+        <CardHeader className="text-center space-y-4 pt-10">
+          <BrandLogo size="lg" className="justify-center" />
+          <div className="space-y-1">
+            <CardTitle className="text-2xl font-bold tracking-tight">
+              {isLogin ? 'Welcome Back' : 'Create Account'}
+            </CardTitle>
+            <CardDescription className="text-muted-foreground/80">
+              {isLogin ? 'Enter your credentials to access your chats' : 'Join Kith and start connecting simply'}
+            </CardDescription>
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
-          </CardTitle>
-          <CardDescription>
-            {isLogin ? 'Enter your credentials to access your chats' : 'Join Kith and start connecting simply'}
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username" className="text-xs uppercase tracking-widest font-bold opacity-70">Username</Label>
                 <Input 
                   id="username" 
                   placeholder="johndoe" 
                   value={username} 
                   onChange={(e) => setUsername(e.target.value)}
+                  className="bg-muted/50 border-none h-11"
                   required 
                 />
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-xs uppercase tracking-widest font-bold opacity-70">Email</Label>
               <Input 
                 id="email" 
                 type="email" 
                 placeholder="m@example.com" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)}
+                className="bg-muted/50 border-none h-11"
                 required 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-xs uppercase tracking-widest font-bold opacity-70">Password</Label>
               <Input 
                 id="password" 
                 type="password" 
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)}
+                className="bg-muted/50 border-none h-11"
                 required 
               />
             </div>
-            <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90">
+            <Button type="submit" className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 mt-2">
               {isLogin ? 'Sign In' : 'Create Account'}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center border-t border-border pt-6">
-          <Button variant="link" onClick={() => setIsLogin(!isLogin)} className="text-sm">
+        <CardFooter className="flex flex-col gap-4 border-t border-border/30 pt-6">
+          <Button variant="link" onClick={() => setIsLogin(!isLogin)} className="text-sm text-muted-foreground hover:text-primary transition-colors">
             {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
           </Button>
+          <p className="text-[10px] text-muted-foreground/50 uppercase tracking-[0.2em] font-medium">
+            &copy; 2024 Kith Messaging
+          </p>
         </CardFooter>
       </Card>
     </div>
