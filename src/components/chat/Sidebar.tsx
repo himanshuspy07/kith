@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
-import { useCollection, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
+import { useCollection, useDoc, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc, limit } from 'firebase/firestore';
 import { signOut, updateProfile } from 'firebase/auth';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -37,6 +37,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
   // Settings State
   const [newUsername, setNewUsername] = useState('');
   const [newAvatar, setNewAvatar] = useState('');
+
+  // Fetch current user's Firestore profile to get the latest photo/name
+  const currentUserRef = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return doc(db, 'users', user.uid);
+  }, [db, user?.uid]);
+  const { data: currentUserProfile } = useDoc(currentUserRef);
 
   // Initial theme check
   useEffect(() => {
@@ -110,28 +117,30 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
   const handleUpdateProfile = async () => {
     if (!user || !db) return;
     
-    // 1. Update Auth Profile for instant UI update in current session
+    // 1. Update Auth Profile (Display Name only)
+    // We skip photoURL here because Base64 strings are too long for Firebase Auth attributes
     try {
-      await updateProfile(user, {
-        displayName: newUsername || user.displayName,
-        photoURL: newAvatar || user.photoURL
-      });
+      if (newUsername) {
+        await updateProfile(user, {
+          displayName: newUsername
+        });
+      }
     } catch (e) {
-      console.error("Failed to update auth profile", e);
+      console.error("Failed to update auth display name", e);
     }
 
-    // 2. Update Firestore for other users to see
+    // 2. Update Firestore (Primary store for profile pictures and usernames)
     const userRef = doc(db, 'users', user.uid);
     updateDocumentNonBlocking(userRef, {
-      username: newUsername || user.displayName || user.email?.split('@')[0],
-      profilePictureUrl: newAvatar || user.photoURL,
+      username: newUsername || currentUserProfile?.username || user.email?.split('@')[0],
+      profilePictureUrl: newAvatar || currentUserProfile?.profilePictureUrl,
       updatedAt: new Date().toISOString()
     });
     
     setIsSettingsOpen(false);
     toast({
       title: "Profile updated",
-      description: "Your changes have been saved successfully.",
+      description: "Your changes have been saved to your profile.",
     });
   };
 
@@ -170,20 +179,28 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
       <div className="p-4 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9 border border-primary/20">
-            <AvatarImage src={user?.photoURL || undefined} />
-            <AvatarFallback>{user?.displayName?.[0] || user?.email?.[0] || 'U'}</AvatarFallback>
+            <AvatarImage src={currentUserProfile?.profilePictureUrl || undefined} />
+            <AvatarFallback>{currentUserProfile?.username?.[0] || user?.email?.[0] || 'U'}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="font-semibold text-sm truncate max-w-[100px]">{user?.displayName || 'Kith'}</span>
+            <span className="font-semibold text-sm truncate max-w-[100px]">{currentUserProfile?.username || 'Kith'}</span>
             <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">{user?.email}</span>
           </div>
         </div>
         <div className="flex gap-1">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            onClick={() => signOut(auth)}
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
           <Dialog open={isSettingsOpen} onOpenChange={(open) => {
             setIsSettingsOpen(open);
-            if (open && user) {
-              setNewUsername(user.displayName || '');
-              setNewAvatar(user.photoURL || '');
+            if (open && currentUserProfile) {
+              setNewUsername(currentUserProfile.username || '');
+              setNewAvatar(currentUserProfile.profilePictureUrl || '');
             }
           }}>
             <DialogTrigger asChild>
@@ -199,7 +216,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                 <div className="flex flex-col items-center gap-4 mb-4">
                   <div className="relative group">
                     <Avatar className="h-24 w-24 border-2 border-primary/20">
-                      <AvatarImage src={newAvatar || user?.photoURL || undefined} />
+                      <AvatarImage src={newAvatar || currentUserProfile?.profilePictureUrl || undefined} />
                       <AvatarFallback className="text-2xl font-bold">{user?.email?.[0].toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <Button 
@@ -239,11 +256,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                   </Button>
                 </div>
               </div>
-              <DialogFooter className="flex-col sm:flex-row gap-2">
-                <Button variant="ghost" onClick={() => signOut(auth)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                  <LogOut className="h-4 w-4 mr-2" /> Sign Out
-                </Button>
-                <Button onClick={handleUpdateProfile} disabled={isUploading}>Save Changes</Button>
+              <DialogFooter>
+                <Button onClick={handleUpdateProfile} disabled={isUploading} className="w-full sm:w-auto">Save Changes</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
