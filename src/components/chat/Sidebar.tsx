@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
-import { Search, LogOut, MessageSquare, Settings, User } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { collection, query, where, doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import NewChatDialog from './NewChatDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface SidebarProps {
   onSelectConversation: (id: string) => void;
@@ -24,9 +25,12 @@ interface SidebarProps {
 export default function Sidebar({ onSelectConversation, selectedConversationId }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const db = useFirestore();
   const auth = useAuth();
+  const { toast } = useToast();
 
   // Settings State
   const [newUsername, setNewUsername] = useState('');
@@ -67,6 +71,36 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
     setIsSettingsOpen(false);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+      toast({
+        variant: "destructive",
+        title: "File too large",
+        description: "Please select an image smaller than 1MB.",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewAvatar(reader.result as string);
+      setIsUploading(false);
+    };
+    reader.onerror = () => {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: "Could not process the image.",
+      });
+      setIsUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="w-80 h-full border-r border-border flex flex-col bg-background/50 backdrop-blur-sm">
       <div className="p-4 flex items-center justify-between border-b border-border">
@@ -81,7 +115,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
           </div>
         </div>
         <div className="flex gap-1">
-          <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+          <Dialog open={isSettingsOpen} onOpenChange={(open) => {
+            setIsSettingsOpen(open);
+            if (open && user) {
+              setNewUsername(user.displayName || '');
+              setNewAvatar(user.photoURL || '');
+            }
+          }}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
                 <Settings className="h-4 w-4" />
@@ -92,11 +132,30 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                 <DialogTitle>Profile Settings</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="flex justify-center mb-4">
-                  <Avatar className="h-20 w-20 border-2 border-primary/20">
-                    <AvatarImage src={newAvatar || user?.photoURL || undefined} />
-                    <AvatarFallback className="text-2xl font-bold">{user?.email?.[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
+                <div className="flex flex-col items-center gap-4 mb-4">
+                  <div className="relative group">
+                    <Avatar className="h-24 w-24 border-2 border-primary/20">
+                      <AvatarImage src={newAvatar || user?.photoURL || undefined} />
+                      <AvatarFallback className="text-2xl font-bold">{user?.email?.[0].toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <Button 
+                      size="icon" 
+                      variant="secondary" 
+                      className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-lg"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    </Button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={handleFileChange} 
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Change Profile Photo</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="set-username">Display Name</Label>
@@ -108,22 +167,12 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                     className="bg-muted/30 border-none"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="set-avatar">Avatar URL</Label>
-                  <Input 
-                    id="set-avatar" 
-                    placeholder="https://..." 
-                    value={newAvatar}
-                    onChange={(e) => setNewAvatar(e.target.value)}
-                    className="bg-muted/30 border-none"
-                  />
-                </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button variant="ghost" onClick={() => signOut(auth)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
                   <LogOut className="h-4 w-4 mr-2" /> Sign Out
                 </Button>
-                <Button onClick={handleUpdateProfile}>Save Changes</Button>
+                <Button onClick={handleUpdateProfile} disabled={isUploading}>Save Changes</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -165,7 +214,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
           filteredConversations.map((room) => {
             const isSelected = selectedConversationId === room.id;
             const updatedAt = room.updatedAt?.toDate?.() || new Date();
-            // Check for unread
             const isUnread = room.lastMessageText && room.lastMessageSenderId !== user?.uid && (!room.readBy?.includes(user?.uid));
 
             return (

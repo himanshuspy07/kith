@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2, Plus } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2, Plus, Upload } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, arrayUnion } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatWindowProps {
   conversationId?: string;
@@ -21,11 +22,12 @@ const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
 export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [showImageInput, setShowImageInput] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const db = useFirestore();
+  const { toast } = useToast();
 
   // Fetch room details
   const roomRef = useMemoFirebase(() => {
@@ -64,8 +66,8 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     }
   }, [messages]);
 
-  const handleSend = (type: 'text' | 'image' = 'text') => {
-    const content = type === 'text' ? inputValue.trim() : imageUrl.trim();
+  const handleSend = (type: 'text' | 'image' = 'text', contentString?: string) => {
+    const content = contentString || inputValue.trim();
     if (!content || !conversationId || !user || !room) return;
 
     const messageData = {
@@ -89,14 +91,43 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     const roomDocRef = doc(db, 'chatRooms', conversationId);
     updateDocumentNonBlocking(roomDocRef, {
       lastMessageText: type === 'text' ? content : '📷 Image',
+      lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
+      readBy: [user.uid]
     });
 
     if (type === 'text') setInputValue('');
-    else {
-      setImageUrl('');
-      setShowImageInput(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 800 * 1024) { // Roughly 800KB to stay safe within Firestore doc limits after base64
+      toast({
+        variant: "destructive",
+        title: "File too large",
+        description: "Please select an image smaller than 800KB for chat.",
+      });
+      return;
     }
+
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      handleSend('image', reader.result as string);
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.onerror = () => {
+      toast({
+        variant: "destructive",
+        title: "Failed to send image",
+        description: "Could not process the file.",
+      });
+      setIsUploading(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   const addReaction = (messageId: string, emoji: string) => {
@@ -251,30 +282,24 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
       {/* Input */}
       <div className="p-4 border-t border-border bg-background/95 backdrop-blur-md">
-        {showImageInput && (
-          <div className="max-w-5xl mx-auto mb-4 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex gap-2">
-              <Input 
-                placeholder="Paste image URL..." 
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                className="bg-muted/40 border-none h-10 rounded-xl"
-              />
-              <Button onClick={() => handleSend('image')} size="sm" className="rounded-xl h-10">Add</Button>
-              <Button onClick={() => setShowImageInput(false)} variant="ghost" size="sm" className="rounded-xl h-10">Cancel</Button>
-            </div>
-          </div>
-        )}
         <div className="flex items-center gap-3 max-w-5xl mx-auto">
           <div className="flex gap-0.5">
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => setShowImageInput(!showImageInput)}
-              className={cn("h-10 w-10 rounded-full transition-colors", showImageInput ? "text-accent bg-accent/10" : "text-muted-foreground hover:text-accent")}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="h-10 w-10 rounded-full text-muted-foreground hover:text-accent transition-colors"
             >
-              <ImageIcon className="h-5 w-5" />
+              {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
             </Button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*" 
+              onChange={handleFileChange} 
+            />
           </div>
           <div className="flex-1 relative">
             <Input 
@@ -287,7 +312,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           </div>
           <Button 
             onClick={() => handleSend()}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() || isUploading}
             className="rounded-2xl h-12 px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold transition-all active:scale-95"
           >
             <Send className="h-4 w-4 mr-2" />
