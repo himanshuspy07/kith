@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, deleteField, where, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, deleteField, where } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 
@@ -140,62 +140,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     if (type === 'text') setInputValue('');
   };
 
-  const startCall = async (type: 'audio' | 'video') => {
-    if (!db || !user || !conversationId || !room) return;
-    
-    const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
-    if (!otherUserId) {
-      toast({
-        title: "Call not available",
-        description: "Calling is only supported for private 1-on-1 chats currently.",
-      });
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: type === 'video', 
-        audio: true 
-      });
-
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-      });
-
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      const callData = {
-        callerId: user.uid,
-        callerName: user.displayName || 'Friend',
-        receiverId: otherUserId,
-        type: type,
-        status: 'ringing',
-        offer: {
-          type: offer.type,
-          sdp: offer.sdp,
-        },
-        roomId: conversationId,
-        createdAt: serverTimestamp(),
-      };
-
-      const callRef = await addDoc(collection(db, 'calls'), callData);
-      
-      // We don't need to pass the PC elsewhere as the CallManager will pick up the local call
-      // Actually, for the caller, we should probably mark it in local state.
-      // CallManager will handle it by listening to 'calls' where callerId == user.uid && status == 'ringing'
-    } catch (e) {
-      console.error(e);
-      toast({
-        variant: 'destructive',
-        title: 'Call failed',
-        description: 'Could not access camera or microphone.',
-      });
-    }
-  };
-
   const isOtherTyping = () => {
     if (!room?.typing) return false;
     const now = Date.now();
@@ -246,22 +190,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-muted-foreground hover:bg-muted/50"
-            onClick={() => startCall('audio')}
-          >
-            <Phone className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-muted-foreground hover:bg-muted/50"
-            onClick={() => startCall('video')}
-          >
-            <Video className="h-4 w-4" />
-          </Button>
           <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-muted/50"><Info className="h-4 w-4" /></Button>
         </div>
       </div>
