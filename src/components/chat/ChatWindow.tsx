@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, deleteField } from 'firebase/firestore';
-import { addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, deleteField, where } from 'firebase/firestore';
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 
 interface ChatWindowProps {
@@ -42,6 +42,26 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   }, [db, conversationId]);
   const { data: room } = useDoc(roomRef);
 
+  // Fetch all users who are members of this room to resolve their display names and avatars
+  const participantsQuery = useMemoFirebase(() => {
+    if (!db || !room?.memberIds) return null;
+    // Note: 'where in' supports up to 30 IDs, which is fine for most group chats
+    return query(
+      collection(db, 'users'),
+      where('id', 'in', room.memberIds)
+    );
+  }, [db, room?.memberIds]);
+  const { data: participants } = useCollection(participantsQuery);
+
+  // Map participant data for easy lookup
+  const participantMap = React.useMemo(() => {
+    const map: Record<string, any> = {};
+    participants?.forEach(u => {
+      map[u.id] = u;
+    });
+    return map;
+  }, [participants]);
+
   // Fetch messages
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
@@ -51,6 +71,25 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     );
   }, [db, conversationId]);
   const { data: messages, isLoading } = useCollection(messagesQuery);
+
+  // Determine chat name dynamically if 1-on-1
+  const chatDisplayName = React.useMemo(() => {
+    if (!room) return 'Loading...';
+    if (!room.isGroupChat && participants && user) {
+      const otherUser = participants.find(p => p.id !== user.uid);
+      if (otherUser) return otherUser.username;
+    }
+    return room.name || 'Chat';
+  }, [room, participants, user]);
+
+  const chatDisplayAvatar = React.useMemo(() => {
+    if (!room) return null;
+    if (!room.isGroupChat && participants && user) {
+      const otherUser = participants.find(p => p.id !== user.uid);
+      if (otherUser) return otherUser.profilePictureUrl;
+    }
+    return null;
+  }, [room, participants, user]);
 
   // Typing logic
   const handleTyping = () => {
@@ -118,7 +157,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
       readBy: [user.uid],
-      [`typing.${user.uid}`]: deleteField() // Stop typing when sent
+      [`typing.${user.uid}`]: deleteField()
     });
 
     if (type === 'text') setInputValue('');
@@ -184,11 +223,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     });
   };
 
-  const getOtherParticipants = () => {
-    if (!room || !user) return [];
-    return Object.keys(room.members || {}).filter(uid => uid !== user.uid);
-  };
-
   const isOtherTyping = () => {
     if (!room?.typing) return false;
     const now = Date.now();
@@ -219,12 +253,13 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       <div className="h-16 px-6 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 border border-border">
+            {chatDisplayAvatar && <AvatarImage src={chatDisplayAvatar} />}
             <AvatarFallback className="bg-primary/10 text-primary font-bold uppercase">
-              {room?.name?.[0] || 'C'}
+              {chatDisplayName?.[0] || 'C'}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <h3 className="text-sm font-semibold tracking-tight truncate max-w-[200px]">{room?.name || 'Loading...'}</h3>
+            <h3 className="text-sm font-semibold tracking-tight truncate max-w-[200px]">{chatDisplayName}</h3>
             {isOtherTyping() ? (
               <p className="text-[10px] text-accent animate-pulse font-bold uppercase tracking-widest">Typing...</p>
             ) : (
@@ -258,6 +293,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         ) : (
           messages.map((msg, i) => {
             const isMe = msg.senderId === user?.uid;
+            const senderProfile = participantMap[msg.senderId];
             const msgDate = msg.createdAt?.toDate?.() || new Date();
             const prevMsg = i > 0 ? messages[i - 1] : null;
             const showDateHeader = i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd');
@@ -272,6 +308,12 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                   </div>
                 )}
                 <div className={cn("flex items-end gap-2 group", isMe ? "flex-row-reverse" : "flex-row")}>
+                  {!isMe && (
+                    <Avatar className="h-8 w-8 shrink-0 border border-border/50">
+                      <AvatarImage src={senderProfile?.profilePictureUrl} />
+                      <AvatarFallback className="text-[10px]">{senderProfile?.username?.[0] || '?'}</AvatarFallback>
+                    </Avatar>
+                  )}
                   <div className={cn(
                     "max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-md transition-all group-hover:shadow-lg relative",
                     isMe 
@@ -281,7 +323,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                   )}>
                     {!isMe && room?.isGroupChat && (
                       <p className="text-[10px] font-bold text-accent mb-1 opacity-80 uppercase tracking-tighter">
-                        User {msg.senderId.slice(0, 4)}
+                        {senderProfile?.username || `User ${msg.senderId.slice(0, 4)}`}
                       </p>
                     )}
                     

@@ -11,8 +11,8 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { useCollection, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import { collection, query, where, doc, limit } from 'firebase/firestore';
+import { signOut, updateProfile } from 'firebase/auth';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import NewChatDialog from './NewChatDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -65,6 +65,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
 
   const { data: rooms, isLoading } = useCollection(roomsQuery);
 
+  // Fetch all users to resolve names and avatars in the sidebar (for 1-on-1 chats)
+  const allUsersQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, 'users');
+  }, [db]);
+  const { data: allUsers } = useCollection(allUsersQuery);
+
   const sortedRooms = useMemo(() => {
     if (!rooms) return [];
     return [...rooms].sort((a, b) => {
@@ -74,19 +81,58 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
     });
   }, [rooms]);
 
-  const filteredConversations = sortedRooms.filter(room => {
-    return room.name?.toLowerCase().includes(searchQuery.toLowerCase());
+  const conversationListData = useMemo(() => {
+    return sortedRooms.map(room => {
+      let displayName = room.name || 'Chat';
+      let displayAvatar = null;
+
+      if (!room.isGroupChat && allUsers && user) {
+        const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
+        const otherUser = allUsers.find(u => u.id === otherUserId);
+        if (otherUser) {
+          displayName = otherUser.username;
+          displayAvatar = otherUser.profilePictureUrl;
+        }
+      }
+
+      return {
+        ...room,
+        displayName,
+        displayAvatar
+      };
+    });
+  }, [sortedRooms, allUsers, user]);
+
+  const filteredConversations = conversationListData.filter(room => {
+    return room.displayName?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const handleUpdateProfile = () => {
+  const handleUpdateProfile = async () => {
     if (!user || !db) return;
+    
+    // 1. Update Auth Profile for instant UI update in current session
+    try {
+      await updateProfile(user, {
+        displayName: newUsername || user.displayName,
+        photoURL: newAvatar || user.photoURL
+      });
+    } catch (e) {
+      console.error("Failed to update auth profile", e);
+    }
+
+    // 2. Update Firestore for other users to see
     const userRef = doc(db, 'users', user.uid);
     updateDocumentNonBlocking(userRef, {
       username: newUsername || user.displayName || user.email?.split('@')[0],
       profilePictureUrl: newAvatar || user.photoURL,
       updatedAt: new Date().toISOString()
     });
+    
     setIsSettingsOpen(false);
+    toast({
+      title: "Profile updated",
+      description: "Your changes have been saved successfully.",
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,7 +174,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
             <AvatarFallback>{user?.displayName?.[0] || user?.email?.[0] || 'U'}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="font-semibold text-sm">Kith</span>
+            <span className="font-semibold text-sm truncate max-w-[100px]">{user?.displayName || 'Kith'}</span>
             <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">{user?.email}</span>
           </div>
         </div>
@@ -202,15 +248,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
             </DialogContent>
           </Dialog>
           <NewChatDialog onChatCreated={onSelectConversation} />
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors"
-            onClick={() => signOut(auth)}
-            title="Sign Out"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
@@ -261,7 +298,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
               >
                 <div className="relative shrink-0">
                   <Avatar className="h-12 w-12 border border-border/50">
-                    <AvatarFallback>{room.name?.[0] || 'C'}</AvatarFallback>
+                    {room.displayAvatar && <AvatarImage src={room.displayAvatar} />}
+                    <AvatarFallback>{room.displayName?.[0] || 'C'}</AvatarFallback>
                   </Avatar>
                   {isUnread && (
                     <span className="absolute -top-1 -right-1 h-3 w-3 bg-accent rounded-full border-2 border-background shadow-sm" />
@@ -271,7 +309,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-0.5">
                     <h3 className={cn("text-sm truncate pr-2", isUnread ? "font-bold" : "font-medium")}>
-                      {room.name || 'Chat'}
+                      {room.displayName}
                     </h3>
                     <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                       {formatDistanceToNow(updatedAt, { addSuffix: false })}
