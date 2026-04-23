@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -6,6 +5,7 @@ import Sidebar from '@/components/chat/Sidebar';
 import ChatWindow from '@/components/chat/ChatWindow';
 import AuthScreen from '@/components/auth/AuthScreen';
 import UserProfileSync from '@/components/chat/UserProfileSync';
+import CallManager from '@/components/chat/CallManager';
 import { useUser } from '@/firebase';
 
 export default function Home() {
@@ -30,6 +30,7 @@ export default function Home() {
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
       <UserProfileSync />
+      <CallManager />
       <Sidebar 
         onSelectConversation={setSelectedConversationId} 
         selectedConversationId={selectedConversationId} 

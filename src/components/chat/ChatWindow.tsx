@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -11,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, deleteField, where } from 'firebase/firestore';
+import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, deleteField, where, addDoc } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 
@@ -42,10 +41,9 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   }, [db, conversationId]);
   const { data: room } = useDoc(roomRef);
 
-  // Fetch all users who are members of this room to resolve their display names and avatars
+  // Fetch all users who are members of this room
   const participantsQuery = useMemoFirebase(() => {
     if (!db || !room?.memberIds) return null;
-    // Note: 'where in' supports up to 30 IDs, which is fine for most group chats
     return query(
       collection(db, 'users'),
       where('id', 'in', room.memberIds)
@@ -53,7 +51,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
-  // Map participant data for easy lookup
   const participantMap = React.useMemo(() => {
     const map: Record<string, any> = {};
     participants?.forEach(u => {
@@ -72,7 +69,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   }, [db, conversationId]);
   const { data: messages, isLoading } = useCollection(messagesQuery);
 
-  // Determine chat name dynamically if 1-on-1
   const chatDisplayName = React.useMemo(() => {
     if (!room) return 'Loading...';
     if (!room.isGroupChat && participants && user) {
@@ -90,24 +86,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     }
     return null;
   }, [room, participants, user]);
-
-  // Typing logic
-  const handleTyping = () => {
-    if (!db || !conversationId || !user) return;
-    
-    const typingRef = doc(db, 'chatRooms', conversationId);
-    updateDocumentNonBlocking(typingRef, {
-      [`typing.${user.uid}`]: serverTimestamp()
-    });
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    
-    typingTimeoutRef.current = setTimeout(() => {
-      updateDocumentNonBlocking(typingRef, {
-        [`typing.${user.uid}`]: deleteField()
-      });
-    }, 3000);
-  };
 
   // Mark as read logic
   useEffect(() => {
@@ -157,70 +135,65 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
       readBy: [user.uid],
-      [`typing.${user.uid}`]: deleteField()
     });
 
     if (type === 'text') setInputValue('');
   };
 
-  const handleUpdateMessage = () => {
-    if (!editingMessageId || !editValue.trim() || !conversationId || !db) return;
-    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', editingMessageId);
-    updateDocumentNonBlocking(msgRef, {
-      content: editValue,
-      updatedAt: serverTimestamp(),
-      isEdited: true
-    });
-    setEditingMessageId(null);
-  };
-
-  const handleDeleteMessage = (messageId: string) => {
-    if (!conversationId || !db) return;
-    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', messageId);
-    updateDocumentNonBlocking(msgRef, {
-      isDeleted: true,
-      content: "This message was deleted",
-      updatedAt: serverTimestamp()
-    });
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 800 * 1024) {
+  const startCall = async (type: 'audio' | 'video') => {
+    if (!db || !user || !conversationId || !room) return;
+    
+    const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
+    if (!otherUserId) {
       toast({
-        variant: "destructive",
-        title: "File too large",
-        description: "Please select an image smaller than 800KB for chat.",
+        title: "Call not available",
+        description: "Calling is only supported for private 1-on-1 chats currently.",
       });
       return;
     }
 
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      handleSend('image', reader.result as string);
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.onerror = () => {
-      toast({
-        variant: "destructive",
-        title: "Failed to send image",
-        description: "Could not process the file.",
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: type === 'video', 
+        audio: true 
       });
-      setIsUploading(false);
-    };
-    reader.readAsDataURL(file);
-  };
 
-  const addReaction = (messageId: string, emoji: string) => {
-    if (!conversationId || !db || !user) return;
-    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', messageId);
-    updateDocumentNonBlocking(msgRef, {
-      reactions: arrayUnion(`${user.uid}:${emoji}`)
-    });
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      });
+
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      const callData = {
+        callerId: user.uid,
+        callerName: user.displayName || 'Friend',
+        receiverId: otherUserId,
+        type: type,
+        status: 'ringing',
+        offer: {
+          type: offer.type,
+          sdp: offer.sdp,
+        },
+        roomId: conversationId,
+        createdAt: serverTimestamp(),
+      };
+
+      const callRef = await addDoc(collection(db, 'calls'), callData);
+      
+      // We don't need to pass the PC elsewhere as the CallManager will pick up the local call
+      // Actually, for the caller, we should probably mark it in local state.
+      // CallManager will handle it by listening to 'calls' where callerId == user.uid && status == 'ringing'
+    } catch (e) {
+      console.error(e);
+      toast({
+        variant: 'destructive',
+        title: 'Call failed',
+        description: 'Could not access camera or microphone.',
+      });
+    }
   };
 
   const isOtherTyping = () => {
@@ -273,8 +246,22 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-muted/50"><Phone className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-muted/50"><Video className="h-4 w-4" /></Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-muted-foreground hover:bg-muted/50"
+            onClick={() => startCall('audio')}
+          >
+            <Phone className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-muted-foreground hover:bg-muted/50"
+            onClick={() => startCall('video')}
+          >
+            <Video className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-muted/50"><Info className="h-4 w-4" /></Button>
         </div>
       </div>
@@ -340,7 +327,16 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                           />
                           <div className="flex justify-end gap-1">
                             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditingMessageId(null)}><X className="h-3 w-3" /></Button>
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleUpdateMessage}><Check className="h-3 w-3" /></Button>
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => {
+                              if (!conversationId || !db) return;
+                              const msgRef = doc(db, 'chatRooms', conversationId, 'messages', editingMessageId);
+                              updateDocumentNonBlocking(msgRef, {
+                                content: editValue,
+                                updatedAt: serverTimestamp(),
+                                isEdited: true
+                              });
+                              setEditingMessageId(null);
+                            }}><Check className="h-3 w-3" /></Button>
                           </div>
                         </div>
                       ) : (
@@ -357,7 +353,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                       {isMe && <CheckCheck className={cn("h-3 w-3", msg.readBy?.length > 1 ? "text-accent" : "")} />}
                     </div>
 
-                    {/* Reaction Display */}
                     {!msg.isDeleted && msg.reactions?.length > 0 && (
                       <div className={cn(
                         "absolute -bottom-3 flex gap-1",
@@ -371,7 +366,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                       </div>
                     )}
 
-                    {/* Message Actions */}
                     {!msg.isDeleted && (
                       <div className={cn(
                         "absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5",
@@ -387,7 +381,13 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                             {EMOJIS.map(emoji => (
                               <button 
                                 key={emoji} 
-                                onClick={() => addReaction(msg.id, emoji)}
+                                onClick={() => {
+                                  if (!conversationId || !db || !user) return;
+                                  const msgRef = doc(db, 'chatRooms', conversationId, 'messages', msg.id);
+                                  updateDocumentNonBlocking(msgRef, {
+                                    reactions: arrayUnion(`${user.uid}:${emoji}`)
+                                  });
+                                }}
                                 className="hover:scale-125 transition-transform p-1 text-lg"
                               >
                                 {emoji}
@@ -410,7 +410,15 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                               }}>
                                 <Pencil className="h-3 w-3 mr-2" /> Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMessage(msg.id)}>
+                              <DropdownMenuItem className="text-destructive" onClick={() => {
+                                if (!conversationId || !db) return;
+                                const msgRef = doc(db, 'chatRooms', conversationId, 'messages', msg.id);
+                                updateDocumentNonBlocking(msgRef, {
+                                  isDeleted: true,
+                                  content: "This message was deleted",
+                                  updatedAt: serverTimestamp()
+                                });
+                              }}>
                                 <Trash2 className="h-3 w-3 mr-2" /> Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -445,7 +453,21 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
               ref={fileInputRef} 
               className="hidden" 
               accept="image/*" 
-              onChange={handleFileChange} 
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 800 * 1024) {
+                  toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB." });
+                  return;
+                }
+                setIsUploading(true);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  handleSend('image', reader.result as string);
+                  setIsUploading(false);
+                };
+                reader.readAsDataURL(file);
+              }} 
             />
           </div>
           <div className="flex-1 relative">
@@ -453,7 +475,13 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
               value={inputValue}
               onChange={(e) => {
                 setInputValue(e.target.value);
-                handleTyping();
+                if (!db || !conversationId || !user) return;
+                const typingRef = doc(db, 'chatRooms', conversationId);
+                updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: serverTimestamp() });
+                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                typingTimeoutRef.current = setTimeout(() => {
+                  updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: deleteField() });
+                }, 3000);
               }}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Start typing..."
