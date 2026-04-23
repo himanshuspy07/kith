@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useState, useMemo, useRef } from 'react';
-import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2 } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2, Moon, Sun } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
   const [searchQuery, setSearchQuery] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const db = useFirestore();
@@ -35,6 +37,22 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
   // Settings State
   const [newUsername, setNewUsername] = useState('');
   const [newAvatar, setNewAvatar] = useState('');
+
+  // Initial theme check
+  useEffect(() => {
+    const isDark = document.documentElement.classList.contains('dark');
+    setIsDarkMode(isDark);
+  }, []);
+
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
 
   // Query chat rooms where the user is a member
   const roomsQuery = useMemoFirebase(() => {
@@ -167,6 +185,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                     className="bg-muted/30 border-none"
                   />
                 </div>
+                <div className="pt-4 border-t border-border flex items-center justify-between">
+                  <span className="text-sm font-medium">Appearance</span>
+                  <Button variant="outline" size="sm" onClick={toggleTheme} className="gap-2">
+                    {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                  </Button>
+                </div>
               </div>
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button variant="ghost" onClick={() => signOut(auth)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
@@ -224,7 +249,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
             const isSelected = selectedConversationId === room.id;
             const updatedAt = room.updatedAt?.toDate?.() || new Date();
             const isUnread = room.lastMessageText && room.lastMessageSenderId !== user?.uid && (!room.readBy?.includes(user?.uid));
-
+            
             return (
               <button
                 key={room.id}
