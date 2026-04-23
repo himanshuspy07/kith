@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2, Plus, Upload } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, Phone, Video, Info, CheckCheck, MessageSquare, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,7 +103,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 800 * 1024) { // Roughly 800KB to stay safe within Firestore doc limits after base64
+    if (file.size > 800 * 1024) {
       toast({
         variant: "destructive",
         title: "File too large",

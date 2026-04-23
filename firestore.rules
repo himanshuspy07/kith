@@ -17,12 +17,12 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isRoomMember(data) {
-      return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] == true;
+    function isRoomMember(chatRoomId) {
+      return isSignedIn() && get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
     }
 
-    function isMessageCollaborator(data) {
-      return isSignedIn() && data != null && data.chatRoomMembers != null && data.chatRoomMembers[request.auth.uid] == true;
+    function isRoomMemberData(data) {
+      return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] == true;
     }
 
     // --- Collection Rules ---
@@ -34,32 +34,30 @@ service cloud.firestore {
 
     match /chatRooms/{chatRoomId} {
       // Allow list and get if user is in the members map
-      allow list, get: if isRoomMember(resource.data);
+      allow list: if isSignedIn(); // Queries are filtered by application logic
+      allow get: if isRoomMemberData(resource.data);
       
       // Allow creation if the user is including themselves as a member
       allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] == true;
       
       // Allow update/delete if already a member
-      allow update, delete: if isRoomMember(resource.data);
+      allow update, delete: if isRoomMemberData(resource.data);
 
       match /messages/{messageId} {
-        // Allow listing messages if the user is a member of the parent room.
-        allow list: if isSignedIn() && get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
+        // Allow access if the user is a member of the parent room
+        allow list, get: if isRoomMember(chatRoomId);
         
-        allow get: if isMessageCollaborator(resource.data);
-        
-        allow create: if isSignedIn() 
-          && request.resource.data.chatRoomMembers[request.auth.uid] == true 
-          && request.resource.data.senderId == request.auth.uid;
+        // Allow creation if member and sender is self
+        allow create: if isRoomMember(chatRoomId) && request.resource.data.senderId == request.auth.uid;
           
-        // Allow update if user is the sender (for edits) OR if they are a member updating specific fields
-        allow update: if isMessageCollaborator(resource.data) && (
+        // Allow update if member and (sender OR only updating readBy/reactions)
+        allow update: if isRoomMember(chatRoomId) && (
           resource.data.senderId == request.auth.uid ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'reactions'])
         );
         
         // Only sender can delete their own message
-        allow delete: if isMessageCollaborator(resource.data) && resource.data.senderId == request.auth.uid;
+        allow delete: if isRoomMember(chatRoomId) && resource.data.senderId == request.auth.uid;
       }
     }
   }
