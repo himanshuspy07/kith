@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -263,11 +262,18 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
             }
 
             return (
-              <button
+              <div
                 key={room.id}
                 onClick={() => onSelectConversation(room.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    onSelectConversation(room.id);
+                  }
+                }}
                 className={cn(
-                  "w-full p-3 flex items-start gap-3 transition-colors hover:bg-muted/20 text-left relative group",
+                  "w-full p-3 flex items-start gap-3 transition-colors hover:bg-muted/20 text-left relative group cursor-pointer",
                   isSelected && "bg-muted/40"
                 )}
               >
@@ -318,7 +324,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                 {isSelected && (
                   <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />
                 )}
-              </button>
+              </div>
             );
           })
         )}
