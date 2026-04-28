@@ -2,13 +2,15 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight, UserPlus, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { format } from 'date-fns';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from '@/components/ui/sheet';
+import { Label } from '@/components/ui/label';
+import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, deleteField, where, limitToLast } from 'firebase/firestore';
@@ -28,6 +30,9 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const [editValue, setEditValue] = useState('');
   const [replyToMessage, setReplyToMessage] = useState<any>(null);
   const [messageLimit, setMessageLimit] = useState(30);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [userSearch, setUserSearch] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const topObserverRef = useRef<HTMLDivElement>(null);
@@ -38,32 +43,34 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const db = useFirestore();
   const { toast } = useToast();
 
-  // Fetch room details
   const roomRef = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
     return doc(db, 'chatRooms', conversationId);
   }, [db, conversationId]);
   const { data: room } = useDoc(roomRef);
 
-  // Fetch all users who are members of this room
   const participantsQuery = useMemoFirebase(() => {
     if (!db || !room?.memberIds) return null;
-    return query(
-      collection(db, 'users'),
-      where('id', 'in', room.memberIds)
-    );
+    return query(collection(db, 'users'), where('id', 'in', room.memberIds));
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
+  const availableUsersQuery = useMemoFirebase(() => {
+    if (!db || !userSearch || userSearch.length < 2) return null;
+    return query(
+      collection(db, 'users'),
+      where('username', '>=', userSearch),
+      where('username', '<=', userSearch + '\uf8ff')
+    );
+  }, [db, userSearch]);
+  const { data: searchResults } = useCollection(availableUsersQuery);
+
   const participantMap = React.useMemo(() => {
     const map: Record<string, any> = {};
-    participants?.forEach(u => {
-      map[u.id] = u;
-    });
+    participants?.forEach(u => { map[u.id] = u; });
     return map;
   }, [participants]);
 
-  // Fetch messages with limit for infinite scroll
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
     return query(
@@ -74,7 +81,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   }, [db, conversationId, messageLimit]);
   const { data: messages, isLoading } = useCollection(messagesQuery);
 
-  // Infinite Scroll Intersection Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -106,27 +112,29 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     return null;
   }, [room, participants, user]);
 
-  // Mark as read logic
+  const presenceInfo = React.useMemo(() => {
+    if (!room || room.isGroupChat || !participants || !user) return null;
+    const otherUser = participants.find(p => p.id !== user.uid);
+    if (!otherUser) return null;
+    const lastActive = otherUser.lastActiveAt?.toDate?.() || new Date(otherUser.lastActiveAt || Date.now());
+    const isOnline = otherUser.onlineStatus && (Date.now() - lastActive.getTime() < 120000);
+    return isOnline ? 'Active now' : `Last seen ${formatDistanceToNow(lastActive)} ago`;
+  }, [room, participants, user]);
+
   useEffect(() => {
     if (messages && user && conversationId && db) {
       messages.forEach((msg) => {
         if (!msg.readBy?.includes(user.uid)) {
           const msgRef = doc(db, 'chatRooms', conversationId, 'messages', msg.id);
-          updateDocumentNonBlocking(msgRef, {
-            readBy: arrayUnion(user.uid)
-          });
+          updateDocumentNonBlocking(msgRef, { readBy: arrayUnion(user.uid) });
         }
       });
     }
   }, [messages, user, conversationId, db]);
 
-  // Auto-scroll to bottom only on new messages, not on infinite load
   useEffect(() => {
     if (messages && messages.length > 0 && !isLoading) {
-      // Small delay to ensure rendering is complete
-      const timeout = setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      const timeout = setTimeout(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
       return () => clearTimeout(timeout);
     }
   }, [messages?.length]);
@@ -134,7 +142,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const handleSend = (type: 'text' | 'image' = 'text', contentString?: string) => {
     const content = contentString || inputValue.trim();
     if (!content || !conversationId || !user || !room) return;
-
     const messageData = {
       chatRoomId: conversationId,
       senderId: user.uid,
@@ -148,12 +155,9 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       isDeleted: false,
       readBy: [user.uid],
       reactions: [],
-      chatRoomMembers: room.members || {},
     };
-
     const msgColRef = collection(db, 'chatRooms', conversationId, 'messages');
     addDocumentNonBlocking(msgColRef, messageData);
-
     const roomDocRef = doc(db, 'chatRooms', conversationId);
     updateDocumentNonBlocking(roomDocRef, {
       lastMessageText: type === 'text' ? content : '📷 Image',
@@ -161,7 +165,6 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
       updatedAt: serverTimestamp(),
       readBy: [user.uid],
     });
-
     if (type === 'text') setInputValue('');
     setReplyToMessage(null);
   };
@@ -176,6 +179,23 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
     });
   };
 
+  const handleUpdateRoom = () => {
+    if (!roomRef || !newRoomName.trim()) return;
+    updateDocumentNonBlocking(roomRef, { name: newRoomName.trim() });
+    setNewRoomName('');
+    toast({ title: "Room updated" });
+  };
+
+  const handleAddMember = (targetUser: any) => {
+    if (!roomRef || room?.memberIds.includes(targetUser.id)) return;
+    updateDocumentNonBlocking(roomRef, {
+      memberIds: arrayUnion(targetUser.id),
+      [`members.${targetUser.id}`]: true
+    });
+    toast({ title: `${targetUser.username} added to group` });
+    setUserSearch('');
+  };
+
   if (!conversationId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-background">
@@ -183,333 +203,207 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
           <MessageSquare className="h-12 w-12 text-muted-foreground opacity-20" />
         </div>
         <h2 className="text-2xl font-bold mb-3 tracking-tight">Your messages</h2>
-        <p className="text-muted-foreground max-w-xs mx-auto text-sm">
-          Send private messages and group chats to your friends on Kith.
-        </p>
+        <p className="text-muted-foreground max-w-xs mx-auto text-sm">Send private messages and group chats to your friends on Kith.</p>
       </div>
     );
   }
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-      {/* Header */}
       <div className="h-16 px-6 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 border border-border">
             {chatDisplayAvatar && <AvatarImage src={chatDisplayAvatar} />}
-            <AvatarFallback className="bg-primary/10 text-primary font-bold uppercase">
-              {chatDisplayName?.[0] || 'C'}
-            </AvatarFallback>
+            <AvatarFallback className="bg-primary/10 text-primary font-bold uppercase">{chatDisplayName?.[0] || 'C'}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
             <h3 className="text-sm font-semibold tracking-tight truncate max-w-[200px]">{chatDisplayName}</h3>
             {isOtherTyping() ? (
               <p className="text-[10px] text-accent animate-pulse font-bold uppercase tracking-widest">Typing...</p>
             ) : (
-              <div className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                  {room?.isGroupChat ? 'Group' : 'Active'}
-                </p>
-              </div>
+              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{presenceInfo || (room?.isGroupChat ? 'Group' : 'Active')}</p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-muted/50"><Info className="h-4 w-4" /></Button>
+          <Sheet open={isInfoOpen} onOpenChange={setIsInfoOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-muted/50"><Info className="h-4 w-4" /></Button>
+            </SheetTrigger>
+            <SheetContent className="bg-card border-border sm:max-w-md overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Conversation Details</SheetTitle>
+                <SheetDescription>View participants and group settings.</SheetDescription>
+              </SheetHeader>
+              <div className="space-y-6 py-6">
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <Avatar className="h-24 w-24 border-2 border-primary/20">
+                    {chatDisplayAvatar && <AvatarImage src={chatDisplayAvatar} />}
+                    <AvatarFallback className="text-2xl">{chatDisplayName?.[0]}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h2 className="text-xl font-bold">{chatDisplayName}</h2>
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mt-1">{room?.isGroupChat ? 'Group Chat' : 'Private Chat'}</p>
+                  </div>
+                </div>
+
+                {room?.isGroupChat && (
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">Group Name</Label>
+                      <div className="flex gap-2">
+                        <Input placeholder={room.name} value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} className="bg-muted/30 border-none" />
+                        <Button size="sm" onClick={handleUpdateRoom} disabled={!newRoomName.trim()}><Check className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">Add Members</Label>
+                      <div className="relative">
+                        <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="bg-muted/30 border-none pl-9" />
+                        <Users className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      </div>
+                      {searchResults && searchResults.length > 0 && (
+                        <div className="bg-muted/20 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
+                          {searchResults.filter(u => !room.memberIds.includes(u.id)).map(u => (
+                            <div key={u.id} className="flex items-center justify-between p-2 hover:bg-muted/40 rounded-md">
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-6 w-6"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
+                                <span className="text-xs font-medium">{u.username}</span>
+                              </div>
+                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleAddMember(u)}><UserPlus className="h-3 w-3" /></Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3 pt-4 border-t border-border">
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground">Participants ({participants?.length || 0})</Label>
+                  <div className="space-y-2">
+                    {participants?.map(u => (
+                      <div key={u.id} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{u.username} {u.id === user?.uid && '(You)'}</span>
+                            <span className="text-[10px] text-muted-foreground">{u.id === room?.createdBy ? 'Admin' : 'Member'}</span>
+                          </div>
+                        </div>
+                        {u.onlineStatus && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed opacity-[0.98]">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
         <div ref={topObserverRef} className="h-10 flex items-center justify-center">
           {isLoading && messageLimit > 30 && <Loader2 className="h-5 w-5 animate-spin text-primary opacity-50" />}
         </div>
-
-        {!messages || messages.length === 0 ? (
-          isLoading ? (
-            <div className="flex flex-col items-center justify-center h-full gap-2">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-xs text-muted-foreground animate-pulse">Syncing messages...</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full opacity-30">
-              <p className="text-sm italic">No messages yet. Say hello!</p>
-            </div>
-          )
-        ) : (
-          messages.map((msg, i) => {
-            const isMe = msg.senderId === user?.uid;
-            const senderProfile = participantMap[msg.senderId];
-            const msgDate = msg.createdAt?.toDate?.() || new Date();
-            const prevMsg = i > 0 ? messages[i - 1] : null;
-            const showDateHeader = i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd');
-
-            // Find replied message context
-            const repliedMsg = msg.replyToId ? messages.find(m => m.id === msg.replyToId) : null;
-            const repliedSender = repliedMsg ? participantMap[repliedMsg.senderId] : null;
-
-            return (
-              <React.Fragment key={msg.id}>
-                {showDateHeader && (
-                  <div className="flex justify-center my-6">
-                    <span className="px-3 py-1 rounded-full bg-muted/50 text-[10px] text-muted-foreground font-bold uppercase tracking-widest border border-border/30">
-                      {format(msgDate, 'MMMM d, yyyy')}
-                    </span>
-                  </div>
+        {messages?.map((msg, i) => {
+          const isMe = msg.senderId === user?.uid;
+          const senderProfile = participantMap[msg.senderId];
+          const msgDate = msg.createdAt?.toDate?.() || new Date();
+          const prevMsg = i > 0 ? messages[i - 1] : null;
+          const showDateHeader = i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd');
+          const repliedMsg = msg.replyToId ? messages.find(m => m.id === msg.replyToId) : null;
+          const repliedSender = repliedMsg ? participantMap[repliedMsg.senderId] : null;
+          return (
+            <React.Fragment key={msg.id}>
+              {showDateHeader && (
+                <div className="flex justify-center my-6"><span className="px-3 py-1 rounded-full bg-muted/50 text-[10px] text-muted-foreground font-bold uppercase tracking-widest border border-border/30">{format(msgDate, 'MMMM d, yyyy')}</span></div>
+              )}
+              <div className={cn("flex items-end gap-2 group", isMe ? "flex-row-reverse" : "flex-row")}>
+                {!isMe && (
+                  <Avatar className="h-8 w-8 shrink-0 border border-border/50">
+                    <AvatarImage src={senderProfile?.profilePictureUrl} /><AvatarFallback className="text-[10px]">{senderProfile?.username?.[0] || '?'}</AvatarFallback>
+                  </Avatar>
                 )}
-                <div className={cn("flex items-end gap-2 group", isMe ? "flex-row-reverse" : "flex-row")}>
-                  {!isMe && (
-                    <Avatar className="h-8 w-8 shrink-0 border border-border/50">
-                      <AvatarImage src={senderProfile?.profilePictureUrl} />
-                      <AvatarFallback className="text-[10px]">{senderProfile?.username?.[0] || '?'}</AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div className={cn(
-                    "max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-md transition-all group-hover:shadow-lg relative",
-                    isMe 
-                      ? "bg-primary text-primary-foreground rounded-br-none" 
-                      : "bg-card border border-border/50 text-foreground rounded-bl-none",
-                    msg.isDeleted && "opacity-40 italic"
-                  )}>
-                    {!isMe && room?.isGroupChat && (
-                      <p className="text-[10px] font-bold text-accent mb-1 opacity-80 uppercase tracking-tighter">
-                        {senderProfile?.username || `User ${msg.senderId.slice(0, 4)}`}
-                      </p>
-                    )}
-
-                    {/* Reply Context UI */}
-                    {repliedMsg && (
-                      <div className={cn(
-                        "mb-2 p-2 rounded-lg text-xs border-l-4 opacity-70 flex flex-col gap-0.5",
-                        isMe ? "bg-primary-foreground/10 border-primary-foreground/50" : "bg-muted border-accent"
-                      )}>
-                        <div className="flex items-center gap-1 font-bold text-[10px] uppercase tracking-tighter">
-                          <CornerDownRight className="h-3 w-3" />
-                          {repliedSender?.id === user?.uid ? "You" : repliedSender?.username || "Deleted User"}
-                        </div>
-                        <p className="truncate italic">
-                          {repliedMsg.isDeleted ? "This message was deleted" : repliedMsg.content}
-                        </p>
-                      </div>
-                    )}
-                    
-                    {msg.type === 'image' && msg.fileUrl ? (
-                      <img src={msg.fileUrl} alt="shared" className="rounded-lg mb-2 max-h-60 w-full object-cover border border-border/20 shadow-sm" />
-                    ) : (
-                      editingMessageId === msg.id ? (
-                        <div className="flex flex-col gap-2 min-w-[200px]">
-                          <Input 
-                            value={editValue} 
-                            onChange={(e) => setEditValue(e.target.value)} 
-                            className="bg-primary-foreground/10 border-none text-white h-8 text-xs"
-                            autoFocus
-                          />
-                          <div className="flex justify-end gap-1">
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditingMessageId(null)}><X className="h-3 w-3" /></Button>
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => {
-                              if (!conversationId || !db) return;
-                              const msgRef = doc(db, 'chatRooms', conversationId, 'messages', editingMessageId);
-                              updateDocumentNonBlocking(msgRef, {
-                                content: editValue,
-                                updatedAt: serverTimestamp(),
-                                isEdited: true
-                              });
-                              setEditingMessageId(null);
-                            }}><Check className="h-3 w-3" /></Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                      )
-                    )}
-
-                    <div className={cn(
-                      "flex items-center justify-end gap-1.5 mt-1.5 text-[9px] font-medium opacity-70",
-                      isMe ? "text-primary-foreground/90" : "text-muted-foreground"
-                    )}>
-                      {msg.isEdited && !msg.isDeleted && <span>Edited • </span>}
-                      <span>{format(msgDate, 'HH:mm')}</span>
-                      {isMe && <CheckCheck className={cn("h-3 w-3", msg.readBy?.length > 1 ? "text-accent" : "")} />}
+                <div className={cn("max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-md transition-all group-hover:shadow-lg relative", isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card border border-border/50 text-foreground rounded-bl-none", msg.isDeleted && "opacity-40 italic")}>
+                  {!isMe && room?.isGroupChat && <p className="text-[10px] font-bold text-accent mb-1 opacity-80 uppercase tracking-tighter">{senderProfile?.username || `User ${msg.senderId.slice(0, 4)}`}</p>}
+                  {repliedMsg && (
+                    <div className={cn("mb-2 p-2 rounded-lg text-xs border-l-4 opacity-70 flex flex-col gap-0.5", isMe ? "bg-primary-foreground/10 border-primary-foreground/50" : "bg-muted border-accent")}>
+                      <div className="flex items-center gap-1 font-bold text-[10px] uppercase tracking-tighter"><CornerDownRight className="h-3 w-3" />{repliedSender?.id === user?.uid ? "You" : repliedSender?.username || "User"}</div>
+                      <p className="truncate italic">{repliedMsg.isDeleted ? "Deleted" : repliedMsg.content}</p>
                     </div>
-
-                    {!msg.isDeleted && msg.reactions?.length > 0 && (
-                      <div className={cn(
-                        "absolute -bottom-3 flex gap-1",
-                        isMe ? "right-0" : "left-0"
-                      )}>
-                        {Array.from(new Set(msg.reactions.map((r: string) => r.split(':')[1]))).map((emoji: any) => (
-                          <span key={emoji} className="bg-background border border-border rounded-full px-1.5 py-0.5 text-[10px] shadow-sm">
-                            {emoji}
-                          </span>
-                        ))}
+                  )}
+                  {msg.type === 'image' && msg.fileUrl ? (
+                    <img src={msg.fileUrl} alt="shared" className="rounded-lg mb-2 max-h-60 w-full object-cover border border-border/20 shadow-sm" />
+                  ) : (
+                    editingMessageId === msg.id ? (
+                      <div className="flex flex-col gap-2 min-w-[200px]">
+                        <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="bg-primary-foreground/10 border-none text-white h-8 text-xs" autoFocus />
+                        <div className="flex justify-end gap-1">
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditingMessageId(null)}><X className="h-3 w-3" /></Button>
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { if (!conversationId || !db) return; updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', msg.id), { content: editValue, updatedAt: serverTimestamp(), isEdited: true }); setEditingMessageId(null); }}><Check className="h-3 w-3" /></Button>
+                        </div>
                       </div>
-                    )}
-
-                    {!msg.isDeleted && (
-                      <div className={cn(
-                        "absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5",
-                        isMe ? "-left-24" : "-right-24"
-                      )}>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 rounded-full bg-muted/50"
-                          onClick={() => setReplyToMessage(msg)}
-                        >
-                          <Reply className="h-4 w-4" />
-                        </Button>
-
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50">
-                              <Smile className="h-4 w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-1 rounded-full flex gap-1 border-border">
-                            {EMOJIS.map(emoji => (
-                              <button 
-                                key={emoji} 
-                                onClick={() => {
-                                  if (!conversationId || !db || !user) return;
-                                  const msgRef = doc(db, 'chatRooms', conversationId, 'messages', msg.id);
-                                  updateDocumentNonBlocking(msgRef, {
-                                    reactions: arrayUnion(`${user.uid}:${emoji}`)
-                                  });
-                                }}
-                                className="hover:scale-125 transition-transform p-1 text-lg"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </PopoverContent>
-                        </Popover>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {isMe && (
-                              <>
-                                <DropdownMenuItem onClick={() => {
-                                  setEditingMessageId(msg.id);
-                                  setEditValue(msg.content);
-                                }}>
-                                  <Pencil className="h-3 w-3 mr-2" /> Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive" onClick={() => {
-                                  if (!conversationId || !db) return;
-                                  const msgRef = doc(db, 'chatRooms', conversationId, 'messages', msg.id);
-                                  updateDocumentNonBlocking(msgRef, {
-                                    isDeleted: true,
-                                    content: "This message was deleted",
-                                    updatedAt: serverTimestamp()
-                                  });
-                                }}>
-                                  <Trash2 className="h-3 w-3 mr-2" /> Delete
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            <DropdownMenuItem onClick={() => {
-                              navigator.clipboard.writeText(msg.content);
-                              toast({ title: "Copied to clipboard" });
-                            }}>
-                              Copy
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    )}
+                    ) : (
+                      <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    )
+                  )}
+                  <div className={cn("flex items-center justify-end gap-1.5 mt-1.5 text-[9px] font-medium opacity-70", isMe ? "text-primary-foreground/90" : "text-muted-foreground")}>
+                    {msg.isEdited && !msg.isDeleted && <span>Edited • </span>}
+                    <span>{format(msgDate, 'HH:mm')}</span>
+                    {isMe && <CheckCheck className={cn("h-3 w-3", msg.readBy?.length > 1 ? "text-accent" : "")} />}
                   </div>
+                  {!msg.isDeleted && (
+                    <div className={cn("absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5", isMe ? "-left-24" : "-right-24")}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50" onClick={() => setReplyToMessage(msg)}><Reply className="h-4 w-4" /></Button>
+                      <Popover>
+                        <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50"><Smile className="h-4 w-4" /></Button></PopoverTrigger>
+                        <PopoverContent className="w-auto p-1 rounded-full flex gap-1 border-border">
+                          {EMOJIS.map(emoji => (
+                            <button key={emoji} onClick={() => { if (!conversationId || !db || !user) return; updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', msg.id), { reactions: arrayUnion(`${user.uid}:${emoji}`) }); }} className="hover:scale-125 transition-transform p-1 text-lg">{emoji}</button>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {isMe && (
+                            <>
+                              <DropdownMenuItem onClick={() => { setEditingMessageId(msg.id); setEditValue(msg.content); }}><Pencil className="h-3 w-3 mr-2" /> Edit</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => { if (!conversationId || !db) return; updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', msg.id), { isDeleted: true, content: "Deleted", updatedAt: serverTimestamp() }); }}><Trash2 className="h-3 w-3 mr-2" /> Delete</DropdownMenuItem>
+                            </>
+                          )}
+                          <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(msg.content); toast({ title: "Copied" }); }}>Copy</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
                 </div>
-              </React.Fragment>
-            );
-          })
-        )}
+              </div>
+            </React.Fragment>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="p-4 border-t border-border bg-background/95 backdrop-blur-md">
-        {/* Reply Preview */}
         {replyToMessage && (
           <div className="max-w-5xl mx-auto mb-3 p-3 bg-muted/50 rounded-xl border border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2">
             <div className="flex flex-col gap-0.5 border-l-4 border-primary pl-3">
-              <span className="text-[10px] font-bold text-primary uppercase tracking-widest">
-                Replying to {participantMap[replyToMessage.senderId]?.username || "User"}
-              </span>
-              <p className="text-xs text-muted-foreground truncate max-w-[500px]">
-                {replyToMessage.content}
-              </p>
+              <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Replying to {participantMap[replyToMessage.senderId]?.username || "User"}</span>
+              <p className="text-xs text-muted-foreground truncate max-w-[500px]">{replyToMessage.content}</p>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setReplyToMessage(null)}>
-              <X className="h-4 w-4" />
-            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setReplyToMessage(null)}><X className="h-4 w-4" /></Button>
           </div>
         )}
-
         <div className="flex items-center gap-3 max-w-5xl mx-auto">
-          <div className="flex gap-0.5">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="h-10 w-10 rounded-full text-muted-foreground hover:text-accent transition-colors"
-            >
-              {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
-            </Button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/*" 
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                if (file.size > 800 * 1024) {
-                  toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB." });
-                  return;
-                }
-                setIsUploading(true);
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  handleSend('image', reader.result as string);
-                  setIsUploading(false);
-                };
-                reader.readAsDataURL(file);
-              }} 
-            />
-          </div>
-          <div className="flex-1 relative">
-            <Input 
-              value={inputValue}
-              onChange={(e) => {
-                setInputValue(e.target.value);
-                if (!db || !conversationId || !user) return;
-                const typingRef = doc(db, 'chatRooms', conversationId);
-                updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: serverTimestamp() });
-                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-                typingTimeoutRef.current = setTimeout(() => {
-                  updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: deleteField() });
-                }, 3000);
-              }}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Start typing..."
-              className="pr-12 bg-muted/40 border-none h-12 focus-visible:ring-2 focus-visible:ring-primary/20 rounded-2xl"
-            />
-          </div>
-          <Button 
-            onClick={() => handleSend()}
-            disabled={!inputValue.trim() || isUploading}
-            className="rounded-2xl h-12 px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold transition-all active:scale-95"
-          >
-            <Send className="h-4 w-4 mr-2" />
-            Send
+          <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-10 w-10 rounded-full text-muted-foreground hover:text-accent transition-colors">
+            {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
           </Button>
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setIsUploading(true); const reader = new FileReader(); reader.onloadend = () => { handleSend('image', reader.result as string); setIsUploading(false); }; reader.readAsDataURL(file); }} />
+          <Input value={inputValue} onChange={(e) => { setInputValue(e.target.value); if (!db || !conversationId || !user) return; const typingRef = doc(db, 'chatRooms', conversationId); updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: serverTimestamp() }); if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = setTimeout(() => { updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: deleteField() }); }, 3000); }} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Start typing..." className="bg-muted/40 border-none h-12 focus-visible:ring-2 focus-visible:ring-primary/20 rounded-2xl" />
+          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className="rounded-2xl h-12 px-6 bg-primary hover:bg-primary/90 shadow-lg font-bold"><Send className="h-4 w-4 mr-2" />Send</Button>
         </div>
       </div>
     </div>

@@ -77,6 +77,14 @@
             "type": "string"
           }
         },
+        "members": {
+          "type": "object",
+          "description": "Map of user IDs to booleans for security rules indexing."
+        },
+        "pinnedBy": {
+          "type": "object",
+          "description": "Map of user IDs to booleans indicating if this room is pinned for them."
+        },
         "createdBy": {
           "type": "string",
           "description": "Reference to the User who created this chat room. Applicable primarily for group chats. (Relationship: User 1:N ChatRoom)"
@@ -91,9 +99,13 @@
           "description": "Timestamp when the chat room's properties (e.g., name, members) were last updated.",
           "format": "date-time"
         },
-        "lastMessageId": {
+        "lastMessageText": {
           "type": "string",
-          "description": "Reference to the ID of the most recent message in this chat room, used for displaying chat previews. (Relationship: Message 1:1 ChatRoom)"
+          "description": "Text preview of the last message sent in this room."
+        },
+        "lastMessageSenderId": {
+          "type": "string",
+          "description": "UID of the sender of the last message."
         }
       },
       "required": [
@@ -127,10 +139,7 @@
         },
         "type": {
           "type": "string",
-          "description": "The type of message, e.g., 'text', 'image', 'file'.",
-          "items": {
-            "type": "string"
-          }
+          "description": "The type of message, e.g., 'text', 'image', 'file'."
         },
         "replyToId": {
           "type": "string",
@@ -140,10 +149,6 @@
           "type": "string",
           "description": "URL to the shared file or image, if the message type is 'image' or 'file'.",
           "format": "uri"
-        },
-        "fileName": {
-          "type": "string",
-          "description": "Original name of the shared file, if the message type is 'file'."
         },
         "createdAt": {
           "type": "string",
@@ -165,14 +170,14 @@
         },
         "readBy": {
           "type": "array",
-          "description": "An array of User IDs who have read this message, enabling read receipts. (Relationship: User N:N Message)",
+          "description": "An array of User IDs who have read this message, enabling read receipts.",
           "items": {
             "type": "string"
           }
         },
         "reactions": {
           "type": "array",
-          "description": "An array of emoji reactions on this message, each containing the user ID and the emoji.",
+          "description": "An array of emoji reactions on this message.",
           "items": {
             "type": "string"
           }
@@ -206,11 +211,11 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores individual user profiles. Authorization for modifications is based on path ownership (`request.auth.uid == userId`). Public data is readable by all authenticated users. Includes onlineStatus and lastActiveAt for real-time presence.",
+          "description": "Stores individual user profiles.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier of the user, matching `request.auth.uid`."
+              "description": "The unique identifier of the user."
             }
           ]
         }
@@ -222,7 +227,7 @@
           "schema": {
             "$ref": "#/backend/entities/ChatRoom"
           },
-          "description": "Stores metadata for each chat conversation (private or group). Includes denormalized 'members' map (e.g., `members: { 'uid1': true, 'uid2': true }`) for authorization independence, allowing direct membership checks in security rules. Also contains 'lastMessageId' for chat previews.",
+          "description": "Stores metadata for each chat conversation.",
           "params": [
             {
               "name": "chatRoomId",
@@ -238,7 +243,7 @@
           "schema": {
             "$ref": "#/backend/entities/Message"
           },
-          "description": "Stores individual messages sent within a chat room. Includes denormalized 'chatRoomMembers' map (a copy of the parent ChatRoom's 'members' map) for authorization independence, enabling message-level security rules without `get()` calls to the parent ChatRoom. Supports read receipts ('readBy') and reactions ('reactions').",
+          "description": "Stores individual messages sent within a chat room.",
           "params": [
             {
               "name": "chatRoomId",
@@ -246,12 +251,11 @@
             },
             {
               "name": "messageId",
-              "description": "The unique identifier for the message within the chat room."
+              "description": "The unique identifier for the message."
             }
           ]
         }
       }
-    ],
-    "reasoning": "The Firestore data structure for Kith Chat is designed with a strong emphasis on Authorization Independence, Structural Segregation, and Access Modeling to ensure robust security rules, scalability, and debuggability. \n\n**Authorization Independence:**\n*   **User Profiles:** Stored in `/users/{userId}`, access control is inherently path-based. A user's profile can only be modified by `request.auth.uid` matching `{userId}`. Reading can be open for all authenticated users to facilitate user search.\n*   **ChatRooms:** Each `ChatRoom` document in the `/chatRooms/{chatRoomId}` collection includes a denormalized `members` map (e.g., `members: { 'uid1': true, 'uid2': true }`). This map explicitly lists all participant UIDs. Security rules can directly check `request.auth.uid in resource.data.members` without requiring `get()` operations on other documents. This is critical for atomic operations and simplifies rule logic.\n*   **Messages:** Each `Message` document, residing in `/chatRooms/{chatRoomId}/messages/{messageId}`, includes a denormalized `chatRoomMembers` map. This map is a direct copy of the `members` map from its parent `ChatRoom`. This design eliminates the need for `get()` operations on the parent `ChatRoom` when authorizing access to a message, making message-level security rules atomic and performant. For example, a rule for messages can simply verify `request.auth.uid in resource.data.chatRoomMembers`.\n\n**QAPs (Queries as Authorization Policies):**\n*   **Users:** The `/users` collection allows authenticated users to list profiles (e.g., for user search). Rules ensure that only public profile information is accessible via `list` and `get`, while private fields are restricted to the profile owner (`request.auth.uid == {userId}`).\n*   **ChatRooms:** Users can effectively query for chat rooms they are a member of using a `where` clause on the denormalized `members` map: `db.collection('chatRooms').where('members.' + request.auth.uid, '==', true)`. This allows `list` operations directly on the collection while adhering to authorization policies enforced by the denormalized `members` field within each document.\n*   **Messages:** Messages are nested under `chatRooms`. When querying messages within a specific `chatRoomId` (`/chatRooms/{chatRoomId}/messages`), the denormalized `chatRoomMembers` map within each `Message` document ensures that `list` queries are automatically filtered and secured. If `request.auth.uid` is not present in `chatRoomMembers`, no messages from that chat room will be accessible, effectively making the subcollection query follow the authorization policy without complex filtering in rules. This structure simplifies rule writing significantly, as rules simply check `request.auth.uid` against the denormalized field on the `resource.data` of the message itself.\n\n**Structural Segregation:**\n*   All `User` documents in `/users` share the same ownership-based security posture.\n*   All `ChatRoom` documents in `/chatRooms` share the same collaborative access pattern, leveraging the `members` map.\n*   All `Message` documents within any given `chatRoomId` share the same access control based on the `chatRoomMembers` map. This consistency simplifies rules and reduces the risk of misconfiguration.\n\nThis architecture provides a scalable, secure, and easily auditable Firestore structure for the Kith chat application."
+    ]
   }
 }
