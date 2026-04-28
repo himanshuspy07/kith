@@ -92,7 +92,7 @@ export default function AuthScreen() {
           </Button>
           <div className="flex flex-col items-center gap-1">
             <p className="text-[10px] text-muted-foreground/40 uppercase tracking-[0.2em] font-medium">
-              &copy; 2024 Kith Messaging
+              &copy; 2026 Kith Messaging
             </p>
             <p className="text-[9px] text-muted-foreground/60 uppercase tracking-[0.3em] font-bold animate-pulse">
               Made by <span className="text-primary/70">Himanshu Yadav</span>
