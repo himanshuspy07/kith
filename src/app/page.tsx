@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -7,10 +8,13 @@ import AuthScreen from '@/components/auth/AuthScreen';
 import UserProfileSync from '@/components/chat/UserProfileSync';
 import BrandLogo from '@/components/ui/brand-logo';
 import { useUser } from '@/firebase';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>(undefined);
+  const isMobile = useIsMobile();
 
   if (isUserLoading) {
     return (
@@ -43,16 +47,32 @@ export default function Home() {
     return <AuthScreen />;
   }
 
+  // Mobile navigation logic: 
+  // - Show Sidebar if no conversation is selected
+  // - Show ChatWindow if a conversation is selected
+  const showSidebar = !isMobile || !selectedConversationId;
+  const showChat = !isMobile || !!selectedConversationId;
+
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
       <UserProfileSync />
-      <Sidebar 
-        onSelectConversation={setSelectedConversationId} 
-        selectedConversationId={selectedConversationId} 
-      />
-      <main className="flex-1 h-full flex flex-col">
-        <ChatWindow conversationId={selectedConversationId} />
-      </main>
+      
+      {showSidebar && (
+        <Sidebar 
+          onSelectConversation={setSelectedConversationId} 
+          selectedConversationId={selectedConversationId} 
+          className={cn(isMobile ? "w-full" : "w-80")}
+        />
+      )}
+      
+      {showChat && (
+        <main className="flex-1 h-full flex flex-col">
+          <ChatWindow 
+            conversationId={selectedConversationId} 
+            onBack={isMobile ? () => setSelectedConversationId(undefined) : undefined}
+          />
+        </main>
+      )}
     </div>
   );
 }

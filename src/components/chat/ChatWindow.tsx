@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight, UserPlus, Users } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight, UserPlus, Users, ChevronLeft } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,11 +19,12 @@ import { useToast } from '@/hooks/use-toast';
 
 interface ChatWindowProps {
   conversationId?: string;
+  onBack?: () => void;
 }
 
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
-export default function ChatWindow({ conversationId }: ChatWindowProps) {
+export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
   const { data: room } = useDoc(roomRef);
 
   const participantsQuery = useMemoFirebase(() => {
-    if (!db || !room?.memberIds) return null;
+    if (!db || !room?.memberIds || room.memberIds.length === 0) return null;
     return query(collection(db, 'users'), where('id', 'in', room.memberIds));
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
@@ -210,18 +211,23 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-      <div className="h-16 px-6 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10 border border-border">
+      <div className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-2 md:gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon" className="h-9 w-9 -ml-2 text-muted-foreground" onClick={onBack}>
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+          )}
+          <Avatar className="h-9 w-9 md:h-10 md:h-10 border border-border">
             {chatDisplayAvatar && <AvatarImage src={chatDisplayAvatar} />}
-            <AvatarFallback className="bg-primary/10 text-primary font-bold uppercase">{chatDisplayName?.[0] || 'C'}</AvatarFallback>
+            <AvatarFallback className="bg-primary/10 text-primary font-bold uppercase text-xs md:text-sm">{chatDisplayName?.[0] || 'C'}</AvatarFallback>
           </Avatar>
-          <div className="flex flex-col">
-            <h3 className="text-sm font-semibold tracking-tight truncate max-w-[200px]">{chatDisplayName}</h3>
+          <div className="flex flex-col overflow-hidden">
+            <h3 className="text-xs md:text-sm font-semibold tracking-tight truncate max-w-[140px] md:max-w-[200px]">{chatDisplayName}</h3>
             {isOtherTyping() ? (
-              <p className="text-[10px] text-accent animate-pulse font-bold uppercase tracking-widest">Typing...</p>
+              <p className="text-[9px] md:text-[10px] text-accent animate-pulse font-bold uppercase tracking-widest">Typing...</p>
             ) : (
-              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{presenceInfo || (room?.isGroupChat ? 'Group' : 'Active')}</p>
+              <p className="text-[9px] md:text-[10px] text-muted-foreground font-medium uppercase tracking-wider truncate">{presenceInfo || (room?.isGroupChat ? 'Group' : 'Active')}</p>
             )}
           </div>
         </div>
@@ -230,7 +236,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-muted/50"><Info className="h-4 w-4" /></Button>
             </SheetTrigger>
-            <SheetContent className="bg-card border-border sm:max-w-md overflow-y-auto">
+            <SheetContent className="bg-card border-border sm:max-w-md w-full overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>Conversation Details</SheetTitle>
                 <SheetDescription>View participants and group settings.</SheetDescription>
@@ -252,15 +258,15 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase font-bold text-muted-foreground">Group Name</Label>
                       <div className="flex gap-2">
-                        <Input placeholder={room.name} value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} className="bg-muted/30 border-none" />
-                        <Button size="sm" onClick={handleUpdateRoom} disabled={!newRoomName.trim()}><Check className="h-4 w-4" /></Button>
+                        <Input placeholder={room.name} value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} className="bg-muted/30 border-none h-11" />
+                        <Button className="h-11" size="sm" onClick={handleUpdateRoom} disabled={!newRoomName.trim()}><Check className="h-4 w-4" /></Button>
                       </div>
                     </div>
                     
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase font-bold text-muted-foreground">Add Members</Label>
                       <div className="relative">
-                        <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="bg-muted/30 border-none pl-9" />
+                        <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="bg-muted/30 border-none pl-9 h-11" />
                         <Users className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       </div>
                       {searchResults && searchResults.length > 0 && (
@@ -271,7 +277,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                                 <Avatar className="h-6 w-6"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
                                 <span className="text-xs font-medium">{u.username}</span>
                               </div>
-                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleAddMember(u)}><UserPlus className="h-3 w-3" /></Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleAddMember(u)}><UserPlus className="h-4 w-4" /></Button>
                             </div>
                           ))}
                         </div>
@@ -303,7 +309,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scrollbar-hide">
         <div ref={topObserverRef} className="h-10 flex items-center justify-center">
           {isLoading && messageLimit > 30 && <Loader2 className="h-5 w-5 animate-spin text-primary opacity-50" />}
         </div>
@@ -322,15 +328,15 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
               )}
               <div className={cn("flex items-end gap-2 group", isMe ? "flex-row-reverse" : "flex-row")}>
                 {!isMe && (
-                  <Avatar className="h-8 w-8 shrink-0 border border-border/50">
+                  <Avatar className="h-7 w-7 md:h-8 md:h-8 shrink-0 border border-border/50">
                     <AvatarImage src={senderProfile?.profilePictureUrl} /><AvatarFallback className="text-[10px]">{senderProfile?.username?.[0] || '?'}</AvatarFallback>
                   </Avatar>
                 )}
-                <div className={cn("max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-md transition-all group-hover:shadow-lg relative", isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card border border-border/50 text-foreground rounded-bl-none", msg.isDeleted && "opacity-40 italic")}>
+                <div className={cn("max-w-[85%] md:max-w-[75%] px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm shadow-md transition-all relative", isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card border border-border/50 text-foreground rounded-bl-none", msg.isDeleted && "opacity-40 italic")}>
                   {!isMe && room?.isGroupChat && <p className="text-[10px] font-bold text-accent mb-1 opacity-80 uppercase tracking-tighter">{senderProfile?.username || `User ${msg.senderId.slice(0, 4)}`}</p>}
                   {repliedMsg && (
-                    <div className={cn("mb-2 p-2 rounded-lg text-xs border-l-4 opacity-70 flex flex-col gap-0.5", isMe ? "bg-primary-foreground/10 border-primary-foreground/50" : "bg-muted border-accent")}>
-                      <div className="flex items-center gap-1 font-bold text-[10px] uppercase tracking-tighter"><CornerDownRight className="h-3 w-3" />{repliedSender?.id === user?.uid ? "You" : repliedSender?.username || "User"}</div>
+                    <div className={cn("mb-2 p-2 rounded-lg text-[10px] md:text-xs border-l-4 opacity-70 flex flex-col gap-0.5", isMe ? "bg-primary-foreground/10 border-primary-foreground/50" : "bg-muted border-accent")}>
+                      <div className="flex items-center gap-1 font-bold text-[9px] md:text-[10px] uppercase tracking-tighter"><CornerDownRight className="h-3 w-3" />{repliedSender?.id === user?.uid ? "You" : repliedSender?.username || "User"}</div>
                       <p className="truncate italic">{repliedMsg.isDeleted ? "Deleted" : repliedMsg.content}</p>
                     </div>
                   )}
@@ -349,13 +355,13 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                       <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                     )
                   )}
-                  <div className={cn("flex items-center justify-end gap-1.5 mt-1.5 text-[9px] font-medium opacity-70", isMe ? "text-primary-foreground/90" : "text-muted-foreground")}>
+                  <div className={cn("flex items-center justify-end gap-1.5 mt-1 text-[8px] md:text-[9px] font-medium opacity-70", isMe ? "text-primary-foreground/90" : "text-muted-foreground")}>
                     {msg.isEdited && !msg.isDeleted && <span>Edited • </span>}
                     <span>{format(msgDate, 'HH:mm')}</span>
                     {isMe && <CheckCheck className={cn("h-3 w-3", msg.readBy?.length > 1 ? "text-accent" : "")} />}
                   </div>
                   {!msg.isDeleted && (
-                    <div className={cn("absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5", isMe ? "-left-24" : "-right-24")}>
+                    <div className={cn("absolute top-0 hidden md:flex transition-opacity opacity-0 group-hover:opacity-100 gap-0.5", isMe ? "-left-24" : "-right-24")}>
                       <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50" onClick={() => setReplyToMessage(msg)}><Reply className="h-4 w-4" /></Button>
                       <Popover>
                         <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50"><Smile className="h-4 w-4" /></Button></PopoverTrigger>
@@ -379,6 +385,7 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
                       </DropdownMenu>
                     </div>
                   )}
+                  {/* Mobile Tap actions could be added here if needed, keeping it clean for now */}
                 </div>
               </div>
             </React.Fragment>
@@ -387,23 +394,26 @@ export default function ChatWindow({ conversationId }: ChatWindowProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-border bg-background/95 backdrop-blur-md">
+      <div className="p-3 md:p-4 border-t border-border bg-background/95 backdrop-blur-md">
         {replyToMessage && (
           <div className="max-w-5xl mx-auto mb-3 p-3 bg-muted/50 rounded-xl border border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2">
-            <div className="flex flex-col gap-0.5 border-l-4 border-primary pl-3">
+            <div className="flex flex-col gap-0.5 border-l-4 border-primary pl-3 overflow-hidden">
               <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Replying to {participantMap[replyToMessage.senderId]?.username || "User"}</span>
-              <p className="text-xs text-muted-foreground truncate max-w-[500px]">{replyToMessage.content}</p>
+              <p className="text-xs text-muted-foreground truncate">{replyToMessage.content}</p>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setReplyToMessage(null)}><X className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0" onClick={() => setReplyToMessage(null)}><X className="h-4 w-4" /></Button>
           </div>
         )}
-        <div className="flex items-center gap-3 max-w-5xl mx-auto">
-          <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-10 w-10 rounded-full text-muted-foreground hover:text-accent transition-colors">
+        <div className="flex items-center gap-2 md:gap-3 max-w-5xl mx-auto">
+          <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-10 w-10 rounded-full text-muted-foreground hover:text-accent transition-colors shrink-0">
             {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
           </Button>
-          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setIsUploading(true); const reader = new FileReader(); reader.onloadend = () => { handleSend('image', reader.result as string); setIsUploading(false); }; reader.readAsDataURL(file); }} />
-          <Input value={inputValue} onChange={(e) => { setInputValue(e.target.value); if (!db || !conversationId || !user) return; const typingRef = doc(db, 'chatRooms', conversationId); updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: serverTimestamp() }); if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = setTimeout(() => { updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: deleteField() }); }, 3000); }} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Start typing..." className="bg-muted/40 border-none h-12 focus-visible:ring-2 focus-visible:ring-primary/20 rounded-2xl" />
-          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className="rounded-2xl h-12 px-6 bg-primary hover:bg-primary/90 shadow-lg font-bold"><Send className="h-4 w-4 mr-2" />Send</Button>
+          <input type="file" min-width="0" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setIsUploading(true); const reader = new FileReader(); reader.onloadend = () => { handleSend('image', reader.result as string); setIsUploading(false); }; reader.readAsDataURL(file); }} />
+          <Input value={inputValue} onChange={(e) => { setInputValue(e.target.value); if (!db || !conversationId || !user) return; const typingRef = doc(db, 'chatRooms', conversationId); updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: serverTimestamp() }); if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = setTimeout(() => { updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: deleteField() }); }, 3000); }} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Start typing..." className="bg-muted/40 border-none h-11 md:h-12 focus-visible:ring-2 focus-visible:ring-primary/20 rounded-2xl flex-1 min-w-0" />
+          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className="rounded-2xl h-11 md:h-12 px-4 md:px-6 bg-primary hover:bg-primary/90 shadow-lg font-bold shrink-0">
+            <Send className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Send</span>
+          </Button>
         </div>
       </div>
     </div>

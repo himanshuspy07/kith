@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -19,9 +20,10 @@ import { useToast } from '@/hooks/use-toast';
 interface SidebarProps {
   onSelectConversation: (id: string) => void;
   selectedConversationId?: string;
+  className?: string;
 }
 
-export default function Sidebar({ onSelectConversation, selectedConversationId }: SidebarProps) {
+export default function Sidebar({ onSelectConversation, selectedConversationId, className }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -102,7 +104,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
     });
 
     return mapped.sort((a, b) => {
-      // Sort by pinned first, then by updatedAt
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       const timeA = a.updatedAt?.toDate?.()?.getTime() || 0;
       const timeB = b.updatedAt?.toDate?.()?.getTime() || 0;
@@ -160,7 +161,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
   };
 
   return (
-    <div className="w-80 h-full border-r border-border flex flex-col bg-background/50 backdrop-blur-sm">
+    <div className={cn("h-full border-r border-border flex flex-col bg-background/50 backdrop-blur-sm shrink-0", className)}>
       <div className="p-4 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9 border border-primary/20">
@@ -168,8 +169,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
             <AvatarFallback>{currentUserProfile?.username?.[0] || user?.email?.[0] || 'U'}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col overflow-hidden">
-            <span className="font-semibold text-sm truncate">{currentUserProfile?.username || 'Kith'}</span>
-            <span className="text-[10px] text-muted-foreground truncate">{user?.email}</span>
+            <span className="font-semibold text-sm truncate max-w-[120px]">{currentUserProfile?.username || 'Kith'}</span>
+            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{user?.email}</span>
           </div>
         </div>
         <div className="flex gap-1">
@@ -188,7 +189,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                 <Settings className="h-4 w-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border">
+            <DialogContent className="bg-card border-border sm:max-w-md w-[90%] rounded-xl">
               <DialogHeader><DialogTitle>Profile Settings</DialogTitle></DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="flex flex-col items-center gap-4 mb-4">
@@ -206,17 +207,17 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="set-username">Display Name</Label>
-                  <Input id="set-username" placeholder="Enter new username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-muted/30 border-none" />
+                  <Input id="set-username" placeholder="Enter new username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-muted/30 border-none h-11" />
                 </div>
                 <div className="pt-4 border-t border-border flex items-center justify-between">
                   <span className="text-sm font-medium">Appearance</span>
-                  <Button variant="outline" size="sm" onClick={toggleTheme} className="gap-2">
+                  <Button variant="outline" size="sm" onClick={toggleTheme} className="gap-2 h-10 px-4">
                     {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                    {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                    <span className="hidden sm:inline">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
                   </Button>
                 </div>
               </div>
-              <DialogFooter><Button onClick={handleUpdateProfile} disabled={isUploading} className="w-full sm:w-auto">Save Changes</Button></DialogFooter>
+              <DialogFooter><Button onClick={handleUpdateProfile} disabled={isUploading} className="w-full h-11">Save Changes</Button></DialogFooter>
             </DialogContent>
           </Dialog>
           <NewChatDialog onChatCreated={onSelectConversation} />
@@ -226,14 +227,14 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
       <div className="p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search conversations..." className="pl-9 h-9 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/30" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+          <Input placeholder="Search conversations..." className="pl-9 h-11 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/30" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {isLoading ? (
           <div className="p-4 space-y-4">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3, 4, 5].map(i => (
               <div key={i} className="flex gap-3 items-center animate-pulse">
                 <div className="h-12 w-12 bg-muted rounded-full" />
                 <div className="flex-1 space-y-2"><div className="h-4 bg-muted rounded w-1/2" /><div className="h-3 bg-muted rounded w-3/4" /></div>
@@ -251,7 +252,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
             const updatedAt = room.updatedAt?.toDate?.() || new Date();
             const isUnread = room.lastMessageText && room.lastMessageSenderId !== user?.uid && (!room.readBy?.includes(user?.uid));
             
-            // Presence Logic
             let presenceText = '';
             if (!room.isGroupChat && room.otherUserProfile) {
               const lastActive = room.otherUserProfile.lastActiveAt?.toDate?.() || new Date(room.otherUserProfile.lastActiveAt || Date.now());
@@ -273,7 +273,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                   }
                 }}
                 className={cn(
-                  "w-full p-3 flex items-start gap-3 transition-colors hover:bg-muted/20 text-left relative group cursor-pointer",
+                  "w-full p-4 flex items-start gap-3 transition-colors hover:bg-muted/20 text-left relative group cursor-pointer border-b border-border/10",
                   isSelected && "bg-muted/40"
                 )}
               >
@@ -313,7 +313,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                   variant="ghost" 
                   size="icon" 
                   className={cn(
-                    "h-6 w-6 rounded-full absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity",
+                    "h-6 w-6 rounded-full absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity",
                     room.isPinned ? "text-primary opacity-100" : "text-muted-foreground"
                   )}
                   onClick={(e) => togglePin(e, room.id, room.isPinned)}
@@ -322,7 +322,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId }
                 </Button>
 
                 {isSelected && (
-                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
                 )}
               </div>
             );
