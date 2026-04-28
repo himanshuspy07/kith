@@ -1,0 +1,28 @@
+
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradient" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#a7f3d0" />
+    </linearGradient>
+  </defs>
+  <!-- Background with rounded corners matching the app UI -->
+  <rect width="512" height="512" rx="128" fill="url(#logoGradient)"/>
+  
+  <!-- Message Square Icon (scaled Lucide MessageSquare) -->
+  <path 
+    d="M416 320C416 337.673 401.673 352 384 352H128L64 416V96C64 78.3269 78.3269 64 96 64H384C401.673 64 416 78.3269 416 96V320Z" 
+    fill="white" 
+    fill-opacity="0.15"
+  />
+  <path 
+    d="M416 320C416 337.673 401.673 352 384 352H128L64 416V96C64 78.3269 78.3269 64 96 64H384C401.673 64 416 78.3269 416 96V320Z" 
+    stroke="white" 
+    stroke-width="24" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+  
+  <!-- The characteristic accent dot from BrandLogo -->
+  <circle cx="440" cy="72" r="48" fill="#5eead4" stroke="#0F172A" stroke-width="12"/>
+</svg>
