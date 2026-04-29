@@ -166,6 +166,16 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     });
   };
 
+  const getRoomTyping = (room: any) => {
+    if (!room.typing) return null;
+    const now = Date.now();
+    return Object.entries(room.typing).find(([uid, ts]: [string, any]) => {
+      if (uid === user?.uid) return false;
+      const timestamp = ts?.toDate?.()?.getTime() || 0;
+      return (now - timestamp) < 4000;
+    });
+  };
+
   return (
     <div className={cn("h-full border-r border-border flex flex-col bg-background/50 backdrop-blur-sm shrink-0", className)}>
       <div className="p-4 flex items-center justify-between border-b border-border">
@@ -257,6 +267,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             const isSelected = selectedConversationId === room.id;
             const updatedAt = room.updatedAt?.toDate?.() || new Date();
             const isUnread = room.lastMessageText && room.lastMessageSenderId !== user?.uid && (!room.readBy?.includes(user?.uid));
+            const typingUser = getRoomTyping(room);
             
             let presenceText = '';
             if (!room.isGroupChat && room.otherUserProfile) {
@@ -306,9 +317,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                     </div>
                   </div>
                   <div className="flex justify-between items-center overflow-hidden">
-                    <p className={cn("text-xs truncate max-w-[140px]", isUnread ? "text-foreground font-medium" : "text-muted-foreground italic")}>
-                      {room.lastMessageText || 'No messages yet'}
-                    </p>
+                    {typingUser ? (
+                      <p className="text-xs text-accent animate-pulse font-bold tracking-tight">Typing...</p>
+                    ) : (
+                      <p className={cn("text-xs truncate max-w-[140px]", isUnread ? "text-foreground font-medium" : "text-muted-foreground italic")}>
+                        {room.lastMessageText || 'No messages yet'}
+                      </p>
+                    )}
                     <span className="text-[9px] text-muted-foreground opacity-60 uppercase font-medium tracking-tighter whitespace-nowrap ml-2">
                       {presenceText}
                     </span>

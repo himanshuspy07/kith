@@ -6,6 +6,7 @@ import Sidebar from '@/components/chat/Sidebar';
 import ChatWindow from '@/components/chat/ChatWindow';
 import AuthScreen from '@/components/auth/AuthScreen';
 import UserProfileSync from '@/components/chat/UserProfileSync';
+import NotificationManager from '@/components/chat/NotificationManager';
 import BrandLogo from '@/components/ui/brand-logo';
 import { useUser } from '@/firebase';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -56,6 +57,7 @@ export default function Home() {
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
       <UserProfileSync />
+      <NotificationManager currentConversationId={selectedConversationId} />
       
       {showSidebar && (
         <Sidebar 

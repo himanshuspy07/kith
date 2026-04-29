@@ -85,6 +85,10 @@
           "type": "object",
           "description": "Map of user IDs to booleans indicating if this room is pinned for them."
         },
+        "typing": {
+          "type": "object",
+          "description": "Map of user IDs to timestamps indicating when they were last typing."
+        },
         "createdBy": {
           "type": "string",
           "description": "Reference to the User who created this chat room. Applicable primarily for group chats. (Relationship: User 1:N ChatRoom)"
