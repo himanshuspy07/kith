@@ -20,17 +20,24 @@ export default function UserProfileSync() {
 
     const userRef = doc(db, 'users', user.uid);
     
-    // Initialize/Update user profile
-    setDocumentNonBlocking(userRef, {
+    // Construct sync data safely
+    // We only include username and photoURL if they are provided by the Auth provider
+    // to avoid overwriting custom profiles set in the app with 'null'
+    const initialSyncData: any = {
       id: user.uid,
-      username: user.displayName || user.email?.split('@')[0] || 'Anonymous',
       email: user.email,
-      profilePictureUrl: user.photoURL,
       onlineStatus: true,
       lastActiveAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }, { merge: true });
+    };
+
+    // Only set these if the Auth object actually has them
+    if (user.displayName) initialSyncData.username = user.displayName;
+    if (user.photoURL) initialSyncData.profilePictureUrl = user.photoURL;
+
+    // Use set with merge: true to ensure the document exists without overwriting 
+    // fields we didn't include in initialSyncData
+    setDocumentNonBlocking(userRef, initialSyncData, { merge: true });
 
     // Periodic heartbeat to keep presence accurate
     heartbeatIntervalRef.current = setInterval(() => {
