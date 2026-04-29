@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { useCollection, useDoc, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, deleteField } from 'firebase/firestore';
+import { collection, query, where, doc, deleteField, serverTimestamp } from 'firebase/firestore';
 import { signOut, updateProfile } from 'firebase/auth';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import NewChatDialog from './NewChatDialog';
@@ -116,20 +116,26 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   });
 
   const handleUpdateProfile = async () => {
-    if (!user || !db) return;
+    if (!user || !db || !currentUserRef) return;
     
-    try {
-      if (newUsername) {
-        await updateProfile(user, { displayName: newUsername });
-      }
-    } catch (e) { console.error(e); }
+    const updates: any = {
+      updatedAt: serverTimestamp()
+    };
 
-    const userRef = doc(db, 'users', user.uid);
-    updateDocumentNonBlocking(userRef, {
-      username: newUsername || currentUserProfile?.username || user.email?.split('@')[0],
-      profilePictureUrl: newAvatar || currentUserProfile?.profilePictureUrl,
-      updatedAt: new Date().toISOString()
-    });
+    if (newUsername.trim()) {
+      updates.username = newUsername.trim();
+      try {
+        await updateProfile(user, { displayName: newUsername.trim() });
+      } catch (e) {
+        console.error("Auth profile update failed:", e);
+      }
+    }
+
+    if (newAvatar) {
+      updates.profilePictureUrl = newAvatar;
+    }
+
+    updateDocumentNonBlocking(currentUserRef, updates);
     
     setIsSettingsOpen(false);
     toast({ title: "Profile updated" });

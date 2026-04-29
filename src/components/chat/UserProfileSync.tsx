@@ -3,12 +3,13 @@
 
 import { useEffect, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, serverTimestamp } from 'firebase/firestore';
+import { doc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 /**
  * Handles initializing and updating the user's Firestore profile.
  * Updates online status and last active timestamp.
+ * Ensures custom profile data (username, avatar) isn't overwritten on refresh.
  */
 export default function UserProfileSync() {
   const { user } = useUser();
@@ -20,24 +21,37 @@ export default function UserProfileSync() {
 
     const userRef = doc(db, 'users', user.uid);
     
-    // Construct sync data safely
-    // We only include username and photoURL if they are provided by the Auth provider
-    // to avoid overwriting custom profiles set in the app with 'null'
-    const initialSyncData: any = {
-      id: user.uid,
-      email: user.email,
-      onlineStatus: true,
-      lastActiveAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+    const syncProfile = async () => {
+      try {
+        const docSnap = await getDoc(userRef);
+        
+        if (!docSnap.exists()) {
+          // First time initialization: use Auth provider defaults
+          const initialData = {
+            id: user.uid,
+            email: user.email,
+            username: user.displayName || user.email?.split('@')[0] || 'User',
+            profilePictureUrl: user.photoURL || '',
+            onlineStatus: true,
+            lastActiveAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          };
+          setDocumentNonBlocking(userRef, initialData, { merge: true });
+        } else {
+          // Profile exists: only update presence to avoid overwriting custom data
+          updateDocumentNonBlocking(userRef, {
+            onlineStatus: true,
+            lastActiveAt: serverTimestamp(),
+          });
+        }
+      } catch (error) {
+        // Fallback for permission issues or network errors
+        console.error("Profile sync error:", error);
+      }
     };
 
-    // Only set these if the Auth object actually has them
-    if (user.displayName) initialSyncData.username = user.displayName;
-    if (user.photoURL) initialSyncData.profilePictureUrl = user.photoURL;
-
-    // Use set with merge: true to ensure the document exists without overwriting 
-    // fields we didn't include in initialSyncData
-    setDocumentNonBlocking(userRef, initialSyncData, { merge: true });
+    syncProfile();
 
     // Periodic heartbeat to keep presence accurate
     heartbeatIntervalRef.current = setInterval(() => {
