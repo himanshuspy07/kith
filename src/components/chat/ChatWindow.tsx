@@ -122,16 +122,26 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return isOnline ? 'Active now' : `Last seen ${formatDistanceToNow(lastActive)} ago`;
   }, [room, participants, user]);
 
+  // Handle Mark as Read
   useEffect(() => {
-    if (messages && user && conversationId && db) {
-      messages.forEach((msg) => {
-        if (!msg.readBy?.includes(user.uid)) {
-          const msgRef = doc(db, 'chatRooms', conversationId, 'messages', msg.id);
-          updateDocumentNonBlocking(msgRef, { readBy: arrayUnion(user.uid) });
-        }
-      });
+    if (user && conversationId && db) {
+      // 1. Mark individual messages as read
+      if (messages) {
+        messages.forEach((msg) => {
+          if (!msg.readBy?.includes(user.uid)) {
+            const msgRef = doc(db, 'chatRooms', conversationId, 'messages', msg.id);
+            updateDocumentNonBlocking(msgRef, { readBy: arrayUnion(user.uid) });
+          }
+        });
+      }
+
+      // 2. Mark the room itself as read (to update the sidebar indicator)
+      if (room && !room.readBy?.includes(user.uid)) {
+        const roomDocRef = doc(db, 'chatRooms', conversationId);
+        updateDocumentNonBlocking(roomDocRef, { readBy: arrayUnion(user.uid) });
+      }
     }
-  }, [messages, user, conversationId, db]);
+  }, [messages, room, user, conversationId, db]);
 
   useEffect(() => {
     if (messages && messages.length > 0 && !isLoading) {
@@ -159,13 +169,15 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     };
     const msgColRef = collection(db, 'chatRooms', conversationId, 'messages');
     addDocumentNonBlocking(msgColRef, messageData);
+    
     const roomDocRef = doc(db, 'chatRooms', conversationId);
     updateDocumentNonBlocking(roomDocRef, {
       lastMessageText: type === 'text' ? content : '📷 Image',
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
-      readBy: [user.uid],
+      readBy: [user.uid], // Reset read list to just the sender
     });
+    
     if (type === 'text') setInputValue('');
     setReplyToMessage(null);
   };
@@ -385,7 +397,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                       </DropdownMenu>
                     </div>
                   )}
-                  {/* Mobile Tap actions could be added here if needed, keeping it clean for now */}
                 </div>
               </div>
             </React.Fragment>
