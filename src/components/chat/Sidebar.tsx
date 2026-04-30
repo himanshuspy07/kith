@@ -215,7 +215,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           </Avatar>
           <div className="flex flex-col overflow-hidden">
             <span className="font-semibold text-sm truncate max-w-[120px]">{currentUserProfile?.username || 'Kith'}</span>
-            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{user?.email}</span>
+            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{user?.email || user?.phoneNumber || 'Auth'}</span>
           </div>
         </div>
         <div className="flex gap-1">
@@ -241,7 +241,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                   <div className="relative group">
                     <Avatar className="h-24 w-24 border-2 border-primary/20">
                       <AvatarImage src={newAvatar || currentUserProfile?.profilePictureUrl || undefined} />
-                      <AvatarFallback className="text-2xl font-bold">{user?.email?.[0].toUpperCase()}</AvatarFallback>
+                      <AvatarFallback className="text-2xl font-bold">{user?.email?.[0].toUpperCase() || 'U'}</AvatarFallback>
                     </Avatar>
                     <Button size="icon" variant="secondary" className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-lg" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                       {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -391,4 +391,3 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     </div>
   );
 }
-

@@ -249,16 +249,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     toast({ title: "Wallpaper updated" });
   };
 
-  const handleAddMember = (targetUser: any) => {
-    if (!roomRef || room?.memberIds.includes(targetUser.id)) return;
-    updateDocumentNonBlocking(roomRef, {
-      memberIds: arrayUnion(targetUser.id),
-      [`members.${targetUser.id}`]: true
-    });
-    toast({ title: `${targetUser.username} added to group` });
-    setUserSearch('');
-  };
-
   if (!conversationId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-background">

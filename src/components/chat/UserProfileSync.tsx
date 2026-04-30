@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -29,7 +30,8 @@ export default function UserProfileSync() {
             // First time initialization: use Auth provider defaults
             const initialData = {
               id: user.uid,
-              email: user.email,
+              email: user.email || '',
+              phoneNumber: user.phoneNumber || '',
               username: user.displayName || user.email?.split('@')[0] || 'User',
               profilePictureUrl: user.photoURL || '',
               onlineStatus: true,

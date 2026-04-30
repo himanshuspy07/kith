@@ -5,7 +5,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user account in the Kith chat application. Stores core profile information and online status. Authentication details (passwords, tokens) are handled externally.",
+      "description": "Represents a user account in the Kith chat application.",
       "properties": {
         "id": {
           "type": "string",
@@ -17,31 +17,35 @@
         },
         "email": {
           "type": "string",
-          "description": "User's email address, used for account recovery or notifications.",
+          "description": "User's email address.",
           "format": "email"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "User's phone number."
         },
         "profilePictureUrl": {
           "type": "string",
-          "description": "URL to the user's profile picture or avatar.",
+          "description": "URL to the user's profile picture.",
           "format": "uri"
         },
         "onlineStatus": {
           "type": "boolean",
-          "description": "Indicates if the user is currently online (true) or offline (false)."
+          "description": "Indicates if the user is online."
         },
         "lastActiveAt": {
           "type": "string",
-          "description": "Timestamp of the user's last known activity.",
+          "description": "Timestamp of the user's last activity.",
           "format": "date-time"
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the user account was created.",
+          "description": "Account creation timestamp.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the user's profile information was last updated.",
+          "description": "Profile update timestamp.",
           "format": "date-time"
         }
       },
@@ -56,136 +60,78 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ChatRoom",
       "type": "object",
-      "description": "Represents a conversation channel, which can be either a one-on-one private chat or a group chat. It links participants and provides metadata about the conversation.",
+      "description": "Represents a conversation channel.",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the ChatRoom entity."
+          "type": "string"
         },
         "name": {
-          "type": "string",
-          "description": "The name of the chat room. Required for group chats. Can be null or system-generated for one-on-one chats."
+          "type": "string"
         },
         "isGroupChat": {
-          "type": "boolean",
-          "description": "Flag indicating if this is a group chat (true) or a one-on-one private chat (false)."
+          "type": "boolean"
         },
         "memberIds": {
           "type": "array",
-          "description": "References to Users who are members of this chat room. (Relationship: User N:N ChatRoom)",
-          "items": {
-            "type": "string"
-          }
+          "items": { "type": "string" }
         },
         "members": {
           "type": "object",
-          "description": "Map of user IDs to booleans for security rules indexing."
+          "description": "Map of user IDs to booleans."
         },
         "pinnedBy": {
-          "type": "object",
-          "description": "Map of user IDs to booleans indicating if this room is pinned for them."
+          "type": "object"
         },
         "typing": {
           "type": "object",
-          "description": "Map of user IDs to timestamps indicating when they were last typing."
+          "description": "Map of user IDs to timestamps."
         },
         "wallpaper": {
           "type": "string",
-          "description": "CSS background property or theme name for the chat window."
+          "description": "The selected theme or background color for this room."
         },
-        "createdBy": {
-          "type": "string",
-          "description": "Reference to the User who created this chat room. Applicable primarily for group chats. (Relationship: User 1:N ChatRoom)"
+        "lastMessageText": {
+          "type": "string"
         },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the chat room was created.",
-          "format": "date-time"
+        "lastMessageSenderId": {
+          "type": "string"
+        },
+        "readBy": {
+          "type": "array",
+          "items": { "type": "string" }
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the chat room's properties (e.g., name, members) were last updated.",
           "format": "date-time"
-        },
-        "lastMessageText": {
-          "type": "string",
-          "description": "Text preview of the last message sent in this room."
-        },
-        "lastMessageSenderId": {
-          "type": "string",
-          "description": "UID of the sender of the last message."
         }
       },
       "required": [
         "id",
         "isGroupChat",
-        "memberIds",
-        "createdAt"
+        "memberIds"
       ]
     },
     "Message": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Message",
       "type": "object",
-      "description": "Represents an individual message sent within a chat room, including its content, sender, and status.",
+      "description": "Represents an individual message.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Message entity."
-        },
-        "chatRoomId": {
-          "type": "string",
-          "description": "Reference to the ChatRoom where this message was sent. (Relationship: ChatRoom 1:N Message)"
-        },
-        "senderId": {
-          "type": "string",
-          "description": "Reference to the User who sent this message. (Relationship: User 1:N Message)"
-        },
-        "content": {
-          "type": "string",
-          "description": "The textual content of the message."
-        },
-        "type": {
-          "type": "string",
-          "description": "The type of message, e.g., 'text', 'image', 'file'."
-        },
-        "replyToId": {
-          "type": "string",
-          "description": "Reference to the ID of the message being replied to."
-        },
-        "fileUrl": {
-          "type": "string",
-          "description": "URL to the shared file or image, if the message type is 'image' or 'file'.",
-          "format": "uri"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the message was originally sent.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the message was last edited.",
-          "format": "date-time"
-        },
-        "isEdited": {
-          "type": "boolean",
-          "description": "Flag indicating if the message has been edited since it was originally sent."
-        },
-        "isDeleted": {
-          "type": "boolean",
-          "description": "Flag indicating if the message has been soft-deleted by the sender."
-        },
+        "id": { "type": "string" },
+        "chatRoomId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "replyToId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
         "readBy": {
           "type": "array",
-          "description": "An array of User IDs who have read this message, enabling read receipts.",
-          "items": {
-            "type": "string"
-          }
+          "items": { "type": "string" }
         },
         "reactions": {
           "type": "object",
-          "description": "Map of emoji characters to arrays of User IDs who reacted with that emoji."
+          "description": "Map of emoji to array of user IDs."
         }
       },
       "required": [
@@ -194,16 +140,14 @@
         "senderId",
         "content",
         "type",
-        "createdAt",
-        "isEdited",
-        "isDeleted",
-        "readBy"
+        "createdAt"
       ]
     }
   },
   "auth": {
     "providers": [
       "password",
+      "phone",
       "anonymous"
     ]
   },
@@ -213,52 +157,21 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores individual user profiles.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            }
-          ]
+          "schema": { "$ref": "#/backend/entities/User" }
         }
       },
       {
         "path": "/chatRooms/{chatRoomId}",
         "definition": {
           "entityName": "ChatRoom",
-          "schema": {
-            "$ref": "#/backend/entities/ChatRoom"
-          },
-          "description": "Stores metadata for each chat conversation.",
-          "params": [
-            {
-              "name": "chatRoomId",
-              "description": "The unique identifier for the chat room."
-            }
-          ]
+          "schema": { "$ref": "#/backend/entities/ChatRoom" }
         }
       },
       {
         "path": "/chatRooms/{chatRoomId}/messages/{messageId}",
         "definition": {
           "entityName": "Message",
-          "schema": {
-            "$ref": "#/backend/entities/Message"
-          },
-          "description": "Stores individual messages sent within a chat room.",
-          "params": [
-            {
-              "name": "chatRoomId",
-              "description": "The unique identifier of the parent chat room."
-            },
-            {
-              "name": "messageId",
-              "description": "The unique identifier for the message."
-            }
-          ]
+          "schema": { "$ref": "#/backend/entities/Message" }
         }
       }
     ]
