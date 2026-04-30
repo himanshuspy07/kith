@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, deleteField, where, limitToLast } from 'firebase/firestore';
+import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, arrayRemove, deleteField, where, limitToLast } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 
@@ -197,11 +197,34 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   };
 
   const handleReaction = (messageId: string, emoji: string) => {
-    if (!conversationId || !user || !db) return;
+    if (!conversationId || !user || !db || !messages) return;
+    
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg) return;
+
+    const updates: any = {};
+    let alreadyHadThisEmoji = false;
+
+    // Check existing reactions and prepare to remove any previously sent reaction by this user
+    if (msg.reactions) {
+      Object.entries(msg.reactions).forEach(([existingEmoji, uids]) => {
+        if (Array.isArray(uids) && uids.includes(user.uid)) {
+          updates[`reactions.${existingEmoji}`] = arrayRemove(user.uid);
+          if (existingEmoji === emoji) {
+            alreadyHadThisEmoji = true;
+          }
+        }
+      });
+    }
+
+    // If the user didn't have this specific emoji already, add it.
+    // This allows toggling off by clicking the same emoji, and switching by clicking a different one.
+    if (!alreadyHadThisEmoji) {
+      updates[`reactions.${emoji}`] = arrayUnion(user.uid);
+    }
+
     const msgRef = doc(db, 'chatRooms', conversationId, 'messages', messageId);
-    updateDocumentNonBlocking(msgRef, {
-      [`reactions.${emoji}`]: arrayUnion(user.uid)
-    });
+    updateDocumentNonBlocking(msgRef, updates);
   };
 
   const isOtherTyping = () => {
@@ -433,7 +456,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                           className="bg-muted/80 backdrop-blur-sm border border-border/50 rounded-full px-1.5 py-0.5 flex items-center gap-1 text-[10px] font-bold shadow-sm"
                         >
                           <span>{emoji}</span>
-                          <span className="opacity-70">{uids.length}</span>
+                          <span className="opacity-70">{Array.isArray(uids) ? uids.length : 0}</span>
                         </div>
                       ))}
                     </div>
