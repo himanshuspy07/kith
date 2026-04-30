@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 
 interface NotificationManagerProps {
   currentConversationId?: string;
@@ -17,12 +17,15 @@ export default function NotificationManager({ currentConversationId }: Notificat
   const { user } = useUser();
   const db = useFirestore();
   const lastNotifiedRef = useRef<Record<string, string>>({});
+  const isFirstLoad = useRef(true);
 
   useEffect(() => {
     if (!("Notification" in window)) return;
     
+    // Check permission status on mount
     if (Notification.permission === "default") {
-      Notification.requestPermission();
+      // We don't auto-request here anymore to avoid annoying the user on every refresh
+      // Requesting is now handled by the button in Sidebar settings
     }
   }, []);
 
@@ -39,26 +42,47 @@ export default function NotificationManager({ currentConversationId }: Notificat
   useEffect(() => {
     if (!rooms || !user) return;
 
+    // Suppression logic: On the very first data arrival, we just record the current state 
+    // without triggering any notifications.
+    if (isFirstLoad.current) {
+      rooms.forEach(room => {
+        if (room.lastMessageText) {
+          lastNotifiedRef.current[room.id] = room.lastMessageText;
+        }
+      });
+      isFirstLoad.current = false;
+      return;
+    }
+
     rooms.forEach(room => {
-      // Trigger notification if:
-      // 1. Room has a last message
-      // 2. Sender is not current user
-      // 3. We are not currently looking at this specific conversation
-      // 4. We haven't already notified for this specific message text/timestamp
+      // Check if message is fresh (within last 5 minutes) to avoid stale notifications
+      const lastUpdate = room.updatedAt?.toDate?.()?.getTime() || Date.now();
+      const isRecent = (Date.now() - lastUpdate) < 300000; // 5 minutes
+
       const isNewMessage = room.lastMessageText && lastNotifiedRef.current[room.id] !== room.lastMessageText;
       const isFromOther = room.lastMessageSenderId !== user.uid;
       const isNotCurrent = room.id !== currentConversationId;
 
-      if (isNewMessage && isFromOther && isNotCurrent) {
+      if (isNewMessage && isFromOther && isNotCurrent && isRecent) {
         if (Notification.permission === "granted") {
-          new Notification(room.name || "Kith", {
-            body: room.lastMessageText,
-            icon: "/icon.svg",
-          });
+          try {
+            const n = new Notification(room.displayName || room.name || "Kith", {
+              body: room.lastMessageText,
+              icon: "/icon.svg",
+              badge: "/icon.svg",
+              tag: room.id, // Group notifications by room
+              renotify: true
+            });
+            
+            // Auto-close notification after 5 seconds
+            setTimeout(() => n.close(), 5000);
+          } catch (e) {
+            console.error("Failed to show notification:", e);
+          }
           lastNotifiedRef.current[room.id] = room.lastMessageText;
         }
       } else if (!isFromOther || !isNotCurrent) {
-        // Sync ref if we saw it or sent it
+        // Always sync the ref if we are looking at the chat or if we sent the message
         lastNotifiedRef.current[room.id] = room.lastMessageText;
       }
     });

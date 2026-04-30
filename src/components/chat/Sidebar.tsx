@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff } from 'lucide-react';
+import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, Bell, BellRing } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const [isUploading, setIsUploading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [notificationPermission, setNotificationPermission] = useState<string>('default');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
@@ -39,10 +40,14 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const [newUsername, setNewUsername] = useState('');
   const [newAvatar, setNewAvatar] = useState('');
 
-  // Stabilize time for hydration
   useEffect(() => {
     setCurrentTime(Date.now());
     const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
+    
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
+    
     return () => clearInterval(interval);
   }, []);
 
@@ -64,6 +69,24 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+    }
+  };
+
+  const handleRequestNotifications = async () => {
+    if (!("Notification" in window)) {
+      toast({ variant: "destructive", title: "Not Supported", description: "Your browser does not support notifications." });
+      return;
+    }
+    
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    
+    if (permission === 'granted') {
+      toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages." });
+      // Test notification
+      new Notification("Kith", { body: "Notifications are now active!", icon: "/icon.svg" });
+    } else {
+      toast({ variant: "destructive", title: "Permission Denied", description: "Notifications are blocked by your browser settings." });
     }
   };
 
@@ -213,7 +236,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             </DialogTrigger>
             <DialogContent className="bg-card border-border sm:max-w-md w-[90%] rounded-xl">
               <DialogHeader><DialogTitle>Profile Settings</DialogTitle></DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2 scrollbar-hide">
                 <div className="flex flex-col items-center gap-4 mb-4">
                   <div className="relative group">
                     <Avatar className="h-24 w-24 border-2 border-primary/20">
@@ -230,12 +253,29 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                   <Label htmlFor="set-username">Display Name</Label>
                   <Input id="set-username" placeholder="Enter new username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-muted/30 border-none h-11" />
                 </div>
-                <div className="pt-4 border-t border-border flex items-center justify-between">
-                  <span className="text-sm font-medium">Appearance</span>
-                  <Button variant="outline" size="sm" onClick={toggleTheme} className="gap-2 h-10 px-4">
-                    {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                    <span className="hidden sm:inline">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
-                  </Button>
+                
+                <div className="pt-4 border-t border-border space-y-3">
+                  <Label className="text-xs uppercase tracking-widest font-bold opacity-70">App Settings</Label>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Appearance</span>
+                    <Button variant="outline" size="sm" onClick={toggleTheme} className="gap-2 h-10 px-4">
+                      {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                      <span>{isDarkMode ? 'Light' : 'Dark'}</span>
+                    </Button>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Notifications</span>
+                    <Button 
+                      variant={notificationPermission === 'granted' ? "ghost" : "outline"} 
+                      size="sm" 
+                      onClick={handleRequestNotifications} 
+                      className={cn("gap-2 h-10 px-4", notificationPermission === 'granted' && "text-accent")}
+                    >
+                      {notificationPermission === 'granted' ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                      <span>{notificationPermission === 'granted' ? 'Enabled' : 'Enable'}</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
               <DialogFooter><Button onClick={handleUpdateProfile} disabled={isUploading} className="w-full h-11">Save Changes</Button></DialogFooter>
@@ -351,3 +391,4 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     </div>
   );
 }
+
