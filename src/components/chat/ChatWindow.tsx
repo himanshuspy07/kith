@@ -34,6 +34,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [userSearch, setUserSearch] = useState('');
+  const [currentTime, setCurrentTime] = useState<number>(0);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const topObserverRef = useRef<HTMLDivElement>(null);
@@ -43,6 +44,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
+
+  // Stabilize time for hydration
+  useEffect(() => {
+    setCurrentTime(Date.now());
+    const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const roomRef = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
@@ -114,18 +122,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [room, participants, user]);
 
   const presenceInfo = React.useMemo(() => {
-    if (!room || room.isGroupChat || !participants || !user) return null;
+    if (!room || room.isGroupChat || !participants || !user || !currentTime) return null;
     const otherUser = participants.find(p => p.id !== user.uid);
     if (!otherUser) return null;
-    const lastActive = otherUser.lastActiveAt?.toDate?.() || new Date(otherUser.lastActiveAt || Date.now());
-    const isOnline = otherUser.onlineStatus && (Date.now() - lastActive.getTime() < 120000);
+    const lastActive = otherUser.lastActiveAt?.toDate?.() || new Date(otherUser.lastActiveAt || currentTime);
+    const isOnline = otherUser.onlineStatus && (currentTime - lastActive.getTime() < 120000);
     return isOnline ? 'Active now' : `Last seen ${formatDistanceToNow(lastActive)} ago`;
-  }, [room, participants, user]);
+  }, [room, participants, user, currentTime]);
 
-  // Handle Mark as Read
   useEffect(() => {
     if (user && conversationId && db) {
-      // 1. Mark individual messages as read
       if (messages) {
         messages.forEach((msg) => {
           if (!msg.readBy?.includes(user.uid)) {
@@ -134,8 +140,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           }
         });
       }
-
-      // 2. Mark the room itself as read (to update the sidebar indicator)
       if (room && !room.readBy?.includes(user.uid)) {
         const roomDocRef = doc(db, 'chatRooms', conversationId);
         updateDocumentNonBlocking(roomDocRef, { readBy: arrayUnion(user.uid) });
@@ -175,7 +179,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       lastMessageText: type === 'text' ? content : '📷 Image',
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
-      readBy: [user.uid], // Reset read list to just the sender
+      readBy: [user.uid],
     });
     
     if (type === 'text') setInputValue('');
@@ -183,12 +187,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   };
 
   const isOtherTyping = () => {
-    if (!room?.typing) return false;
-    const now = Date.now();
+    if (!room?.typing || !currentTime) return false;
     return Object.entries(room.typing).some(([uid, ts]: [string, any]) => {
       if (uid === user?.uid) return false;
       const timestamp = ts?.toDate?.()?.getTime() || 0;
-      return (now - timestamp) < 4000;
+      return (currentTime - timestamp) < 4000;
     });
   };
 
@@ -328,14 +331,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         {messages?.map((msg, i) => {
           const isMe = msg.senderId === user?.uid;
           const senderProfile = participantMap[msg.senderId];
-          const msgDate = msg.createdAt?.toDate?.() || new Date();
+          const msgDate = msg.createdAt?.toDate?.() || (currentTime ? new Date(currentTime) : null);
           const prevMsg = i > 0 ? messages[i - 1] : null;
-          const showDateHeader = i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(), 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd');
+          const showDateHeader = msgDate && (i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(currentTime), 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd'));
           const repliedMsg = msg.replyToId ? messages.find(m => m.id === msg.replyToId) : null;
           const repliedSender = repliedMsg ? participantMap[repliedMsg.senderId] : null;
           return (
             <React.Fragment key={msg.id}>
-              {showDateHeader && (
+              {showDateHeader && msgDate && (
                 <div className="flex justify-center my-6"><span className="px-3 py-1 rounded-full bg-muted/50 text-[10px] text-muted-foreground font-bold uppercase tracking-widest border border-border/30">{format(msgDate, 'MMMM d, yyyy')}</span></div>
               )}
               <div className={cn("flex items-end gap-2 group", isMe ? "flex-row-reverse" : "flex-row")}>
@@ -369,34 +372,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   )}
                   <div className={cn("flex items-center justify-end gap-1.5 mt-1 text-[8px] md:text-[9px] font-medium opacity-70", isMe ? "text-primary-foreground/90" : "text-muted-foreground")}>
                     {msg.isEdited && !msg.isDeleted && <span>Edited • </span>}
-                    <span>{format(msgDate, 'HH:mm')}</span>
+                    <span>{msgDate ? format(msgDate, 'HH:mm') : '--:--'}</span>
                     {isMe && <CheckCheck className={cn("h-3 w-3", msg.readBy?.length > 1 ? "text-accent" : "")} />}
                   </div>
-                  {!msg.isDeleted && (
-                    <div className={cn("absolute top-0 hidden md:flex transition-opacity opacity-0 group-hover:opacity-100 gap-0.5", isMe ? "-left-24" : "-right-24")}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50" onClick={() => setReplyToMessage(msg)}><Reply className="h-4 w-4" /></Button>
-                      <Popover>
-                        <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50"><Smile className="h-4 w-4" /></Button></PopoverTrigger>
-                        <PopoverContent className="w-auto p-1 rounded-full flex gap-1 border-border">
-                          {EMOJIS.map(emoji => (
-                            <button key={emoji} onClick={() => { if (!conversationId || !db || !user) return; updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', msg.id), { reactions: arrayUnion(`${user.uid}:${emoji}`) }); }} className="hover:scale-125 transition-transform p-1 text-lg">{emoji}</button>
-                          ))}
-                        </PopoverContent>
-                      </Popover>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted/50"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {isMe && (
-                            <>
-                              <DropdownMenuItem onClick={() => { setEditingMessageId(msg.id); setEditValue(msg.content); }}><Pencil className="h-3 w-3 mr-2" /> Edit</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => { if (!conversationId || !db) return; updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', msg.id), { isDeleted: true, content: "Deleted", updatedAt: serverTimestamp() }); }}><Trash2 className="h-3 w-3 mr-2" /> Delete</DropdownMenuItem>
-                            </>
-                          )}
-                          <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(msg.content); toast({ title: "Copied" }); }}>Copy</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  )}
                 </div>
               </div>
             </React.Fragment>

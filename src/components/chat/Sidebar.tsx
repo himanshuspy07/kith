@@ -28,6 +28,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [currentTime, setCurrentTime] = useState<number>(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
@@ -37,6 +38,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
   const [newUsername, setNewUsername] = useState('');
   const [newAvatar, setNewAvatar] = useState('');
+
+  // Stabilize time for hydration
+  useEffect(() => {
+    setCurrentTime(Date.now());
+    const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const currentUserRef = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
@@ -127,7 +135,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       try {
         await updateProfile(user, { displayName: newUsername.trim() });
       } catch (e) {
-        console.error("Auth profile update failed:", e);
+        // Handled silently
       }
     }
 
@@ -136,7 +144,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     }
 
     updateDocumentNonBlocking(currentUserRef, updates);
-    
     setIsSettingsOpen(false);
     toast({ title: "Profile updated" });
   };
@@ -167,12 +174,11 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   };
 
   const getRoomTyping = (room: any) => {
-    if (!room.typing) return null;
-    const now = Date.now();
+    if (!room.typing || !currentTime) return null;
     return Object.entries(room.typing).find(([uid, ts]: [string, any]) => {
       if (uid === user?.uid) return false;
       const timestamp = ts?.toDate?.()?.getTime() || 0;
-      return (now - timestamp) < 4000;
+      return (currentTime - timestamp) < 4000;
     });
   };
 
@@ -219,7 +225,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                     </Button>
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                   </div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Change Profile Photo</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="set-username">Display Name</Label>
@@ -265,15 +270,15 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         ) : (
           filteredConversations.map((room) => {
             const isSelected = selectedConversationId === room.id;
-            const updatedAt = room.updatedAt?.toDate?.() || new Date();
+            const updatedAt = room.updatedAt?.toDate?.() || (currentTime ? new Date(currentTime) : null);
             const isUnread = room.lastMessageText && room.lastMessageSenderId !== user?.uid && (!room.readBy?.includes(user?.uid));
             const typingUser = getRoomTyping(room);
             
             let presenceText = '';
             if (!room.isGroupChat && room.otherUserProfile) {
-              const lastActive = room.otherUserProfile.lastActiveAt?.toDate?.() || new Date(room.otherUserProfile.lastActiveAt || Date.now());
-              const isOnline = room.otherUserProfile.onlineStatus && (Date.now() - lastActive.getTime() < 120000);
-              presenceText = isOnline ? 'Online' : `Seen ${formatDistanceToNow(lastActive)} ago`;
+              const lastActive = room.otherUserProfile.lastActiveAt?.toDate?.() || new Date(room.otherUserProfile.lastActiveAt || currentTime || Date.now());
+              const isOnline = room.otherUserProfile.onlineStatus && (currentTime && (currentTime - lastActive.getTime() < 120000));
+              presenceText = isOnline ? 'Online' : (currentTime ? `Seen ${formatDistanceToNow(lastActive)} ago` : 'Offline');
             } else if (room.isGroupChat) {
               presenceText = `${room.memberIds?.length || 0} members`;
             }
@@ -282,13 +287,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
               <div
                 key={room.id}
                 onClick={() => onSelectConversation(room.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    onSelectConversation(room.id);
-                  }
-                }}
                 className={cn(
                   "w-full p-4 flex items-start gap-3 transition-colors hover:bg-muted/20 text-left relative group cursor-pointer border-b border-border/10",
                   isSelected && "bg-muted/40"
@@ -312,7 +310,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                     <div className="flex items-center gap-1.5 shrink-0">
                       {room.isPinned && <Pin className="h-3 w-3 text-primary fill-primary" />}
                       <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        {formatDistanceToNow(updatedAt, { addSuffix: false })}
+                        {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: false }) : '--'}
                       </span>
                     </div>
                   </div>
