@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '@/components/chat/Sidebar';
 import ChatWindow from '@/components/chat/ChatWindow';
 import AuthScreen from '@/components/auth/AuthScreen';
@@ -16,6 +16,12 @@ export default function Home() {
   const { user, isUserLoading } = useUser();
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>(undefined);
   const isMobile = useIsMobile();
+  const [hasMounted, setHasMounted] = useState(false);
+
+  // Avoid hydration mismatch by waiting for mount
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   if (isUserLoading) {
     return (
@@ -48,11 +54,10 @@ export default function Home() {
     return <AuthScreen />;
   }
 
-  // Mobile navigation logic: 
-  // - Show Sidebar if no conversation is selected
-  // - Show ChatWindow if a conversation is selected
-  const showSidebar = !isMobile || !selectedConversationId;
-  const showChat = !isMobile || !!selectedConversationId;
+  // Mobile navigation logic (only applies after mount to prevent hydration mismatch)
+  const isMobileView = hasMounted && isMobile;
+  const showSidebar = !isMobileView || !selectedConversationId;
+  const showChat = !isMobileView || !!selectedConversationId;
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
@@ -63,7 +68,7 @@ export default function Home() {
         <Sidebar 
           onSelectConversation={setSelectedConversationId} 
           selectedConversationId={selectedConversationId} 
-          className={cn(isMobile ? "w-full" : "w-80")}
+          className={cn(isMobileView ? "w-full" : "w-80")}
         />
       )}
       
@@ -71,7 +76,7 @@ export default function Home() {
         <main className="flex-1 h-full flex flex-col">
           <ChatWindow 
             conversationId={selectedConversationId} 
-            onBack={isMobile ? () => setSelectedConversationId(undefined) : undefined}
+            onBack={isMobileView ? () => setSelectedConversationId(undefined) : undefined}
           />
         </main>
       )}
