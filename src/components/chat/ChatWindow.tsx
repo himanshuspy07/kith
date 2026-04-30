@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -37,8 +36,6 @@ const WALLPAPERS = [
 export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
   const [replyToMessage, setReplyToMessage] = useState<any>(null);
   const [messageLimit, setMessageLimit] = useState(30);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -73,16 +70,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return query(collection(db, 'users'), where('id', 'in', room.memberIds));
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
-
-  const availableUsersQuery = useMemoFirebase(() => {
-    if (!db || !userSearch || userSearch.length < 2) return null;
-    return query(
-      collection(db, 'users'),
-      where('username', '>=', userSearch),
-      where('username', '<=', userSearch + '\uf8ff')
-    );
-  }, [db, userSearch]);
-  const { data: searchResults } = useCollection(availableUsersQuery);
 
   const participantMap = React.useMemo(() => {
     const map: Record<string, any> = {};
@@ -162,7 +149,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       const timeout = setTimeout(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
       return () => clearTimeout(timeout);
     }
-  }, [messages?.length]);
+  }, [messages?.length, isLoading]);
 
   const handleSend = (type: 'text' | 'image' = 'text', contentString?: string) => {
     const content = contentString || inputValue.trim();
@@ -205,7 +192,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     const updates: any = {};
     let alreadyHadThisEmoji = false;
 
-    // Check existing reactions and prepare to remove any previously sent reaction by this user
     if (msg.reactions) {
       Object.entries(msg.reactions).forEach(([existingEmoji, uids]) => {
         if (Array.isArray(uids) && uids.includes(user.uid)) {
@@ -217,8 +203,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       });
     }
 
-    // If the user didn't have this specific emoji already, add it.
-    // This allows toggling off by clicking the same emoji, and switching by clicking a different one.
     if (!alreadyHadThisEmoji) {
       updates[`reactions.${emoji}`] = arrayUnion(user.uid);
     }
@@ -263,7 +247,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-      {/* Header */}
       <div className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-2 md:gap-3">
           {onBack && (
@@ -363,7 +346,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       </div>
 
-      {/* Message Area */}
       <div 
         className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scrollbar-hide relative"
         style={{ background: room?.wallpaper || 'transparent' }}
@@ -398,7 +380,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card border border-border/50 text-foreground rounded-bl-none",
                     msg.isDeleted && "opacity-40 italic"
                   )}>
-                    {/* Reaction Bar (Hover Only) */}
                     <div className={cn(
                       "absolute -top-10 opacity-0 group-hover/bubble:opacity-100 transition-opacity bg-background border border-border shadow-xl rounded-full p-1 flex gap-1 z-10",
                       isMe ? "right-0" : "left-0"
@@ -431,13 +412,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                       <span>{msgDate ? format(msgDate, 'HH:mm') : '--:--'}</span>
                       {isMe && (
                         <button onClick={() => setSeenByMessage(msg)} className="hover:text-accent transition-colors">
-                          <CheckCheck className={cn("h-3 w-3", msg.readBy?.length > 1 ? "text-accent" : "")} />
+                          <CheckCheck className={cn("h-3 w-3", (msg.readBy?.length || 0) > 1 ? "text-accent" : "")} />
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Reactions Display */}
                   {Object.keys(reactions).length > 0 && (
                     <div className={cn("flex flex-wrap gap-1", isMe ? "justify-end" : "justify-start")}>
                       {Object.entries(reactions).map(([emoji, uids]: [string, any]) => (
@@ -459,7 +439,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
       <div className="p-3 md:p-4 border-t border-border bg-background/95 backdrop-blur-md z-20">
         {replyToMessage && (
           <div className="max-w-5xl mx-auto mb-3 p-3 bg-muted/50 rounded-xl border border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2">
@@ -496,7 +475,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       </div>
 
-      {/* Seen By Dialog */}
       <Dialog open={!!seenByMessage} onOpenChange={() => setSeenByMessage(null)}>
         <DialogContent className="sm:max-w-md bg-card border-border">
           <DialogHeader>

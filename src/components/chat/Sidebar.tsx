@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -78,15 +77,18 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       return;
     }
     
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
-    
-    if (permission === 'granted') {
-      toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages." });
-      // Test notification
-      new Notification("Kith", { body: "Notifications are now active!", icon: "/icon.svg" });
-    } else {
-      toast({ variant: "destructive", title: "Permission Denied", description: "Notifications are blocked by your browser settings." });
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      
+      if (permission === 'granted') {
+        toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages." });
+        new Notification("Kith", { body: "Notifications are now active!", icon: "/icon.svg" });
+      } else {
+        toast({ variant: "destructive", title: "Permission Denied", description: "Notifications are blocked by your browser settings." });
+      }
+    } catch (e) {
+      console.error("Notification request failed:", e);
     }
   };
 
@@ -100,11 +102,23 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
   const { data: rooms, isLoading } = useCollection(roomsQuery);
 
-  const allUsersQuery = useMemoFirebase(() => {
-    if (!db) return null;
-    return collection(db, 'users');
-  }, [db]);
-  const { data: allUsers } = useCollection(allUsersQuery);
+  // Optimized: Collect unique participant IDs from all rooms to fetch only their profiles
+  const participantIds = useMemo(() => {
+    if (!rooms || !user) return [];
+    const ids = new Set<string>();
+    rooms.forEach(room => {
+      room.memberIds?.forEach((id: string) => {
+        if (id !== user.uid) ids.add(id);
+      });
+    });
+    return Array.from(ids).slice(0, 30); // Firestore 'in' query limit is 30
+  }, [rooms, user]);
+
+  const usersQuery = useMemoFirebase(() => {
+    if (!db || participantIds.length === 0) return null;
+    return query(collection(db, 'users'), where('id', 'in', participantIds));
+  }, [db, participantIds]);
+  const { data: participantProfiles } = useCollection(usersQuery);
 
   const conversationListData = useMemo(() => {
     if (!rooms) return [];
@@ -114,9 +128,9 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       let displayAvatar = null;
       let otherUserProfile = null;
 
-      if (!room.isGroupChat && allUsers && user) {
+      if (!room.isGroupChat && participantProfiles && user) {
         const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
-        otherUserProfile = allUsers.find(u => u.id === otherUserId);
+        otherUserProfile = participantProfiles.find(u => u.id === otherUserId);
         if (otherUserProfile) {
           displayName = otherUserProfile.username;
           displayAvatar = otherUserProfile.profilePictureUrl;
@@ -140,10 +154,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       const timeB = b.updatedAt?.toDate?.()?.getTime() || 0;
       return timeB - timeA;
     });
-  }, [rooms, allUsers, user]);
+  }, [rooms, participantProfiles, user]);
 
   const filteredConversations = conversationListData.filter(room => {
-    return room.displayName?.toLowerCase().includes(searchQuery.toLowerCase());
+    return (room.displayName || '').toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const handleUpdateProfile = async () => {
@@ -158,7 +172,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       try {
         await updateProfile(user, { displayName: newUsername.trim() });
       } catch (e) {
-        // Handled silently
+        // Silently handle auth profile update error
       }
     }
 
@@ -241,7 +255,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                   <div className="relative group">
                     <Avatar className="h-24 w-24 border-2 border-primary/20">
                       <AvatarImage src={newAvatar || currentUserProfile?.profilePictureUrl || undefined} />
-                      <AvatarFallback className="text-2xl font-bold">{user?.email?.[0].toUpperCase() || 'U'}</AvatarFallback>
+                      <AvatarFallback className="text-2xl font-bold">{user?.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
                     </Avatar>
                     <Button size="icon" variant="secondary" className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-lg" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                       {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}

@@ -36,6 +36,7 @@ export default function CallManager() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const iceUnsubscribeRef = useRef<(() => void) | null>(null);
 
   // Listen for incoming calls
   const incomingCallsQuery = useMemoFirebase(() => {
@@ -57,6 +58,10 @@ export default function CallManager() {
 
   // Clean up WebRTC on end
   const cleanup = async () => {
+    if (iceUnsubscribeRef.current) {
+      iceUnsubscribeRef.current();
+      iceUnsubscribeRef.current = null;
+    }
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
@@ -123,10 +128,7 @@ export default function CallManager() {
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     try {
-      // Signalling: Set remote description
       await pc.setRemoteDescription(new RTCSessionDescription(activeCall.offer));
-
-      // Signalling: Create answer
       const answerDescription = await pc.createAnswer();
       await pc.setLocalDescription(answerDescription);
 
@@ -141,9 +143,9 @@ export default function CallManager() {
 
       setCallStatus('ongoing');
 
-      // Listen for caller ICE candidates
+      // Listen for caller ICE candidates with proper cleanup tracking
       const candidatesCol = collection(db, 'calls', activeCall.id, 'callerCandidates');
-      onSnapshot(candidatesCol, (snapshot) => {
+      const unsubscribe = onSnapshot(candidatesCol, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
           if (change.type === 'added') {
             pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
@@ -155,6 +157,8 @@ export default function CallManager() {
           operation: 'list'
         }));
       });
+      
+      iceUnsubscribeRef.current = unsubscribe;
     } catch (error) {
       console.error("Signaling error:", error);
       cleanup();
@@ -169,7 +173,6 @@ export default function CallManager() {
     cleanup();
   };
 
-  // Listen for call status changes (to end call)
   useEffect(() => {
     if (activeCall && db) {
       const callRef = doc(db, 'calls', activeCall.id);
@@ -198,7 +201,6 @@ export default function CallManager() {
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <Card className="w-full max-w-4xl aspect-video bg-card border-none shadow-2xl relative overflow-hidden flex flex-col md:flex-row">
         
-        {/* Remote Video (Full Size) */}
         <div className="flex-1 bg-muted relative">
           <video 
             ref={remoteVideoRef} 
@@ -225,7 +227,6 @@ export default function CallManager() {
           )}
         </div>
 
-        {/* Local Video (Floating) */}
         <div className="absolute top-4 right-4 w-48 aspect-video bg-black rounded-xl border border-white/10 shadow-xl overflow-hidden z-10">
           <video 
             ref={localVideoRef} 
@@ -241,7 +242,6 @@ export default function CallManager() {
           )}
         </div>
 
-        {/* Controls Overlay */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-background/50 backdrop-blur-xl p-4 rounded-full border border-white/10 shadow-2xl z-20">
           <Button 
             variant="ghost" 
