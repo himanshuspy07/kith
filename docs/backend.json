@@ -89,6 +89,10 @@
           "type": "object",
           "description": "Map of user IDs to timestamps indicating when they were last typing."
         },
+        "wallpaper": {
+          "type": "string",
+          "description": "CSS background property or theme name for the chat window."
+        },
         "createdBy": {
           "type": "string",
           "description": "Reference to the User who created this chat room. Applicable primarily for group chats. (Relationship: User 1:N ChatRoom)"
@@ -180,11 +184,8 @@
           }
         },
         "reactions": {
-          "type": "array",
-          "description": "An array of emoji reactions on this message.",
-          "items": {
-            "type": "string"
-          }
+          "type": "object",
+          "description": "Map of emoji characters to arrays of User IDs who reacted with that emoji."
         }
       },
       "required": [

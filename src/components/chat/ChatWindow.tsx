@@ -2,13 +2,14 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight, UserPlus, Users, ChevronLeft } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight, UserPlus, Users, ChevronLeft, Palette } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -22,7 +23,16 @@ interface ChatWindowProps {
   onBack?: () => void;
 }
 
-const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🙌', '✨'];
+
+const WALLPAPERS = [
+  { id: 'default', name: 'Default', value: 'transparent' },
+  { id: 'slate', name: 'Slate Night', value: 'hsl(var(--background))' },
+  { id: 'ocean', name: 'Ocean Deep', value: 'linear-gradient(to bottom, #0f172a, #1e293b)' },
+  { id: 'emerald', name: 'Emerald Forest', value: 'linear-gradient(to bottom, #064e3b, #065f46)' },
+  { id: 'midnight', name: 'Midnight Purple', value: 'linear-gradient(to bottom, #1e1b4b, #312e81)' },
+  { id: 'sunset', name: 'Sunset Glow', value: 'linear-gradient(to bottom, #451a03, #78350f)' },
+];
 
 export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
@@ -35,6 +45,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [newRoomName, setNewRoomName] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [seenByMessage, setSeenByMessage] = useState<any>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const topObserverRef = useRef<HTMLDivElement>(null);
@@ -45,7 +56,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const db = useFirestore();
   const { toast } = useToast();
 
-  // Stabilize time for hydration
   useEffect(() => {
     setCurrentTime(Date.now());
     const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
@@ -169,7 +179,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       isEdited: false,
       isDeleted: false,
       readBy: [user.uid],
-      reactions: [],
+      reactions: {},
     };
     const msgColRef = collection(db, 'chatRooms', conversationId, 'messages');
     addDocumentNonBlocking(msgColRef, messageData);
@@ -186,6 +196,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     setReplyToMessage(null);
   };
 
+  const handleReaction = (messageId: string, emoji: string) => {
+    if (!conversationId || !user || !db) return;
+    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', messageId);
+    updateDocumentNonBlocking(msgRef, {
+      [`reactions.${emoji}`]: arrayUnion(user.uid)
+    });
+  };
+
   const isOtherTyping = () => {
     if (!room?.typing || !currentTime) return false;
     return Object.entries(room.typing).some(([uid, ts]: [string, any]) => {
@@ -200,6 +218,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     updateDocumentNonBlocking(roomRef, { name: newRoomName.trim() });
     setNewRoomName('');
     toast({ title: "Room updated" });
+  };
+
+  const setWallpaper = (wallpaperValue: string) => {
+    if (!roomRef) return;
+    updateDocumentNonBlocking(roomRef, { wallpaper: wallpaperValue });
+    toast({ title: "Wallpaper updated" });
   };
 
   const handleAddMember = (targetUser: any) => {
@@ -226,7 +250,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-      <div className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+      {/* Header */}
+      <div className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-2 md:gap-3">
           {onBack && (
             <Button variant="ghost" size="icon" className="h-9 w-9 -ml-2 text-muted-foreground" onClick={onBack}>
@@ -268,6 +293,28 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   </div>
                 </div>
 
+                <div className="space-y-3 pt-4 border-t border-border">
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-2">
+                    <Palette className="h-3 w-3" />
+                    Chat Wallpaper
+                  </Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {WALLPAPERS.map((wp) => (
+                      <button
+                        key={wp.id}
+                        className={cn(
+                          "aspect-video rounded-md border-2 transition-all flex items-center justify-center text-[10px] font-bold p-1 overflow-hidden",
+                          room?.wallpaper === wp.value ? "border-primary shadow-lg scale-105" : "border-transparent opacity-70 hover:opacity-100"
+                        )}
+                        style={{ background: wp.value }}
+                        onClick={() => setWallpaper(wp.value)}
+                      >
+                        <span className="bg-black/40 px-1 rounded backdrop-blur-sm truncate">{wp.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {room?.isGroupChat && (
                   <div className="space-y-4 pt-4 border-t border-border">
                     <div className="space-y-2">
@@ -276,27 +323,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         <Input placeholder={room.name} value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} className="bg-muted/30 border-none h-11" />
                         <Button className="h-11" size="sm" onClick={handleUpdateRoom} disabled={!newRoomName.trim()}><Check className="h-4 w-4" /></Button>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">Add Members</Label>
-                      <div className="relative">
-                        <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="bg-muted/30 border-none pl-9 h-11" />
-                        <Users className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      </div>
-                      {searchResults && searchResults.length > 0 && (
-                        <div className="bg-muted/20 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
-                          {searchResults.filter(u => !room.memberIds.includes(u.id)).map(u => (
-                            <div key={u.id} className="flex items-center justify-between p-2 hover:bg-muted/40 rounded-md">
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-6 w-6"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
-                                <span className="text-xs font-medium">{u.username}</span>
-                              </div>
-                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleAddMember(u)}><UserPlus className="h-4 w-4" /></Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
@@ -324,7 +350,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scrollbar-hide">
+      {/* Message Area */}
+      <div 
+        className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scrollbar-hide relative"
+        style={{ background: room?.wallpaper || 'transparent' }}
+      >
         <div ref={topObserverRef} className="h-10 flex items-center justify-center">
           {isLoading && messageLimit > 30 && <Loader2 className="h-5 w-5 animate-spin text-primary opacity-50" />}
         </div>
@@ -335,11 +365,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           const prevMsg = i > 0 ? messages[i - 1] : null;
           const showDateHeader = msgDate && (i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(currentTime), 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd'));
           const repliedMsg = msg.replyToId ? messages.find(m => m.id === msg.replyToId) : null;
-          const repliedSender = repliedMsg ? participantMap[repliedMsg.senderId] : null;
+          const reactions = msg.reactions || {};
+
           return (
             <React.Fragment key={msg.id}>
               {showDateHeader && msgDate && (
-                <div className="flex justify-center my-6"><span className="px-3 py-1 rounded-full bg-muted/50 text-[10px] text-muted-foreground font-bold uppercase tracking-widest border border-border/30">{format(msgDate, 'MMMM d, yyyy')}</span></div>
+                <div className="flex justify-center my-6"><span className="px-3 py-1 rounded-full bg-muted/50 text-[10px] text-muted-foreground font-bold uppercase tracking-widest border border-border/30 backdrop-blur-sm">{format(msgDate, 'MMMM d, yyyy')}</span></div>
               )}
               <div className={cn("flex items-end gap-2 group", isMe ? "flex-row-reverse" : "flex-row")}>
                 {!isMe && (
@@ -347,34 +378,66 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     <AvatarImage src={senderProfile?.profilePictureUrl} /><AvatarFallback className="text-[10px]">{senderProfile?.username?.[0] || '?'}</AvatarFallback>
                   </Avatar>
                 )}
-                <div className={cn("max-w-[85%] md:max-w-[75%] px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm shadow-md transition-all relative", isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card border border-border/50 text-foreground rounded-bl-none", msg.isDeleted && "opacity-40 italic")}>
-                  {!isMe && room?.isGroupChat && <p className="text-[10px] font-bold text-accent mb-1 opacity-80 uppercase tracking-tighter">{senderProfile?.username || `User ${msg.senderId.slice(0, 4)}`}</p>}
-                  {repliedMsg && (
-                    <div className={cn("mb-2 p-2 rounded-lg text-[10px] md:text-xs border-l-4 opacity-70 flex flex-col gap-0.5", isMe ? "bg-primary-foreground/10 border-primary-foreground/50" : "bg-muted border-accent")}>
-                      <div className="flex items-center gap-1 font-bold text-[9px] md:text-[10px] uppercase tracking-tighter"><CornerDownRight className="h-3 w-3" />{repliedSender?.id === user?.uid ? "You" : repliedSender?.username || "User"}</div>
-                      <p className="truncate italic">{repliedMsg.isDeleted ? "Deleted" : repliedMsg.content}</p>
+                
+                <div className="flex flex-col gap-1 max-w-[85%] md:max-w-[75%]">
+                  <div className={cn(
+                    "px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm shadow-md transition-all relative group/bubble", 
+                    isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card border border-border/50 text-foreground rounded-bl-none",
+                    msg.isDeleted && "opacity-40 italic"
+                  )}>
+                    {/* Reaction Bar (Hover Only) */}
+                    <div className={cn(
+                      "absolute -top-10 opacity-0 group-hover/bubble:opacity-100 transition-opacity bg-background border border-border shadow-xl rounded-full p-1 flex gap-1 z-10",
+                      isMe ? "right-0" : "left-0"
+                    )}>
+                      {EMOJIS.map(e => (
+                        <button 
+                          key={e} 
+                          onClick={() => handleReaction(msg.id, e)} 
+                          className="hover:bg-muted p-1.5 rounded-full transition-colors text-sm"
+                        >
+                          {e}
+                        </button>
+                      ))}
                     </div>
-                  )}
-                  {msg.type === 'image' && msg.fileUrl ? (
-                    <img src={msg.fileUrl} alt="shared" className="rounded-lg mb-2 max-h-60 w-full object-cover border border-border/20 shadow-sm" />
-                  ) : (
-                    editingMessageId === msg.id ? (
-                      <div className="flex flex-col gap-2 min-w-[200px]">
-                        <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="bg-primary-foreground/10 border-none text-white h-8 text-xs" autoFocus />
-                        <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditingMessageId(null)}><X className="h-3 w-3" /></Button>
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { if (!conversationId || !db) return; updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', msg.id), { content: editValue, updatedAt: serverTimestamp(), isEdited: true }); setEditingMessageId(null); }}><Check className="h-3 w-3" /></Button>
-                        </div>
+
+                    {!isMe && room?.isGroupChat && <p className="text-[10px] font-bold text-accent mb-1 opacity-80 uppercase tracking-tighter">{senderProfile?.username || "User"}</p>}
+                    {repliedMsg && (
+                      <div className={cn("mb-2 p-2 rounded-lg text-[10px] md:text-xs border-l-4 opacity-70 flex flex-col gap-0.5", isMe ? "bg-primary-foreground/10 border-primary-foreground/50" : "bg-muted border-accent")}>
+                        <p className="truncate italic">{repliedMsg.content}</p>
                       </div>
+                    )}
+                    
+                    {msg.type === 'image' && msg.fileUrl ? (
+                      <img src={msg.fileUrl} alt="shared" className="rounded-lg mb-2 max-h-60 w-full object-cover border border-border/20" />
                     ) : (
                       <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                    )
-                  )}
-                  <div className={cn("flex items-center justify-end gap-1.5 mt-1 text-[8px] md:text-[9px] font-medium opacity-70", isMe ? "text-primary-foreground/90" : "text-muted-foreground")}>
-                    {msg.isEdited && !msg.isDeleted && <span>Edited • </span>}
-                    <span>{msgDate ? format(msgDate, 'HH:mm') : '--:--'}</span>
-                    {isMe && <CheckCheck className={cn("h-3 w-3", msg.readBy?.length > 1 ? "text-accent" : "")} />}
+                    )}
+
+                    <div className={cn("flex items-center justify-end gap-1.5 mt-1 text-[8px] md:text-[9px] font-medium opacity-70", isMe ? "text-primary-foreground/90" : "text-muted-foreground")}>
+                      <span>{msgDate ? format(msgDate, 'HH:mm') : '--:--'}</span>
+                      {isMe && (
+                        <button onClick={() => setSeenByMessage(msg)} className="hover:text-accent transition-colors">
+                          <CheckCheck className={cn("h-3 w-3", msg.readBy?.length > 1 ? "text-accent" : "")} />
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Reactions Display */}
+                  {Object.keys(reactions).length > 0 && (
+                    <div className={cn("flex flex-wrap gap-1", isMe ? "justify-end" : "justify-start")}>
+                      {Object.entries(reactions).map(([emoji, uids]: [string, any]) => (
+                        <div 
+                          key={emoji} 
+                          className="bg-muted/80 backdrop-blur-sm border border-border/50 rounded-full px-1.5 py-0.5 flex items-center gap-1 text-[10px] font-bold shadow-sm"
+                        >
+                          <span>{emoji}</span>
+                          <span className="opacity-70">{uids.length}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </React.Fragment>
@@ -383,28 +446,76 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-3 md:p-4 border-t border-border bg-background/95 backdrop-blur-md">
+      {/* Input Area */}
+      <div className="p-3 md:p-4 border-t border-border bg-background/95 backdrop-blur-md z-20">
         {replyToMessage && (
           <div className="max-w-5xl mx-auto mb-3 p-3 bg-muted/50 rounded-xl border border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2">
             <div className="flex flex-col gap-0.5 border-l-4 border-primary pl-3 overflow-hidden">
               <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Replying to {participantMap[replyToMessage.senderId]?.username || "User"}</span>
               <p className="text-xs text-muted-foreground truncate">{replyToMessage.content}</p>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0" onClick={() => setReplyToMessage(null)}><X className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setReplyToMessage(null)}><X className="h-4 w-4" /></Button>
           </div>
         )}
         <div className="flex items-center gap-2 md:gap-3 max-w-5xl mx-auto">
-          <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-10 w-10 rounded-full text-muted-foreground hover:text-accent transition-colors shrink-0">
+          <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-10 w-10 rounded-full text-muted-foreground hover:text-accent shrink-0">
             {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
           </Button>
-          <input type="file" min-width="0" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setIsUploading(true); const reader = new FileReader(); reader.onloadend = () => { handleSend('image', reader.result as string); setIsUploading(false); }; reader.readAsDataURL(file); }} />
-          <Input value={inputValue} onChange={(e) => { setInputValue(e.target.value); if (!db || !conversationId || !user) return; const typingRef = doc(db, 'chatRooms', conversationId); updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: serverTimestamp() }); if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = setTimeout(() => { updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: deleteField() }); }, 3000); }} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Start typing..." className="bg-muted/40 border-none h-11 md:h-12 focus-visible:ring-2 focus-visible:ring-primary/20 rounded-2xl flex-1 min-w-0" />
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setIsUploading(true); const reader = new FileReader(); reader.onloadend = () => { handleSend('image', reader.result as string); setIsUploading(false); }; reader.readAsDataURL(file); }} />
+          <Input 
+            value={inputValue} 
+            onChange={(e) => { 
+              setInputValue(e.target.value); 
+              if (!db || !conversationId || !user) return;
+              const typingRef = doc(db, 'chatRooms', conversationId);
+              updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: serverTimestamp() });
+              if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+              typingTimeoutRef.current = setTimeout(() => { updateDocumentNonBlocking(typingRef, { [`typing.${user.uid}`]: deleteField() }); }, 3000);
+            }} 
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
+            placeholder="Start typing..." 
+            className="bg-muted/40 border-none h-11 md:h-12 focus-visible:ring-2 focus-visible:ring-primary/20 rounded-2xl flex-1 min-w-0 shadow-inner" 
+          />
           <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className="rounded-2xl h-11 md:h-12 px-4 md:px-6 bg-primary hover:bg-primary/90 shadow-lg font-bold shrink-0">
             <Send className="h-4 w-4 md:mr-2" />
             <span className="hidden md:inline">Send</span>
           </Button>
         </div>
       </div>
+
+      {/* Seen By Dialog */}
+      <Dialog open={!!seenByMessage} onOpenChange={() => setSeenByMessage(null)}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Message Info</DialogTitle>
+            <DialogDescription>See who has viewed your message.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Read By</Label>
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
+              {seenByMessage?.readBy?.map((uid: string) => {
+                const viewer = participantMap[uid];
+                if (!viewer) return null;
+                return (
+                  <div key={uid} className="flex items-center gap-3">
+                    <Avatar className="h-8 w-8 border border-border">
+                      <AvatarImage src={viewer.profilePictureUrl} />
+                      <AvatarFallback>{viewer.username?.[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold">{viewer.username} {uid === user?.uid && '(You)'}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Read</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {(!seenByMessage?.readBy || seenByMessage.readBy.length === 0) && (
+                <p className="text-sm text-muted-foreground italic">No one has read this message yet.</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
