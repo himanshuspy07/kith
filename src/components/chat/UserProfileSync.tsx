@@ -1,10 +1,11 @@
-
 "use client";
 
 import { useEffect, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
 import { doc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
  * Handles initializing and updating the user's Firestore profile.
@@ -22,33 +23,36 @@ export default function UserProfileSync() {
     const userRef = doc(db, 'users', user.uid);
     
     const syncProfile = async () => {
-      try {
-        const docSnap = await getDoc(userRef);
-        
-        if (!docSnap.exists()) {
-          // First time initialization: use Auth provider defaults
-          const initialData = {
-            id: user.uid,
-            email: user.email,
-            username: user.displayName || user.email?.split('@')[0] || 'User',
-            profilePictureUrl: user.photoURL || '',
-            onlineStatus: true,
-            lastActiveAt: serverTimestamp(),
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          };
-          setDocumentNonBlocking(userRef, initialData, { merge: true });
-        } else {
-          // Profile exists: only update presence to avoid overwriting custom data
-          updateDocumentNonBlocking(userRef, {
-            onlineStatus: true,
-            lastActiveAt: serverTimestamp(),
-          });
-        }
-      } catch (error) {
-        // Fallback for permission issues or network errors
-        console.error("Profile sync error:", error);
-      }
+      getDoc(userRef)
+        .then((docSnap) => {
+          if (!docSnap.exists()) {
+            // First time initialization: use Auth provider defaults
+            const initialData = {
+              id: user.uid,
+              email: user.email,
+              username: user.displayName || user.email?.split('@')[0] || 'User',
+              profilePictureUrl: user.photoURL || '',
+              onlineStatus: true,
+              lastActiveAt: serverTimestamp(),
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            };
+            setDocumentNonBlocking(userRef, initialData, { merge: true });
+          } else {
+            // Profile exists: only update presence to avoid overwriting custom data
+            updateDocumentNonBlocking(userRef, {
+              onlineStatus: true,
+              lastActiveAt: serverTimestamp(),
+            });
+          }
+        })
+        .catch((error) => {
+          // Surfacing rich permission errors for development
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'get',
+          }));
+        });
     };
 
     syncProfile();

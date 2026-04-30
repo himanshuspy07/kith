@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc, onSnapshot, setDoc, addDoc, serverTimestamp, deleteDoc, updateDoc } from 'firebase/firestore';
-import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -96,7 +98,9 @@ export default function CallManager() {
     pc.onicecandidate = (event) => {
       if (event.candidate && db) {
         const side = activeCall?.callerId === user?.uid ? 'callerCandidates' : 'receiverCandidates';
-        addDoc(collection(db, 'calls', callId, side), event.candidate.toJSON());
+        const candidateData = event.candidate.toJSON();
+        const candidatesCol = collection(db, 'calls', callId, side);
+        addDocumentNonBlocking(candidatesCol, candidateData);
       }
     };
 
@@ -118,38 +122,49 @@ export default function CallManager() {
     const pc = createPeerConnection(activeCall.id);
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-    // Signalling: Set remote description
-    await pc.setRemoteDescription(new RTCSessionDescription(activeCall.offer));
+    try {
+      // Signalling: Set remote description
+      await pc.setRemoteDescription(new RTCSessionDescription(activeCall.offer));
 
-    // Signalling: Create answer
-    const answerDescription = await pc.createAnswer();
-    await pc.setLocalDescription(answerDescription);
+      // Signalling: Create answer
+      const answerDescription = await pc.createAnswer();
+      await pc.setLocalDescription(answerDescription);
 
-    const callRef = doc(db, 'calls', activeCall.id);
-    updateDoc(callRef, {
-      answer: {
-        type: answerDescription.type,
-        sdp: answerDescription.sdp,
-      },
-      status: 'ongoing'
-    });
-
-    setCallStatus('ongoing');
-
-    // Listen for caller ICE candidates
-    onSnapshot(collection(db, 'calls', activeCall.id, 'callerCandidates'), (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-        }
+      const callRef = doc(db, 'calls', activeCall.id);
+      updateDocumentNonBlocking(callRef, {
+        answer: {
+          type: answerDescription.type,
+          sdp: answerDescription.sdp,
+        },
+        status: 'ongoing'
       });
-    });
+
+      setCallStatus('ongoing');
+
+      // Listen for caller ICE candidates
+      const candidatesCol = collection(db, 'calls', activeCall.id, 'callerCandidates');
+      onSnapshot(candidatesCol, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+          }
+        });
+      }, async (serverError) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: candidatesCol.path,
+          operation: 'list'
+        }));
+      });
+    } catch (error) {
+      console.error("Signaling error:", error);
+      cleanup();
+    }
   };
 
   const handleHangup = () => {
     if (activeCall && db) {
       const callRef = doc(db, 'calls', activeCall.id);
-      updateDoc(callRef, { status: 'ended' });
+      updateDocumentNonBlocking(callRef, { status: 'ended' });
     }
     cleanup();
   };
@@ -157,7 +172,8 @@ export default function CallManager() {
   // Listen for call status changes (to end call)
   useEffect(() => {
     if (activeCall && db) {
-      const unsubscribe = onSnapshot(doc(db, 'calls', activeCall.id), (snapshot) => {
+      const callRef = doc(db, 'calls', activeCall.id);
+      const unsubscribe = onSnapshot(callRef, (snapshot) => {
         const data = snapshot.data();
         if (data?.status === 'ended') {
           cleanup();
@@ -166,6 +182,11 @@ export default function CallManager() {
           pcRef.current?.setRemoteDescription(new RTCSessionDescription(data.answer));
           setCallStatus('ongoing');
         }
+      }, async (serverError) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: callRef.path,
+          operation: 'get'
+        }));
       });
       return () => unsubscribe();
     }

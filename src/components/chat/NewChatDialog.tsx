@@ -8,8 +8,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Search, Plus, UserPlus, Users, Loader2, X, Check } from 'lucide-react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection, query, where, doc, serverTimestamp, setDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, doc, serverTimestamp } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase';
+import { addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { cn } from '@/lib/utils';
 
 interface NewChatDialogProps {
@@ -45,7 +46,7 @@ export default function NewChatDialog({ onChatCreated }: NewChatDialogProps) {
     );
   };
 
-  const startPrivateChat = async (targetUser: any) => {
+  const startPrivateChat = (targetUser: any) => {
     if (!currentUser || !db) return;
     const roomId = [currentUser.uid, targetUser.id].sort().join('_');
     const roomRef = doc(db, 'chatRooms', roomId);
@@ -62,18 +63,18 @@ export default function NewChatDialog({ onChatCreated }: NewChatDialogProps) {
       lastMessageText: 'New conversation started',
     };
 
-    await setDoc(roomRef, roomData, { merge: true });
+    setDocumentNonBlocking(roomRef, roomData, { merge: true });
     onChatCreated(roomId);
     resetAndClose();
   };
 
-  const createGroupChat = async () => {
+  const createGroupChat = () => {
     if (!currentUser || !db || selectedUsers.length === 0 || !groupName.trim()) return;
 
     const memberIds = [currentUser.uid, ...selectedUsers.map(u => u.id)];
     const membersMap = memberIds.reduce((acc, id) => ({ ...acc, [id]: true }), {});
 
-    const roomRef = await addDoc(collection(db, 'chatRooms'), {
+    const roomData = {
       name: groupName,
       isGroupChat: true,
       memberIds: memberIds,
@@ -82,10 +83,14 @@ export default function NewChatDialog({ onChatCreated }: NewChatDialogProps) {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       lastMessageText: 'Group created',
-    });
+    };
 
-    onChatCreated(roomRef.id);
-    resetAndClose();
+    addDocumentNonBlocking(collection(db, 'chatRooms'), roomData).then((docRef) => {
+      if (docRef) {
+        onChatCreated(docRef.id);
+        resetAndClose();
+      }
+    });
   };
 
   const resetAndClose = () => {
