@@ -8,26 +8,61 @@ import AuthScreen from '@/components/auth/AuthScreen';
 import UserProfileSync from '@/components/chat/UserProfileSync';
 import NotificationManager from '@/components/chat/NotificationManager';
 import BrandLogo from '@/components/ui/brand-logo';
-import { useUser } from '@/firebase';
+import { useUser, useAuth } from '@/firebase';
+import { initiateResendVerification } from '@/firebase/non-blocking-login';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Card, CardTitle, CardDescription } from '@/components/ui/card';
+import { Mail, RefreshCw, LogOut } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const { toast } = useToast();
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>(undefined);
   const isMobile = useIsMobile();
   const [hasMounted, setHasMounted] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   // Critical for PWA and Mobile: Ensure client is hydrated before rendering dynamic layouts
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
+  const handleResendVerification = async () => {
+    if (!user) return;
+    setIsResending(true);
+    try {
+      await initiateResendVerification(user);
+      toast({
+        title: "Verification sent",
+        description: "Check your inbox for a new verification link.",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    if (!user) return;
+    await user.reload();
+    // This triggers a re-render because useUser listens to auth state
+    // but we need to force a local state check if it doesn't auto-update
+    window.location.reload(); 
+  };
+
   const loadingUI = (
     <div className="flex h-screen w-full flex-col items-center justify-center bg-background relative overflow-hidden">
-      {/* Background Ambient Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] animate-pulse" />
-      
       <div className="flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-700 relative z-10">
         <BrandLogo size="lg" showText={false} className="animate-bounce" />
         <div className="flex flex-col items-center gap-2">
@@ -35,20 +70,9 @@ export default function Home() {
           <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] font-medium animate-pulse">Initializing...</p>
         </div>
       </div>
-
-      {/* Animated Footer */}
-      <div className="absolute bottom-12 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500 fill-mode-forwards opacity-0">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-px w-12 bg-gradient-to-r from-transparent via-border to-transparent mb-2" />
-          <p className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.4em] font-bold">
-            Made by <span className="text-primary animate-pulse transition-all hover:text-accent">Himanshu Yadav</span>
-          </p>
-        </div>
-      </div>
     </div>
   );
 
-  // Wait for auth and for client mounting to prevent hydration errors
   if (isUserLoading || !hasMounted) {
     return loadingUI;
   }
@@ -57,7 +81,49 @@ export default function Home() {
     return <AuthScreen />;
   }
 
-  // At this point, we are definitely on the client and mounted
+  // Verification Gate
+  if (!user.emailVerified) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[160px] -translate-y-1/2 translate-x-1/2" />
+        <Card className="w-full max-w-md border-white/5 bg-white/5 backdrop-blur-3xl shadow-2xl relative z-10 rounded-[2.5rem] p-10 text-center flex flex-col items-center gap-6">
+          <div className="h-20 w-20 rounded-3xl bg-primary/20 flex items-center justify-center mb-2">
+            <Mail className="h-10 w-10 text-primary" />
+          </div>
+          <div className="space-y-2">
+            <CardTitle className="text-2xl font-bold">Verify your email</CardTitle>
+            <CardDescription className="max-w-xs">
+              We've sent a verification link to <span className="text-foreground font-bold">{user.email}</span>. Please verify your account to continue.
+            </CardDescription>
+          </div>
+          <div className="w-full space-y-3 pt-4">
+            <Button 
+              className="w-full h-14 rounded-2xl bg-primary font-bold uppercase tracking-widest text-xs shadow-xl"
+              onClick={handleManualRefresh}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" /> I've Verified
+            </Button>
+            <Button 
+              variant="outline"
+              disabled={isResending}
+              className="w-full h-14 rounded-2xl border-white/10 hover:bg-white/5 font-bold uppercase tracking-widest text-xs"
+              onClick={handleResendVerification}
+            >
+              {isResending ? <RefreshCw className="animate-spin h-4 w-4" /> : 'Resend Email'}
+            </Button>
+            <Button 
+              variant="ghost"
+              className="w-full h-12 rounded-xl text-muted-foreground hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
+              onClick={() => signOut(auth)}
+            >
+              <LogOut className="mr-2 h-3 w-3" /> Sign Out
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   const showSidebar = !isMobile || !selectedConversationId;
   const showChat = !isMobile || !!selectedConversationId;
 
