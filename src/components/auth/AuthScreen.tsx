@@ -53,10 +53,9 @@ export default function AuthScreen() {
     } catch (error: any) {
       let errorMessage = "Something went wrong.";
       
-      // Specifically handle the "unregistered" case by suggesting signup
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
         if (mode === 'login') {
-          errorMessage = "Account not found or password incorrect. If you haven't joined Kith, please sign up first.";
+          errorMessage = "Account not found or password incorrect. If you haven't joined kithofficial, please sign up first.";
         } else {
           errorMessage = "Invalid credentials provided.";
         }
@@ -108,7 +107,6 @@ export default function AuthScreen() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Background Ambient Glows */}
       <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[160px] -translate-y-1/2 translate-x-1/2" />
       <div className="absolute bottom-0 left-0 w-[800px] h-[800px] bg-accent/5 rounded-full blur-[160px] translate-y-1/2 -translate-x-1/2" />
       
@@ -117,7 +115,7 @@ export default function AuthScreen() {
           <BrandLogo size="lg" className="justify-center" />
           <div className="space-y-2">
             <CardTitle className="text-3xl font-bold tracking-tighter">
-              {mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Join Kith' : 'Reset Password'}
+              {mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Join kithofficial' : 'Reset Password'}
             </CardTitle>
             <CardDescription className="text-muted-foreground/50 font-medium uppercase tracking-[0.2em] text-[10px]">
               {mode === 'login' ? 'Access your professional network' : mode === 'signup' ? 'Connect with friends simply' : 'Retrieve your account access'}
@@ -203,7 +201,7 @@ export default function AuthScreen() {
             </Button>
           )}
           <div className="text-center">
-            <p className="text-[9px] text-muted-foreground/30 uppercase tracking-[0.4em] font-bold">Kith Messenger &copy; 2026</p>
+            <p className="text-[9px] text-muted-foreground/30 uppercase tracking-[0.4em] font-bold">kithofficial &copy; 2026</p>
           </div>
         </CardFooter>
       </Card>

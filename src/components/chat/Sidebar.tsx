@@ -84,7 +84,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       
       if (permission === 'granted') {
         toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages." });
-        new Notification("Kith", { body: "Notifications are now active!", icon: "/icon.svg" });
+        new Notification("kithofficial", { body: "Notifications are now active!", icon: "/icon.svg" });
       } else {
         toast({ variant: "destructive", title: "Permission Denied", description: "Notifications are blocked by your browser settings." });
       }
@@ -223,10 +223,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 border border-primary/20 shadow-lg">
             <AvatarImage src={currentUserProfile?.profilePictureUrl || undefined} />
-            <AvatarFallback className="bg-primary/10 text-primary">{currentUserProfile?.username?.[0] || 'U'}</AvatarFallback>
+            <AvatarFallback className="bg-primary/10 text-primary">{currentUserProfile?.username?.[0] || 'k'}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col overflow-hidden">
-            <span className="font-bold text-sm tracking-tight truncate max-w-[120px]">{currentUserProfile?.username || 'Kith'}</span>
+            <span className="font-bold text-sm tracking-tight truncate max-w-[120px]">{currentUserProfile?.username || 'kithofficial'}</span>
             <span className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-widest truncate max-w-[120px]">Profile</span>
           </div>
         </div>

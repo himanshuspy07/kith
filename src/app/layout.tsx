@@ -5,13 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'Kith - Connecting You Simply',
+  title: 'kithofficial - Connecting You Simply',
   description: 'A modern, real-time chat application for private and group conversations.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Kith',
+    title: 'kithofficial',
   },
 };
 

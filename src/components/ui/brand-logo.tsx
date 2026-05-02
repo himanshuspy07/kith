@@ -42,7 +42,7 @@ export default function BrandLogo({ className, iconClassName, size = 'md', showT
       </div>
       {showText && (
         <span className={cn("font-black tracking-tighter text-foreground uppercase italic", textMap[size])}>
-          Kith
+          kithofficial
         </span>
       )}
     </div>

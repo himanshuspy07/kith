@@ -27,7 +27,6 @@ export default function Home() {
   const [hasMounted, setHasMounted] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
-  // Critical for PWA and Mobile: Ensure client is hydrated before rendering dynamic layouts
   useEffect(() => {
     setHasMounted(true);
   }, []);
@@ -55,8 +54,6 @@ export default function Home() {
   const handleManualRefresh = async () => {
     if (!user) return;
     await user.reload();
-    // This triggers a re-render because useUser listens to auth state
-    // but we need to force a local state check if it doesn't auto-update
     window.location.reload(); 
   };
 
@@ -66,7 +63,7 @@ export default function Home() {
       <div className="flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-700 relative z-10">
         <BrandLogo size="lg" showText={false} className="animate-bounce" />
         <div className="flex flex-col items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tighter">Kith</h1>
+          <h1 className="text-2xl font-bold tracking-tighter">kithofficial</h1>
           <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] font-medium animate-pulse">Initializing...</p>
         </div>
       </div>
@@ -81,7 +78,6 @@ export default function Home() {
     return <AuthScreen />;
   }
 
-  // Verification Gate
   if (!user.emailVerified) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
@@ -104,7 +100,7 @@ export default function Home() {
               <RefreshCw className="mr-2 h-4 w-4" /> I've Verified
             </Button>
             <Button 
-              variant="outline"
+              variant="outline" 
               disabled={isResending}
               className="w-full h-14 rounded-2xl border-white/10 hover:bg-white/5 font-bold uppercase tracking-widest text-xs"
               onClick={handleResendVerification}
@@ -112,7 +108,7 @@ export default function Home() {
               {isResending ? <RefreshCw className="animate-spin h-4 w-4" /> : 'Resend Email'}
             </Button>
             <Button 
-              variant="ghost"
+              variant="ghost" 
               className="w-full h-12 rounded-xl text-muted-foreground hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
               onClick={() => signOut(auth)}
             >
