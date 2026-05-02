@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -53,7 +52,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
       if (isNewMessage && isFromOther && isNotCurrent && isRecent) {
         if (Notification.permission === "granted") {
           try {
-            const n = new Notification(room.displayName || room.name || "kithofficial", {
+            const n = new Notification(room.displayName || room.name || "kith", {
               body: room.lastMessageText,
               icon: "/icon.svg",
               badge: "/icon.svg",

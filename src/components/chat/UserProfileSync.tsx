@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -32,7 +31,7 @@ export default function UserProfileSync() {
               id: user.uid,
               email: user.email || '',
               phoneNumber: user.phoneNumber || '',
-              username: user.displayName || user.email?.split('@')[0] || 'User',
+              username: user.displayName || user.email?.split('@')[0] || 'kith_user',
               profilePictureUrl: user.photoURL || '',
               onlineStatus: true,
               lastActiveAt: serverTimestamp(),

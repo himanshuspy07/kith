@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -84,7 +83,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       
       if (permission === 'granted') {
         toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages." });
-        new Notification("kithofficial", { body: "Notifications are now active!", icon: "/icon.svg" });
+        new Notification("kith", { body: "Notifications are now active!", icon: "/icon.svg" });
       } else {
         toast({ variant: "destructive", title: "Permission Denied", description: "Notifications are blocked by your browser settings." });
       }
@@ -226,7 +225,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             <AvatarFallback className="bg-primary/10 text-primary">{currentUserProfile?.username?.[0] || 'k'}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col overflow-hidden">
-            <span className="font-bold text-sm tracking-tight truncate max-w-[120px]">{currentUserProfile?.username || 'kithofficial'}</span>
+            <span className="font-bold text-sm tracking-tight truncate max-w-[120px]">{currentUserProfile?.username || 'kith'}</span>
             <span className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-widest truncate max-w-[120px]">Profile</span>
           </div>
         </div>

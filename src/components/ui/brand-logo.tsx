@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -42,7 +41,7 @@ export default function BrandLogo({ className, iconClassName, size = 'md', showT
       </div>
       {showText && (
         <span className={cn("font-black tracking-tighter text-foreground uppercase italic", textMap[size])}>
-          kithofficial
+          kith
         </span>
       )}
     </div>

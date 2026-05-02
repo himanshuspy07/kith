@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -63,7 +62,7 @@ export default function Home() {
       <div className="flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-700 relative z-10">
         <BrandLogo size="lg" showText={false} className="animate-bounce" />
         <div className="flex flex-col items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tighter">kithofficial</h1>
+          <h1 className="text-2xl font-bold tracking-tighter">kith</h1>
           <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] font-medium animate-pulse">Initializing...</p>
         </div>
       </div>
