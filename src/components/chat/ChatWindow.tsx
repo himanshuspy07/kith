@@ -310,7 +310,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="text-muted-foreground/40 hover:text-primary hover:bg-white/5 rounded-full"><Info className="h-5 w-5" /></Button>
             </SheetTrigger>
-            <SheetContent className="bg-card/95 backdrop-blur-2xl border-white/10 sm:max-w-md w-full overflow-y-auto shadow-2xl">
+            <SheetContent className="bg-card/95 backdrop-blur-2xl border-white/10 sm:max-w-md w-full overflow-y-auto scrollbar-hide shadow-2xl">
               <SheetHeader>
                 <SheetTitle className="text-2xl font-bold tracking-tight">Conversation</SheetTitle>
               </SheetHeader>
@@ -366,26 +366,28 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   </div>
                 )}
 
-                <div className="space-y-4 pt-6 border-t border-white/5">
-                  <Label className="text-[10px] uppercase font-bold tracking-widest text-primary">Participants ({participants?.length || 0})</Label>
-                  <div className="space-y-3">
-                    {participants?.map(u => (
-                      <div key={u.id} className="flex flex-col bg-white/5 p-4 rounded-2xl gap-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9 border border-white/10"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold">{u.username}</span>
-                              <span className="text-[10px] text-muted-foreground/60 uppercase font-bold tracking-tighter">{u.id === room?.createdBy ? 'Admin' : 'Member'}</span>
+                {room?.isGroupChat && (
+                  <div className="space-y-4 pt-6 border-t border-white/5">
+                    <Label className="text-[10px] uppercase font-bold tracking-widest text-primary">Participants ({participants?.length || 0})</Label>
+                    <div className="space-y-3">
+                      {participants?.map(u => (
+                        <div key={u.id} className="flex flex-col bg-white/5 p-4 rounded-2xl gap-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9 border border-white/10"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold">{u.username}</span>
+                                <span className="text-[10px] text-muted-foreground/60 uppercase font-bold tracking-tighter">{u.id === room?.createdBy ? 'Admin' : 'Member'}</span>
+                              </div>
                             </div>
+                            {u.onlineStatus && <span className="h-2 w-2 rounded-full bg-accent shadow-[0_0_10px_rgba(166,245,217,0.5)]" />}
                           </div>
-                          {u.onlineStatus && <span className="h-2 w-2 rounded-full bg-accent shadow-[0_0_10px_rgba(166,245,217,0.5)]" />}
+                          {u.bio && <p className="text-[10px] text-muted-foreground/60 italic px-1">{u.bio}</p>}
                         </div>
-                        {u.bio && <p className="text-[10px] text-muted-foreground/60 italic px-1">{u.bio}</p>}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </SheetContent>
           </Sheet>
