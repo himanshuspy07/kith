@@ -1,7 +1,8 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight, UserPlus, Users, ChevronLeft, Palette } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight, UserPlus, Users, ChevronLeft, Palette, Quote } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -119,6 +120,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       if (otherUser) return otherUser.profilePictureUrl;
     }
     return null;
+  }, [room, participants, user]);
+
+  const chatDisplayBio = React.useMemo(() => {
+    if (!room || room.isGroupChat || !participants || !user) return null;
+    const otherUser = participants.find(p => p.id !== user.uid);
+    return otherUser?.bio;
   }, [room, participants, user]);
 
   const presenceInfo = React.useMemo(() => {
@@ -317,6 +324,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     <h2 className="text-2xl font-bold tracking-tight">{chatDisplayName}</h2>
                     <Badge variant="outline" className="mt-2 uppercase tracking-widest font-bold text-[9px] bg-primary/10 text-primary border-none">{room?.isGroupChat ? 'Group' : 'Direct'}</Badge>
                   </div>
+                  {chatDisplayBio && (
+                    <div className="px-6 py-4 bg-white/5 rounded-2xl relative">
+                      <Quote className="absolute -top-2 -left-2 h-4 w-4 text-primary/40 rotate-180" />
+                      <p className="text-xs text-muted-foreground italic leading-relaxed">
+                        {chatDisplayBio}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4 pt-6 border-t border-white/5">
@@ -355,15 +370,18 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   <Label className="text-[10px] uppercase font-bold tracking-widest text-primary">Participants ({participants?.length || 0})</Label>
                   <div className="space-y-3">
                     {participants?.map(u => (
-                      <div key={u.id} className="flex items-center justify-between bg-white/5 p-3 rounded-2xl">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9 border border-white/10"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold">{u.username}</span>
-                            <span className="text-[10px] text-muted-foreground/60 uppercase font-bold tracking-tighter">{u.id === room?.createdBy ? 'Admin' : 'Member'}</span>
+                      <div key={u.id} className="flex flex-col bg-white/5 p-4 rounded-2xl gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9 border border-white/10"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold">{u.username}</span>
+                              <span className="text-[10px] text-muted-foreground/60 uppercase font-bold tracking-tighter">{u.id === room?.createdBy ? 'Admin' : 'Member'}</span>
+                            </div>
                           </div>
+                          {u.onlineStatus && <span className="h-2 w-2 rounded-full bg-accent shadow-[0_0_10px_rgba(166,245,217,0.5)]" />}
                         </div>
-                        {u.onlineStatus && <span className="h-2 w-2 rounded-full bg-accent shadow-[0_0_10px_rgba(166,245,217,0.5)]" />}
+                        {u.bio && <p className="text-[10px] text-muted-foreground/60 italic px-1">{u.bio}</p>}
                       </div>
                     ))}
                   </div>

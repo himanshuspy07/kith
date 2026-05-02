@@ -36,6 +36,7 @@ export default function UserProfileSync() {
               username: username,
               usernameLowercase: username.toLowerCase(),
               profilePictureUrl: user.photoURL || '',
+              bio: '',
               onlineStatus: true,
               lastActiveAt: serverTimestamp(),
               createdAt: serverTimestamp(),
@@ -53,6 +54,11 @@ export default function UserProfileSync() {
             // Backfill lowercase field if it doesn't exist
             if (!existingData.usernameLowercase && existingData.username) {
               updates.usernameLowercase = existingData.username.toLowerCase();
+            }
+
+            // Ensure bio field exists
+            if (existingData.bio === undefined) {
+              updates.bio = '';
             }
 
             updateDocumentNonBlocking(userRef, updates);

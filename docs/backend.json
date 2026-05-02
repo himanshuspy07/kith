@@ -24,6 +24,10 @@
           "description": "User's email address.",
           "format": "email"
         },
+        "bio": {
+          "type": "string",
+          "description": "A short professional biography or status."
+        },
         "phoneNumber": {
           "type": "string",
           "description": "User's phone number."

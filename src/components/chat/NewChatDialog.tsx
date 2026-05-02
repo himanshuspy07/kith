@@ -177,25 +177,29 @@ export default function NewChatDialog({ onChatCreated }: NewChatDialogProps) {
                 )}
                 onClick={() => isGroupMode ? toggleUserSelection(user) : startPrivateChat(user)}
               >
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <Avatar className="h-10 w-10 shrink-0">
                     <AvatarImage src={user.profilePictureUrl} />
                     <AvatarFallback>{user.username?.[0]}</AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col overflow-hidden">
                     <span className="text-sm font-medium">{user.username}</span>
-                    <span className="text-xs text-muted-foreground">{user.email}</span>
+                    {user.bio && (
+                      <span className="text-xs text-muted-foreground truncate italic">
+                        {user.bio}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {isGroupMode ? (
                   <div className={cn(
-                    "h-5 w-5 rounded-full border flex items-center justify-center transition-colors",
+                    "h-5 w-5 rounded-full border flex items-center justify-center transition-colors shrink-0",
                     selectedUsers.find(u => u.id === user.id) ? "bg-primary border-primary" : "border-border"
                   )}>
                     {selectedUsers.find(u => u.id === user.id) && <Check className="h-3 w-3 text-primary-foreground" />}
                   </div>
                 ) : (
-                  <Button size="sm" variant="ghost" className="h-8 w-8 rounded-full">
+                  <Button size="sm" variant="ghost" className="h-8 w-8 rounded-full shrink-0">
                     <Plus className="h-4 w-4" />
                   </Button>
                 )}

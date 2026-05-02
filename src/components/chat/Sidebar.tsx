@@ -1,9 +1,11 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, Bell, BellRing, MoreVertical, Trash2 } from 'lucide-react';
+import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, Bell, BellRing, MoreVertical, Trash2, TextQuote } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -39,6 +41,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
   const [newUsername, setNewUsername] = useState('');
   const [newAvatar, setNewAvatar] = useState('');
+  const [newBio, setNewBio] = useState('');
 
   useEffect(() => {
     setCurrentTime(Date.now());
@@ -164,7 +167,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     if (!user || !db || !currentUserRef) return;
     
     const updates: any = {
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      bio: newBio.trim()
     };
 
     if (newUsername.trim()) {
@@ -251,6 +255,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             if (open && currentUserProfile) {
               setNewUsername(currentUserProfile.username || '');
               setNewAvatar(currentUserProfile.profilePictureUrl || '');
+              setNewBio(currentUserProfile.bio || '');
             }
           }}>
             <DialogTrigger asChild>
@@ -273,9 +278,24 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Display Name</Label>
-                  <Input placeholder="Enter your name" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-white/5 border-none h-12 rounded-xl focus-visible:ring-1 focus-visible:ring-primary/40" />
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Display Name</Label>
+                    <Input placeholder="Enter your name" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-white/5 border-none h-12 rounded-xl focus-visible:ring-1 focus-visible:ring-primary/40" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Bio</Label>
+                    <Textarea 
+                      placeholder="Share a short professional bio..." 
+                      value={newBio} 
+                      onChange={(e) => setNewBio(e.target.value)} 
+                      className="bg-white/5 border-none min-h-[100px] rounded-xl focus-visible:ring-1 focus-visible:ring-primary/40 resize-none" 
+                      maxLength={150}
+                    />
+                    <p className="text-[9px] text-right text-muted-foreground/40">{newBio.length}/150</p>
+                  </div>
                 </div>
                 
                 <div className="pt-6 border-t border-white/5 space-y-4">
