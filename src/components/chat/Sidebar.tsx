@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -75,7 +76,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   };
 
   const handleRequestNotifications = async () => {
-    if (!("Notification" in window)) {
+    if (typeof window === "undefined" || !("Notification" in window)) {
       toast({ variant: "destructive", title: "Not Supported", description: "Your browser does not support notifications." });
       return;
     }
@@ -85,8 +86,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       setNotificationPermission(permission);
       
       if (permission === 'granted') {
-        toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages." });
-        new Notification("kith", { body: "Notifications are now active!", icon: "/icon.svg" });
+        toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages, even in the background." });
+        // The NotificationManager handles FCM token registration once permission is granted
       } else {
         toast({ variant: "destructive", title: "Permission Denied", description: "Notifications are blocked by your browser settings." });
       }
@@ -307,14 +308,19 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                   </div>
                   
                   <div className="flex items-center justify-between bg-white/5 p-4 rounded-xl">
-                    <span className="text-sm font-medium">Notifications</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-medium">Push Notifications</span>
+                      <span className="text-[9px] text-muted-foreground uppercase tracking-widest">Enable 100% background alerts</span>
+                    </div>
                     <Button 
                       variant="ghost"
                       size="sm" 
                       onClick={handleRequestNotifications} 
-                      className={cn("h-9 px-4 rounded-full text-xs font-bold", notificationPermission === 'granted' ? "text-accent bg-accent/10" : "text-muted-foreground bg-white/5")}
+                      className={cn("h-9 px-4 rounded-full text-xs font-bold transition-all", notificationPermission === 'granted' ? "text-accent bg-accent/10 hover:bg-accent/20" : "text-muted-foreground bg-white/5 hover:bg-white/10")}
                     >
-                      {notificationPermission === 'granted' ? 'Enabled' : 'Enable'}
+                      {notificationPermission === 'granted' ? (
+                        <div className="flex items-center gap-2"><BellRing className="h-3.5 w-3.5" /> Enabled</div>
+                      ) : 'Enable'}
                     </Button>
                   </div>
                 </div>
