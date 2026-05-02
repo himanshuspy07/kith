@@ -31,6 +31,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
   useEffect(() => {
     if (!rooms || !user) return;
 
+    // Initialize the baseline to prevent notifying for all old messages on load
     if (isFirstLoad.current) {
       rooms.forEach(room => {
         if (room.lastMessageText) {
@@ -42,6 +43,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
     }
 
     rooms.forEach(room => {
+      // Basic check: is the last update very recent (within 5 minutes)?
       const lastUpdate = room.updatedAt?.toDate?.()?.getTime() || Date.now();
       const isRecent = (Date.now() - lastUpdate) < 300000; 
 
@@ -67,6 +69,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
           lastNotifiedRef.current[room.id] = room.lastMessageText;
         }
       } else if (!isFromOther || !isNotCurrent) {
+        // Sync the last notified text even if we didn't show a notification
         lastNotifiedRef.current[room.id] = room.lastMessageText;
       }
     });

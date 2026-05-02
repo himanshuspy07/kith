@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -282,7 +281,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Display Name</Label>
-                    <Input placeholder="Enter your name" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-white/5 border-none h-12 rounded-xl focus-visible:ring-1 focus-visible:ring-primary/40" />
+                    <input placeholder="Enter your name" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-white/5 border-none h-12 rounded-xl focus-visible:ring-1 focus-visible:ring-primary/40 w-full px-4 outline-none" />
                   </div>
                   
                   <div className="space-y-2">
