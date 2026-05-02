@@ -38,6 +38,10 @@ export default function AuthScreen() {
             displayName: username
           });
         }
+        toast({
+          title: "Account created",
+          description: "Check your email for a verification link.",
+        });
       } else if (mode === 'reset') {
         await initiatePasswordReset(auth, email);
         setResetSent(true);
@@ -49,11 +53,15 @@ export default function AuthScreen() {
     } catch (error: any) {
       let errorMessage = "Something went wrong.";
       
-      // Map common Firebase error codes to user-friendly messages
-      if (error.code === 'auth/invalid-credential') {
-        errorMessage = "The email or password you entered is incorrect.";
+      // Specifically handle the "unregistered" case by suggesting signup
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+        if (mode === 'login') {
+          errorMessage = "Account not found or password incorrect. If you haven't joined Kith, please sign up first.";
+        } else {
+          errorMessage = "Invalid credentials provided.";
+        }
       } else if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "An account already exists with this email.";
+        errorMessage = "An account already exists with this email. Try logging in.";
       } else if (error.code === 'auth/weak-password') {
         errorMessage = "Password should be at least 6 characters.";
       } else if (error.message) {
@@ -126,7 +134,7 @@ export default function AuthScreen() {
                   placeholder="e.g. johndoe" 
                   value={username} 
                   onChange={(e) => setUsername(e.target.value)} 
-                  className="bg-white/5 border-none h-14 rounded-2xl px-5" 
+                  className="bg-white/5 border-none h-14 rounded-2xl px-5 focus-visible:ring-1 focus-visible:ring-primary/20" 
                   required 
                 />
               </div>
@@ -138,7 +146,7 @@ export default function AuthScreen() {
                 placeholder="name@example.com" 
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
-                className="bg-white/5 border-none h-14 rounded-2xl px-5" 
+                className="bg-white/5 border-none h-14 rounded-2xl px-5 focus-visible:ring-1 focus-visible:ring-primary/20" 
                 required 
               />
             </div>
@@ -161,7 +169,7 @@ export default function AuthScreen() {
                   placeholder="••••••••"
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
-                  className="bg-white/5 border-none h-14 rounded-2xl px-5" 
+                  className="bg-white/5 border-none h-14 rounded-2xl px-5 focus-visible:ring-1 focus-visible:ring-primary/20" 
                   required 
                 />
               </div>
@@ -195,7 +203,7 @@ export default function AuthScreen() {
             </Button>
           )}
           <div className="text-center">
-            <p className="text-[9px] text-muted-foreground/30 uppercase tracking-[0.4em] font-bold">Kith Professional Messenger &copy; 2026</p>
+            <p className="text-[9px] text-muted-foreground/30 uppercase tracking-[0.4em] font-bold">Kith Messenger &copy; 2026</p>
           </div>
         </CardFooter>
       </Card>
