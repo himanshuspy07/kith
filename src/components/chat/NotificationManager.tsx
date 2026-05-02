@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -11,9 +10,8 @@ interface NotificationManagerProps {
   currentConversationId?: string;
 }
 
-// NOTE: You must generate a VAPID key in the Firebase Console (Settings > Cloud Messaging)
-// and replace this placeholder to enable push tokens.
-const VAPID_KEY = "BDp_S9G4eE_J0Yn8R_E...YOUR_ACTUAL_VAPID_KEY";
+// Provided VAPID key for Firebase Cloud Messaging
+const VAPID_KEY = "BCg1UIFx2xNkxfPrxSeATRRO2jyjVh2c2C_9AEfN3FsbTFjcS3EN5fyF3qIDsWbSt5RN_L4UpGWlq4QTuBJwplE";
 
 export default function NotificationManager({ currentConversationId }: NotificationManagerProps) {
   const { user } = useUser();
@@ -53,7 +51,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
           });
         }
       } catch (error) {
-        console.warn("FCM setup failed. This is expected if VAPID_KEY is not set or browser is offline.", error);
+        console.warn("FCM setup failed. This might be due to browser restrictions or VAPID mismatch.", error);
       }
     };
 
