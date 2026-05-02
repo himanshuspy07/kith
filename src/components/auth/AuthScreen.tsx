@@ -11,6 +11,7 @@ import { initiateEmailSignIn, initiateEmailSignUp, initiatePasswordReset } from 
 import BrandLogo from '@/components/ui/brand-logo';
 import { Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { updateProfile } from 'firebase/auth';
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
@@ -31,7 +32,12 @@ export default function AuthScreen() {
       if (mode === 'login') {
         await initiateEmailSignIn(auth, email, password);
       } else if (mode === 'signup') {
-        await initiateEmailSignUp(auth, email, password);
+        const userCredential = await initiateEmailSignUp(auth, email, password);
+        if (userCredential.user && username) {
+          await updateProfile(userCredential.user, {
+            displayName: username
+          });
+        }
       } else if (mode === 'reset') {
         await initiatePasswordReset(auth, email);
         setResetSent(true);
@@ -41,10 +47,23 @@ export default function AuthScreen() {
         });
       }
     } catch (error: any) {
+      let errorMessage = "Something went wrong.";
+      
+      // Map common Firebase error codes to user-friendly messages
+      if (error.code === 'auth/invalid-credential') {
+        errorMessage = "The email or password you entered is incorrect.";
+      } else if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "An account already exists with this email.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Password should be at least 6 characters.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         variant: "destructive",
         title: "Authentication Error",
-        description: error.message || "Something went wrong.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);

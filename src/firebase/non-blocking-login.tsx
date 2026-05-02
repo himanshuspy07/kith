@@ -3,6 +3,7 @@
 import {
   Auth,
   User,
+  UserCredential,
   signInAnonymously,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -10,28 +11,26 @@ import {
   sendEmailVerification,
 } from 'firebase/auth';
 
-/** Initiate anonymous sign-in (non-blocking). */
-export function initiateAnonymousSignIn(authInstance: Auth): void {
-  signInAnonymously(authInstance);
+/** Initiate anonymous sign-in. */
+export function initiateAnonymousSignIn(authInstance: Auth): Promise<UserCredential> {
+  return signInAnonymously(authInstance);
 }
 
-/** Initiate email/password sign-up (non-blocking). */
-export function initiateEmailSignUp(authInstance: Auth, email: string, password: string): void {
-  createUserWithEmailAndPassword(authInstance, email, password)
-    .then((userCredential) => {
-      // Send verification email immediately upon sign up
-      if (userCredential.user) {
-        sendEmailVerification(userCredential.user);
-      }
-    });
+/** Initiate email/password sign-up. */
+export async function initiateEmailSignUp(authInstance: Auth, email: string, password: string): Promise<UserCredential> {
+  const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
+  if (userCredential.user) {
+    await sendEmailVerification(userCredential.user);
+  }
+  return userCredential;
 }
 
-/** Initiate email/password sign-in (non-blocking). */
-export function initiateEmailSignIn(authInstance: Auth, email: string, password: string): void {
-  signInWithEmailAndPassword(authInstance, email, password);
+/** Initiate email/password sign-in. */
+export function initiateEmailSignIn(authInstance: Auth, email: string, password: string): Promise<UserCredential> {
+  return signInWithEmailAndPassword(authInstance, email, password);
 }
 
-/** Initiate password reset email (non-blocking). */
+/** Initiate password reset email. */
 export function initiatePasswordReset(authInstance: Auth, email: string): Promise<void> {
   return sendPasswordResetEmail(authInstance, email);
 }
