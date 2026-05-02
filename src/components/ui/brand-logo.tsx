@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -13,34 +14,34 @@ interface BrandLogoProps {
 
 export default function BrandLogo({ className, iconClassName, size = 'md', showText = true }: BrandLogoProps) {
   const sizeMap = {
-    sm: 'h-6 w-6',
-    md: 'h-10 w-10',
-    lg: 'h-16 w-16',
-    xl: 'h-24 w-24'
+    sm: 'h-8 w-8',
+    md: 'h-12 w-12',
+    lg: 'h-20 w-20',
+    xl: 'h-28 w-28'
   };
 
   const textMap = {
-    sm: 'text-lg',
-    md: 'text-2xl',
-    lg: 'text-4xl',
-    xl: 'text-6xl'
+    sm: 'text-xl',
+    md: 'text-3xl',
+    lg: 'text-5xl',
+    xl: 'text-7xl'
   };
 
   return (
-    <div className={cn("flex items-center gap-3", className)}>
+    <div className={cn("flex items-center gap-4", className)}>
       <div className={cn(
-        "relative flex items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/20",
+        "relative flex items-center justify-center rounded-[1.2rem] bg-gradient-to-br from-primary via-primary to-accent shadow-2xl shadow-primary/30",
         sizeMap[size],
         iconClassName
       )}>
         <MessageSquare className={cn(
-          "text-primary-foreground fill-primary-foreground/10",
-          size === 'sm' ? 'h-3 w-3' : size === 'md' ? 'h-5 w-5' : size === 'lg' ? 'h-8 w-8' : 'h-12 w-12'
+          "text-primary-foreground fill-primary-foreground/20",
+          size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-6 w-6' : size === 'lg' ? 'h-10 w-10' : 'h-14 w-14'
         )} />
-        <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-accent border-2 border-background animate-pulse" />
+        <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-accent border-4 border-background shadow-lg" />
       </div>
       {showText && (
-        <span className={cn("font-bold tracking-tighter text-foreground", textMap[size])}>
+        <span className={cn("font-black tracking-tighter text-foreground uppercase italic", textMap[size])}>
           Kith
         </span>
       )}

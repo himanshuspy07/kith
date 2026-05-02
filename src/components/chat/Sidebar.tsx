@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -102,7 +103,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
   const { data: rooms, isLoading } = useCollection(roomsQuery);
 
-  // Optimized: Collect unique participant IDs from all rooms to fetch only their profiles
   const participantIds = useMemo(() => {
     if (!rooms || !user) return [];
     const ids = new Set<string>();
@@ -111,7 +111,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         if (id !== user.uid) ids.add(id);
       });
     });
-    return Array.from(ids).slice(0, 30); // Firestore 'in' query limit is 30
+    return Array.from(ids).slice(0, 30);
   }, [rooms, user]);
 
   const usersQuery = useMemoFirebase(() => {
@@ -171,9 +171,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       updates.username = newUsername.trim();
       try {
         await updateProfile(user, { displayName: newUsername.trim() });
-      } catch (e) {
-        // Silently handle auth profile update error
-      }
+      } catch (e) {}
     }
 
     if (newAvatar) {
@@ -220,20 +218,20 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   };
 
   return (
-    <div className={cn("h-full border-r border-border flex flex-col bg-background/50 backdrop-blur-sm shrink-0", className)}>
-      <div className="p-4 flex items-center justify-between border-b border-border">
+    <div className={cn("h-full border-r border-white/5 flex flex-col bg-background/80 backdrop-blur-xl shrink-0 z-30", className)}>
+      <div className="p-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9 border border-primary/20">
+          <Avatar className="h-10 w-10 border border-primary/20 shadow-lg">
             <AvatarImage src={currentUserProfile?.profilePictureUrl || undefined} />
-            <AvatarFallback>{currentUserProfile?.username?.[0] || user?.email?.[0] || 'U'}</AvatarFallback>
+            <AvatarFallback className="bg-primary/10 text-primary">{currentUserProfile?.username?.[0] || 'U'}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col overflow-hidden">
-            <span className="font-semibold text-sm truncate max-w-[120px]">{currentUserProfile?.username || 'Kith'}</span>
-            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{user?.email || user?.phoneNumber || 'Auth'}</span>
+            <span className="font-bold text-sm tracking-tight truncate max-w-[120px]">{currentUserProfile?.username || 'Kith'}</span>
+            <span className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-widest truncate max-w-[120px]">Profile</span>
           </div>
         </div>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => signOut(auth)}>
+        <div className="flex gap-1.5">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-full" onClick={() => signOut(auth)}>
             <LogOut className="h-4 w-4" />
           </Button>
           <Dialog open={isSettingsOpen} onOpenChange={(open) => {
@@ -244,82 +242,84 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             }
           }}>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground/50 hover:bg-white/5 rounded-full">
                 <Settings className="h-4 w-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border sm:max-w-md w-[90%] rounded-xl">
-              <DialogHeader><DialogTitle>Profile Settings</DialogTitle></DialogHeader>
-              <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2 scrollbar-hide">
-                <div className="flex flex-col items-center gap-4 mb-4">
-                  <div className="relative group">
-                    <Avatar className="h-24 w-24 border-2 border-primary/20">
+            <DialogContent className="bg-card/95 backdrop-blur-2xl border-white/10 sm:max-w-md w-[90%] rounded-2xl shadow-2xl">
+              <DialogHeader><DialogTitle className="text-xl font-bold tracking-tight">Profile Settings</DialogTitle></DialogHeader>
+              <div className="space-y-6 py-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative">
+                    <Avatar className="h-28 w-28 border-2 border-primary/30 shadow-2xl">
                       <AvatarImage src={newAvatar || currentUserProfile?.profilePictureUrl || undefined} />
-                      <AvatarFallback className="text-2xl font-bold">{user?.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                      <AvatarFallback className="text-3xl font-bold bg-muted">{user?.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
                     </Avatar>
-                    <Button size="icon" variant="secondary" className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-lg" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                    <Button size="icon" variant="secondary" className="absolute bottom-0 right-0 h-9 w-9 rounded-full shadow-xl bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                       {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                     </Button>
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="set-username">Display Name</Label>
-                  <Input id="set-username" placeholder="Enter new username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-muted/30 border-none h-11" />
+                  <Label className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Display Name</Label>
+                  <Input placeholder="Enter your name" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-white/5 border-none h-12 rounded-xl focus-visible:ring-1 focus-visible:ring-primary/40" />
                 </div>
                 
-                <div className="pt-4 border-t border-border space-y-3">
-                  <Label className="text-xs uppercase tracking-widest font-bold opacity-70">App Settings</Label>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Appearance</span>
-                    <Button variant="outline" size="sm" onClick={toggleTheme} className="gap-2 h-10 px-4">
+                <div className="pt-6 border-t border-white/5 space-y-4">
+                  <Label className="text-[10px] uppercase tracking-[0.2em] font-bold text-primary">Preferences</Label>
+                  <div className="flex items-center justify-between bg-white/5 p-4 rounded-xl">
+                    <span className="text-sm font-medium">Dark Mode</span>
+                    <Button variant="ghost" size="sm" onClick={toggleTheme} className="h-9 w-9 rounded-full">
                       {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                      <span>{isDarkMode ? 'Light' : 'Dark'}</span>
                     </Button>
                   </div>
                   
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between bg-white/5 p-4 rounded-xl">
                     <span className="text-sm font-medium">Notifications</span>
                     <Button 
-                      variant={notificationPermission === 'granted' ? "ghost" : "outline"} 
+                      variant="ghost"
                       size="sm" 
                       onClick={handleRequestNotifications} 
-                      className={cn("gap-2 h-10 px-4", notificationPermission === 'granted' && "text-accent")}
+                      className={cn("h-9 px-4 rounded-full text-xs font-bold", notificationPermission === 'granted' ? "text-accent bg-accent/10" : "text-muted-foreground bg-white/5")}
                     >
-                      {notificationPermission === 'granted' ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-                      <span>{notificationPermission === 'granted' ? 'Enabled' : 'Enable'}</span>
+                      {notificationPermission === 'granted' ? 'Enabled' : 'Enable'}
                     </Button>
                   </div>
                 </div>
               </div>
-              <DialogFooter><Button onClick={handleUpdateProfile} disabled={isUploading} className="w-full h-11">Save Changes</Button></DialogFooter>
+              <DialogFooter><Button onClick={handleUpdateProfile} disabled={isUploading} className="w-full h-12 rounded-xl font-bold shadow-lg">Save Changes</Button></DialogFooter>
             </DialogContent>
           </Dialog>
           <NewChatDialog onChatCreated={onSelectConversation} />
         </div>
       </div>
 
-      <div className="p-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search conversations..." className="pl-9 h-11 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/30" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+      <div className="px-5 mb-4">
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+          <Input 
+            placeholder="Search..." 
+            className="pl-10 h-11 bg-white/5 border-none focus-visible:ring-1 focus-visible:ring-primary/20 rounded-xl text-sm" 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)} 
+          />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-hide">
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-3 pb-6">
         {isLoading ? (
-          <div className="p-4 space-y-4">
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="flex gap-3 items-center animate-pulse">
-                <div className="h-12 w-12 bg-muted rounded-full" />
-                <div className="flex-1 space-y-2"><div className="h-4 bg-muted rounded w-1/2" /><div className="h-3 bg-muted rounded w-3/4" /></div>
+          <div className="space-y-4 px-2">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="flex gap-4 items-center animate-pulse">
+                <div className="h-12 w-12 bg-white/5 rounded-full" />
+                <div className="flex-1 space-y-2"><div className="h-3 bg-white/5 rounded w-1/2" /><div className="h-2 bg-white/5 rounded w-3/4" /></div>
               </div>
             ))}
           </div>
         ) : filteredConversations.length === 0 ? (
-          <div className="p-8 text-center flex flex-col items-center gap-4">
-            <MessageSquare className="h-8 w-8 text-muted-foreground opacity-20" />
-            <p className="text-sm text-muted-foreground">No conversations yet.</p>
+          <div className="p-12 text-center">
+            <p className="text-xs text-muted-foreground/40 font-bold uppercase tracking-widest">No results</p>
           </div>
         ) : (
           filteredConversations.map((room) => {
@@ -332,9 +332,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             if (!room.isGroupChat && room.otherUserProfile) {
               const lastActive = room.otherUserProfile.lastActiveAt?.toDate?.() || new Date(room.otherUserProfile.lastActiveAt || currentTime || Date.now());
               const isOnline = room.otherUserProfile.onlineStatus && (currentTime && (currentTime - lastActive.getTime() < 120000));
-              presenceText = isOnline ? 'Online' : (currentTime ? `Seen ${formatDistanceToNow(lastActive)} ago` : 'Offline');
-            } else if (room.isGroupChat) {
-              presenceText = `${room.memberIds?.length || 0} members`;
+              presenceText = isOnline ? 'Online' : (currentTime ? formatDistanceToNow(lastActive) : 'Offline');
             }
 
             return (
@@ -342,43 +340,38 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                 key={room.id}
                 onClick={() => onSelectConversation(room.id)}
                 className={cn(
-                  "w-full p-4 flex items-start gap-3 transition-colors hover:bg-muted/20 text-left relative group cursor-pointer border-b border-border/10",
-                  isSelected && "bg-muted/40"
+                  "w-full p-4 mb-1 flex items-start gap-3 transition-all rounded-2xl relative group cursor-pointer",
+                  isSelected ? "bg-white/10 shadow-lg" : "hover:bg-white/5"
                 )}
               >
                 <div className="relative shrink-0">
-                  <Avatar className="h-12 w-12 border border-border/50">
+                  <Avatar className="h-12 w-12 border border-white/5 shadow-md">
                     {room.displayAvatar && <AvatarImage src={room.displayAvatar} />}
-                    <AvatarFallback>{room.displayName?.[0] || 'C'}</AvatarFallback>
+                    <AvatarFallback className="bg-muted font-bold">{room.displayName?.[0] || 'C'}</AvatarFallback>
                   </Avatar>
                   {isUnread && (
-                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-accent rounded-full border-2 border-background shadow-sm" />
+                    <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-accent rounded-full border-2 border-background shadow-lg" />
                   )}
                 </div>
                 
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-baseline mb-0.5">
-                    <h3 className={cn("text-sm truncate pr-2", isUnread ? "font-bold" : "font-medium")}>
+                <div className="flex-1 min-w-0 py-0.5">
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className={cn("text-sm truncate pr-2 tracking-tight", isUnread ? "font-bold" : "font-semibold text-foreground/80")}>
                       {room.displayName}
                     </h3>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {room.isPinned && <Pin className="h-3 w-3 text-primary fill-primary" />}
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: false }) : '--'}
-                      </span>
-                    </div>
+                    <span className="text-[9px] text-muted-foreground/40 font-bold uppercase tracking-tighter shrink-0">
+                      {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: false }) : ''}
+                    </span>
                   </div>
-                  <div className="flex justify-between items-center overflow-hidden">
+                  <div className="flex justify-between items-center">
                     {typingUser ? (
-                      <p className="text-xs text-accent animate-pulse font-bold tracking-tight">Typing...</p>
+                      <p className="text-[10px] text-accent animate-pulse font-bold tracking-widest uppercase">Typing...</p>
                     ) : (
-                      <p className={cn("text-xs truncate max-w-[140px]", isUnread ? "text-foreground font-medium" : "text-muted-foreground italic")}>
-                        {room.lastMessageText || 'No messages yet'}
+                      <p className={cn("text-[11px] truncate max-w-[140px]", isUnread ? "text-foreground font-medium" : "text-muted-foreground/50")}>
+                        {room.lastMessageText || 'No messages'}
                       </p>
                     )}
-                    <span className="text-[9px] text-muted-foreground opacity-60 uppercase font-medium tracking-tighter whitespace-nowrap ml-2">
-                      {presenceText}
-                    </span>
+                    {room.isPinned && <Pin className="h-3 w-3 text-primary/40 fill-primary/40" />}
                   </div>
                 </div>
 
@@ -386,17 +379,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                   variant="ghost" 
                   size="icon" 
                   className={cn(
-                    "h-6 w-6 rounded-full absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity",
+                    "h-6 w-6 rounded-full absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 backdrop-blur-md",
                     room.isPinned ? "text-primary opacity-100" : "text-muted-foreground"
                   )}
                   onClick={(e) => togglePin(e, room.id, room.isPinned)}
                 >
                   {room.isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
                 </Button>
-
-                {isSelected && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
-                )}
               </div>
             );
           })
