@@ -1,4 +1,2 @@
-// Flows will be imported for their side effects in this file.
-// import './flows/smart-reply-flow';
-
+// AI functionality is disabled for this project.
 export {};
