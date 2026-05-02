@@ -24,6 +24,10 @@ service cloud.firestore {
       return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] == true;
     }
 
+    function isRoomAdmin(chatRoomId) {
+      return isSignedIn() && get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid;
+    }
+
     // --- Collection Rules ---
 
     match /users/{userId} {
@@ -49,14 +53,15 @@ service cloud.firestore {
         // Allow creation if member and sender is self
         allow create: if isRoomMember(chatRoomId) && request.resource.data.senderId == request.auth.uid;
           
-        // Allow update if member and (sender OR only updating readBy/reactions)
+        // Allow update if member and (sender OR room admin OR only updating readBy/reactions)
         allow update: if isRoomMember(chatRoomId) && (
           resource.data.senderId == request.auth.uid ||
+          isRoomAdmin(chatRoomId) ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'reactions'])
         );
         
-        // Only sender can delete their own message
-        allow delete: if isRoomMember(chatRoomId) && resource.data.senderId == request.auth.uid;
+        // Only sender or admin can delete their own message
+        allow delete: if isRoomMember(chatRoomId) && (resource.data.senderId == request.auth.uid || isRoomAdmin(chatRoomId));
       }
     }
   }

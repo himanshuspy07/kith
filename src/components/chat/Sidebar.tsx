@@ -1,19 +1,19 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, Bell, BellRing } from 'lucide-react';
+import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, Bell, BellRing, MoreVertical, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { useCollection, useDoc, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc, deleteField, serverTimestamp } from 'firebase/firestore';
 import { signOut, updateProfile } from 'firebase/auth';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import NewChatDialog from './NewChatDialog';
 import { useToast } from '@/hooks/use-toast';
 
@@ -209,6 +209,17 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     });
   };
 
+  const handleDeleteConversation = (e: React.MouseEvent, roomId: string) => {
+    e.stopPropagation();
+    if (!db || !user) return;
+    const roomRef = doc(db, 'chatRooms', roomId);
+    deleteDocumentNonBlocking(roomRef);
+    if (selectedConversationId === roomId) {
+      onSelectConversation('');
+    }
+    toast({ title: "Conversation deleted" });
+  };
+
   const getRoomTyping = (room: any) => {
     if (!room.typing || !currentTime) return null;
     return Object.entries(room.typing).find(([uid, ts]: [string, any]) => {
@@ -360,9 +371,28 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                     <h3 className={cn("text-sm truncate pr-2 tracking-tight", isUnread ? "font-bold" : "font-semibold text-foreground/80")}>
                       {room.displayName}
                     </h3>
-                    <span className="text-[9px] text-muted-foreground/40 font-bold uppercase tracking-tighter shrink-0">
-                      {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: false }) : ''}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-muted-foreground/40 font-bold uppercase tracking-tighter shrink-0">
+                        {updatedAt ? formatDistanceToNow(updatedAt, { addSuffix: false }) : ''}
+                      </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 rounded-full">
+                            <MoreVertical className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-card/95 backdrop-blur-2xl border-white/10">
+                          <DropdownMenuItem onClick={(e) => togglePin(e, room.id, room.isPinned)}>
+                            {room.isPinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
+                            {room.isPinned ? 'Unpin' : 'Pin'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => handleDeleteConversation(e, room.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Chat
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                   <div className="flex justify-between items-center">
                     {typingUser ? (
@@ -375,18 +405,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                     {room.isPinned && <Pin className="h-3 w-3 text-primary/40 fill-primary/40" />}
                   </div>
                 </div>
-
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className={cn(
-                    "h-6 w-6 rounded-full absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 backdrop-blur-md",
-                    room.isPinned ? "text-primary opacity-100" : "text-muted-foreground"
-                  )}
-                  onClick={(e) => togglePin(e, room.id, room.isPinned)}
-                >
-                  {room.isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
-                </Button>
               </div>
             );
           })

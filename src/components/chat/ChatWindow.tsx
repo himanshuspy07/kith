@@ -207,6 +207,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       fileUrl: null,
       updatedAt: serverTimestamp()
     });
+    toast({ title: "Message deleted" });
   };
 
   const handleReaction = (messageId: string, emoji: string) => {
@@ -382,6 +383,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
         {messages?.map((msg, i) => {
           const isMe = msg.senderId === user?.uid;
+          const isAdmin = room?.createdBy === user?.uid;
+          const canDelete = isMe || isAdmin;
+          
           const senderProfile = participantMap[msg.senderId];
           const msgDate = msg.createdAt?.toDate?.() || (currentTime ? new Date(currentTime) : null);
           const prevMsg = i > 0 ? messages[i - 1] : null;
@@ -431,10 +435,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         <div className="w-px h-5 bg-white/10 mx-1 my-auto" />
                         <button onClick={() => setReplyToMessage(msg)} className="hover:bg-white/10 p-2 rounded-xl text-muted-foreground"><Reply className="h-4 w-4" /></button>
                         {isMe && (
-                          <>
-                            <button onClick={() => { setEditingMessageId(msg.id); setEditValue(msg.content); }} className="hover:bg-white/10 p-2 rounded-xl text-accent"><Pencil className="h-4 w-4" /></button>
-                            <button onClick={() => handleDeleteMessage(msg.id)} className="hover:bg-white/10 p-2 rounded-xl text-destructive"><Trash2 className="h-4 w-4" /></button>
-                          </>
+                          <button onClick={() => { setEditingMessageId(msg.id); setEditValue(msg.content); }} className="hover:bg-white/10 p-2 rounded-xl text-accent"><Pencil className="h-4 w-4" /></button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => handleDeleteMessage(msg.id)} className="hover:bg-white/10 p-2 rounded-xl text-destructive"><Trash2 className="h-4 w-4" /></button>
                         )}
                       </div>
                     )}
