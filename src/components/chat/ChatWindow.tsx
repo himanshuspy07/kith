@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -40,9 +41,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [messageLimit, setMessageLimit] = useState(30);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
-  const [userSearch, setUserSearch] = useState('');
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [seenByMessage, setSeenByMessage] = useState<any>(null);
+  
+  // Edit state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const topObserverRef = useRef<HTMLDivElement>(null);
@@ -183,11 +187,35 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     setReplyToMessage(null);
   };
 
+  const handleEditMessage = () => {
+    if (!editingMessageId || !editValue.trim() || !conversationId || !db) return;
+    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', editingMessageId);
+    updateDocumentNonBlocking(msgRef, {
+      content: editValue.trim(),
+      isEdited: true,
+      updatedAt: serverTimestamp()
+    });
+    setEditingMessageId(null);
+    setEditValue('');
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    if (!conversationId || !db) return;
+    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', messageId);
+    updateDocumentNonBlocking(msgRef, {
+      content: 'This message was deleted',
+      isDeleted: true,
+      fileUrl: null,
+      updatedAt: serverTimestamp()
+    });
+    toast({ title: "Message deleted" });
+  };
+
   const handleReaction = (messageId: string, emoji: string) => {
     if (!conversationId || !user || !db || !messages) return;
     
     const msg = messages.find(m => m.id === messageId);
-    if (!msg) return;
+    if (!msg || msg.isDeleted) return;
 
     const updates: any = {};
     let alreadyHadThisEmoji = false;
@@ -361,6 +389,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           const showDateHeader = msgDate && (i === 0 || format(prevMsg?.createdAt?.toDate?.() || new Date(currentTime), 'yyyy-MM-dd') !== format(msgDate, 'yyyy-MM-dd'));
           const repliedMsg = msg.replyToId ? messages.find(m => m.id === msg.replyToId) : null;
           const reactions = msg.reactions || {};
+          const isEditing = editingMessageId === msg.id;
 
           return (
             <React.Fragment key={msg.id}>
@@ -378,22 +407,34 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   <div className={cn(
                     "px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-xs md:text-sm shadow-md transition-all relative group/bubble", 
                     isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card border border-border/50 text-foreground rounded-bl-none",
-                    msg.isDeleted && "opacity-40 italic"
+                    msg.isDeleted && "opacity-40 italic",
+                    isEditing && "ring-2 ring-accent ring-offset-2"
                   )}>
-                    <div className={cn(
-                      "absolute -top-10 opacity-0 group-hover/bubble:opacity-100 transition-opacity bg-background border border-border shadow-xl rounded-full p-1 flex gap-1 z-10",
-                      isMe ? "right-0" : "left-0"
-                    )}>
-                      {EMOJIS.map(e => (
-                        <button 
-                          key={e} 
-                          onClick={() => handleReaction(msg.id, e)} 
-                          className="hover:bg-muted p-1.5 rounded-full transition-colors text-sm"
-                        >
-                          {e}
-                        </button>
-                      ))}
-                    </div>
+                    
+                    {!msg.isDeleted && !isEditing && (
+                      <div className={cn(
+                        "absolute -top-10 opacity-0 group-hover/bubble:opacity-100 transition-opacity bg-background border border-border shadow-xl rounded-full p-1 flex gap-1 z-10",
+                        isMe ? "right-0" : "left-0"
+                      )}>
+                        {EMOJIS.map(e => (
+                          <button 
+                            key={e} 
+                            onClick={() => handleReaction(msg.id, e)} 
+                            className="hover:bg-muted p-1.5 rounded-full transition-colors text-sm"
+                          >
+                            {e}
+                          </button>
+                        ))}
+                        {isMe && (
+                          <>
+                            <div className="w-px h-4 bg-border mx-1 my-auto" />
+                            <button onClick={() => { setEditingMessageId(msg.id); setEditValue(msg.content); }} className="hover:bg-muted p-1.5 rounded-full transition-colors text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => handleDeleteMessage(msg.id)} className="hover:bg-muted p-1.5 rounded-full transition-colors text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </>
+                        )}
+                        <button onClick={() => setReplyToMessage(msg)} className="hover:bg-muted p-1.5 rounded-full transition-colors text-muted-foreground"><Reply className="h-3.5 w-3.5" /></button>
+                      </div>
+                    )}
 
                     {!isMe && room?.isGroupChat && <p className="text-[10px] font-bold text-accent mb-1 opacity-80 uppercase tracking-tighter">{senderProfile?.username || "User"}</p>}
                     {repliedMsg && (
@@ -402,20 +443,41 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                       </div>
                     )}
                     
-                    {msg.type === 'image' && msg.fileUrl ? (
-                      <img src={msg.fileUrl} alt="shared" className="rounded-lg mb-2 max-h-60 w-full object-cover border border-border/20" />
+                    {isEditing ? (
+                      <div className="space-y-2 py-1">
+                        <Input 
+                          value={editValue} 
+                          onChange={(e) => setEditValue(e.target.value)} 
+                          onKeyDown={(e) => e.key === 'Enter' && handleEditMessage()}
+                          className="bg-primary-foreground/10 border-none h-8 text-xs md:text-sm text-primary-foreground focus-visible:ring-0" 
+                          autoFocus
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => setEditingMessageId(null)} className="text-[10px] uppercase font-bold text-primary-foreground/70 hover:text-primary-foreground transition-colors">Cancel</button>
+                          <button onClick={handleEditMessage} className="text-[10px] uppercase font-bold text-accent hover:text-accent-foreground transition-colors">Save</button>
+                        </div>
+                      </div>
                     ) : (
-                      <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                      <>
+                        {msg.type === 'image' && msg.fileUrl ? (
+                          <img src={msg.fileUrl} alt="shared" className="rounded-lg mb-2 max-h-60 w-full object-cover border border-border/20" />
+                        ) : (
+                          <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                        )}
+                      </>
                     )}
 
-                    <div className={cn("flex items-center justify-end gap-1.5 mt-1 text-[8px] md:text-[9px] font-medium opacity-70", isMe ? "text-primary-foreground/90" : "text-muted-foreground")}>
-                      <span>{msgDate ? format(msgDate, 'HH:mm') : '--:--'}</span>
-                      {isMe && (
-                        <button onClick={() => setSeenByMessage(msg)} className="hover:text-accent transition-colors">
-                          <CheckCheck className={cn("h-3 w-3", (msg.readBy?.length || 0) > 1 ? "text-accent" : "")} />
-                        </button>
-                      )}
-                    </div>
+                    {!isEditing && (
+                      <div className={cn("flex items-center justify-end gap-1.5 mt-1 text-[8px] md:text-[9px] font-medium opacity-70", isMe ? "text-primary-foreground/90" : "text-muted-foreground")}>
+                        {msg.isEdited && <span className="italic mr-1">(edited)</span>}
+                        <span>{msgDate ? format(msgDate, 'HH:mm') : '--:--'}</span>
+                        {isMe && (
+                          <button onClick={() => setSeenByMessage(msg)} className="hover:text-accent transition-colors">
+                            <CheckCheck className={cn("h-3 w-3", (msg.readBy?.length || 0) > 1 ? "text-accent" : "")} />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {Object.keys(reactions).length > 0 && (
