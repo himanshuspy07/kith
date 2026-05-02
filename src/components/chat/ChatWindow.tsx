@@ -248,7 +248,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const handleUpdateRoom = () => {
     if (!roomRef || !newRoomName.trim()) return;
-    updateDocumentNonBlocking(roomRef, { name: newRoomName.trim() });
+    updateDocumentNonBlocking(roomRef, { 
+      name: newRoomName.trim(),
+      nameLowercase: newRoomName.trim().toLowerCase()
+    });
     setNewRoomName('');
     toast({ title: "Room updated" });
   };

@@ -5,7 +5,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user account in the Kith chat application.",
+      "description": "Represents a user account in the kith application.",
       "properties": {
         "id": {
           "type": "string",
@@ -14,6 +14,10 @@
         "username": {
           "type": "string",
           "description": "Unique display name chosen by the user."
+        },
+        "usernameLowercase": {
+          "type": "string",
+          "description": "Lowercase version of the username for case-insensitive search."
         },
         "email": {
           "type": "string",
@@ -52,6 +56,7 @@
       "required": [
         "id",
         "username",
+        "usernameLowercase",
         "onlineStatus",
         "createdAt"
       ]
@@ -67,6 +72,10 @@
         },
         "name": {
           "type": "string"
+        },
+        "nameLowercase": {
+          "type": "string",
+          "description": "Lowercase version of the room name for case-insensitive search."
         },
         "isGroupChat": {
           "type": "boolean"

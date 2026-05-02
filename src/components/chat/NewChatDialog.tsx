@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -29,10 +30,11 @@ export default function NewChatDialog({ onChatCreated }: NewChatDialogProps) {
 
   const usersQuery = useMemoFirebase(() => {
     if (!db || !searchTerm || searchTerm.length < 2) return null;
+    const lowerSearch = searchTerm.toLowerCase();
     return query(
       collection(db, 'users'),
-      where('username', '>=', searchTerm),
-      where('username', '<=', searchTerm + '\uf8ff')
+      where('usernameLowercase', '>=', lowerSearch),
+      where('usernameLowercase', '<=', lowerSearch + '\uf8ff')
     );
   }, [db, searchTerm]);
 
@@ -54,6 +56,7 @@ export default function NewChatDialog({ onChatCreated }: NewChatDialogProps) {
     const roomData = {
       id: roomId,
       name: targetUser.username,
+      nameLowercase: targetUser.username.toLowerCase(),
       isGroupChat: false,
       memberIds: [currentUser.uid, targetUser.id],
       members: { [currentUser.uid]: true, [targetUser.id]: true },
@@ -76,6 +79,7 @@ export default function NewChatDialog({ onChatCreated }: NewChatDialogProps) {
 
     const roomData = {
       name: groupName,
+      nameLowercase: groupName.toLowerCase(),
       isGroupChat: true,
       memberIds: memberIds,
       members: membersMap,

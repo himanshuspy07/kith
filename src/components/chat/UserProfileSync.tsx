@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -27,11 +28,13 @@ export default function UserProfileSync() {
         .then((docSnap) => {
           if (!docSnap.exists()) {
             // First time initialization: use Auth provider defaults
+            const username = user.displayName || user.email?.split('@')[0] || 'kith_user';
             const initialData = {
               id: user.uid,
               email: user.email || '',
               phoneNumber: user.phoneNumber || '',
-              username: user.displayName || user.email?.split('@')[0] || 'kith_user',
+              username: username,
+              usernameLowercase: username.toLowerCase(),
               profilePictureUrl: user.photoURL || '',
               onlineStatus: true,
               lastActiveAt: serverTimestamp(),
@@ -40,15 +43,22 @@ export default function UserProfileSync() {
             };
             setDocumentNonBlocking(userRef, initialData, { merge: true });
           } else {
-            // Profile exists: only update presence to avoid overwriting custom data
-            updateDocumentNonBlocking(userRef, {
+            // Profile exists: update presence and ensure lowercase field exists for case-insensitive search
+            const existingData = docSnap.data();
+            const updates: any = {
               onlineStatus: true,
               lastActiveAt: serverTimestamp(),
-            });
+            };
+            
+            // Backfill lowercase field if it doesn't exist
+            if (!existingData.usernameLowercase && existingData.username) {
+              updates.usernameLowercase = existingData.username.toLowerCase();
+            }
+
+            updateDocumentNonBlocking(userRef, updates);
           }
         })
         .catch((error) => {
-          // Surfacing rich permission errors for development
           errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: userRef.path,
             operation: 'get',
@@ -58,13 +68,12 @@ export default function UserProfileSync() {
 
     syncProfile();
 
-    // Periodic heartbeat to keep presence accurate
     heartbeatIntervalRef.current = setInterval(() => {
       updateDocumentNonBlocking(userRef, {
         lastActiveAt: serverTimestamp(),
         onlineStatus: true
       });
-    }, 1000 * 60); // Every minute
+    }, 1000 * 60);
 
     return () => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -168,6 +169,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
     if (newUsername.trim()) {
       updates.username = newUsername.trim();
+      updates.usernameLowercase = newUsername.trim().toLowerCase();
       try {
         await updateProfile(user, { displayName: newUsername.trim() });
       } catch (e) {}
