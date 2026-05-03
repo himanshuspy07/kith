@@ -1,4 +1,3 @@
-
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -8,6 +7,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Standard pass-through for online-first app
+  // Basic pass-through for now, can be extended for offline caching
   event.respondWith(fetch(event.request));
 });

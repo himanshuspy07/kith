@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -14,7 +13,9 @@ import {
   Edit2, 
   Trash2, 
   X, 
-  Camera
+  Camera,
+  LogOut,
+  Pin
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -81,6 +82,9 @@ const MessageItem = memo(({
   onReact, 
   currentUserId 
 }: any) => {
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => { setHasMounted(true); }, []);
+
   const reactions = msg.reactions || {};
   const hasReactions = Object.values(reactions).some((uids: any) => Array.isArray(uids) && uids.length > 0);
 
@@ -237,7 +241,7 @@ const MessageItem = memo(({
         </div>
       </div>
 
-      {!isGrouped && msg.createdAt && (
+      {hasMounted && !isGrouped && msg.createdAt && msg.createdAt.toDate && (
         <div className="mt-1 px-1 flex items-center gap-1.5">
           <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">
             {format(msg.createdAt.toDate(), 'HH:mm')}
@@ -632,6 +636,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           const isGrouped = prevMsg && 
             prevMsg.senderId === msg.senderId && 
             msg.createdAt && prevMsg.createdAt &&
+            msg.createdAt.toDate && prevMsg.createdAt.toDate &&
             isSameDay(msg.createdAt.toDate(), prevMsg.createdAt.toDate()) &&
             differenceInMinutes(msg.createdAt.toDate(), prevMsg.createdAt.toDate()) < 5 &&
             !msg.replyToId;

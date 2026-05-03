@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
@@ -58,7 +57,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       <div className="flex-1 overflow-hidden">
         <div className="flex justify-between items-center mb-0.5">
           <h3 className={cn("text-xs font-bold truncate", isSelected ? "text-primary" : "text-foreground")}>{room.displayName}</h3>
-          {hasMounted && room.updatedAt && (
+          {hasMounted && room.updatedAt && room.updatedAt.toDate && (
             <span className="text-[8px] text-muted-foreground/40 font-bold uppercase">
               {formatDistanceToNow(room.updatedAt.toDate())}
             </span>
