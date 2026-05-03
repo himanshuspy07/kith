@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -19,7 +18,8 @@ import {
   LogOut,
   Pin,
   PinOff,
-  Camera
+  Camera,
+  AtSign
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -79,6 +79,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [isGroupImageUploading, setIsGroupImageUploading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [editingMessage, setEditingMessage] = useState<any>(null);
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,7 +127,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
+    const val = e.target.value;
+    setInputValue(val);
     
     if (!user) return;
 
@@ -135,6 +138,27 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     typingTimeoutRef.current = setTimeout(() => {
       updateTypingStatus(false);
     }, 3000);
+
+    // Mention detection
+    const lastAtPos = val.lastIndexOf('@');
+    if (lastAtPos !== -1 && room?.isGroupChat) {
+      const textAfterAt = val.substring(lastAtPos + 1);
+      if (!textAfterAt.includes(' ')) {
+        setShowMentions(true);
+        setMentionFilter(textAfterAt.toLowerCase());
+      } else {
+        setShowMentions(false);
+      }
+    } else {
+      setShowMentions(false);
+    }
+  };
+
+  const insertMention = (username: string) => {
+    const lastAtPos = inputValue.lastIndexOf('@');
+    const newVal = inputValue.substring(0, lastAtPos) + '@' + username + ' ';
+    setInputValue(newVal);
+    setShowMentions(false);
   };
 
   const handleSend = (type: 'text' | 'image' = 'text', content?: string) => {
@@ -213,14 +237,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     const reactions = { ...(message.reactions || {}) };
     const hadThisEmoji = (reactions[emoji] || []).includes(user.uid);
 
-    // Enforce one reaction: remove user from ALL current reactions
     Object.keys(reactions).forEach(e => {
       reactions[e] = (reactions[e] || []).filter((uid: string) => uid !== user.uid);
-      // Clean up empty arrays to keep data neat
       if (reactions[e].length === 0) delete reactions[e];
     });
 
-    // If they didn't have this specific emoji already, add it now
     if (!hadThisEmoji) {
       if (!reactions[emoji]) reactions[emoji] = [];
       reactions[emoji].push(user.uid);
@@ -356,6 +377,48 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       .filter(Boolean);
   }, [room?.typing, participants, user]);
 
+  const renderMarkdown = (content: string) => {
+    if (!content) return null;
+
+    // Handle Mentions
+    const parts = content.split(/(@\w+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        return <span key={i} className="mention">{part}</span>;
+      }
+      
+      // Simple Markdown Parsing for Bold, Italic, Code
+      let text: any = part;
+      
+      // Code: `code`
+      text = text.split(/`([^`]+)`/g).map((subPart: string, si: number) => 
+        si % 2 === 1 ? <code key={si}>{subPart}</code> : subPart
+      );
+
+      // Bold: **text**
+      text = Array.isArray(text) ? text.map((item: any) => {
+        if (typeof item !== 'string') return item;
+        return item.split(/\*\*([^\*\*]+)\*\*/g).map((sp: string, ssi: number) => 
+          ssi % 2 === 1 ? <strong key={ssi}>{sp}</strong> : sp
+        );
+      }).flat() : text.split(/\*\*([^\*\*]+)\*\*/g).map((sp: string, ssi: number) => 
+        ssi % 2 === 1 ? <strong key={ssi}>{sp}</strong> : sp
+      );
+
+      // Italic: *text*
+      text = Array.isArray(text) ? text.map((item: any) => {
+        if (typeof item !== 'string') return item;
+        return item.split(/\*([^\*]+)\*/g).map((sp: string, ssi: number) => 
+          ssi % 2 === 1 ? <em key={ssi}>{sp}</em> : sp
+        );
+      }).flat() : text.split(/\*([^\*]+)\*/g).map((sp: string, ssi: number) => 
+        ssi % 2 === 1 ? <em key={ssi}>{sp}</em> : sp
+      );
+
+      return <React.Fragment key={i}>{text}</React.Fragment>;
+    });
+  };
+
   if (!conversationId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-background">
@@ -407,11 +470,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5 shrink-0">
+            <Button variant="ghost" size="icon" className="rounded-full hover:bg-black/5 dark:hover:bg-white/5 shrink-0">
               <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
             </Button>
           </SheetTrigger>
-          <SheetContent className="bg-card/95 backdrop-blur-xl border-white/10 w-full sm:max-w-md flex flex-col">
+          <SheetContent className="bg-card/95 backdrop-blur-xl border-black/5 dark:border-white/10 w-full sm:max-w-md flex flex-col">
             <SheetHeader className="pb-8">
               <SheetTitle>Conversation Settings</SheetTitle>
               <SheetDescription>Personalize your chat experience.</SheetDescription>
@@ -421,9 +484,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               {room?.isGroupChat && (
                 <div className="space-y-4">
                   <Label className="text-xs font-bold uppercase tracking-widest text-primary">Group Identity</Label>
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex items-center gap-4 p-4 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
                     <div className="relative group">
-                      <Avatar className="h-16 w-16 border-2 border-white/10 shadow-lg">
+                      <Avatar className="h-16 w-16 border-2 border-black/5 dark:border-white/10 shadow-lg">
                         <AvatarImage src={room.groupImageUrl} className="object-cover" />
                         <AvatarFallback className="text-xl">{room.name?.[0]}</AvatarFallback>
                       </Avatar>
@@ -455,12 +518,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                       onClick={() => roomRef && updateDocumentNonBlocking(roomRef, { wallpaper: wp.value })}
                       className={cn(
                         "group relative h-20 w-full rounded-xl overflow-hidden border-2 transition-all hover:scale-[1.02]",
-                        room?.wallpaper === wp.value ? "border-primary shadow-lg shadow-primary/20" : "border-white/5"
+                        room?.wallpaper === wp.value ? "border-primary shadow-lg shadow-primary/20" : "border-black/5 dark:border-white/5"
                       )}
                     >
                       <div className={cn("absolute inset-0", wp.preview)} style={{ background: wp.value }} />
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{wp.name}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white">{wp.name}</span>
                       </div>
                     </button>
                   ))}
@@ -471,7 +534,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 <Label className="text-xs font-bold uppercase tracking-widest text-primary">Conversation Members</Label>
                 <div className="space-y-2">
                   {participants?.map(member => (
-                    <div key={member.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                    <div key={member.id} className="flex items-center justify-between p-2 rounded-lg bg-black/5 dark:bg-white/5">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={member.profilePictureUrl} />
@@ -498,7 +561,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               </div>
             </div>
 
-            <SheetFooter className="pt-8 border-t border-white/5 flex flex-col gap-2">
+            <SheetFooter className="pt-8 border-t border-black/5 dark:border-white/5 flex flex-col gap-2">
               <Button 
                 variant="outline" 
                 className="w-full gap-2 rounded-xl"
@@ -553,7 +616,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
               {msg.replyToId && (
                 <div className={cn(
-                  "px-3 py-1 mb-[-4px] rounded-t-xl bg-white/5 border-l-2 border-primary text-[10px] text-muted-foreground/80 max-w-[80%] md:max-w-[60%] truncate",
+                  "px-3 py-1 mb-[-4px] rounded-t-xl bg-black/5 dark:bg-white/5 border-l-2 border-primary text-[10px] text-muted-foreground/80 max-w-[80%] md:max-w-[60%] truncate",
                   isMe ? "mr-2" : "ml-2"
                 )}>
                   <Reply className="h-3 w-3 inline mr-1 opacity-50" />
@@ -586,7 +649,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-transform relative",
                   isMe 
                     ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
-                    : "bg-white/[0.05] backdrop-blur-md border border-white/5 text-foreground rounded-bl-none message-shadow",
+                    : "bg-black/[0.05] dark:bg-white/[0.05] backdrop-blur-md border border-black/5 dark:border-white/5 text-foreground rounded-bl-none message-shadow",
                   msg.type === 'image' ? 'p-1' : 'p-3 md:p-4',
                   msg.isDeleted && "italic opacity-50",
                   isGrouped && (isMe ? "rounded-tr-none" : "rounded-tl-none")
@@ -594,7 +657,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   {msg.type === 'image' ? (
                     <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64 md:max-h-96" />
                   ) : (
-                    msg.content
+                    renderMarkdown(msg.content)
                   )}
                   {msg.isEdited && !msg.isDeleted && (
                     <span className="block text-[8px] opacity-40 mt-1 text-right">edited</span>
@@ -613,7 +676,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                             "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] glass-morphism-heavy shadow-2xl border transition-all active:scale-90",
                             uids.includes(user?.uid) 
                               ? "border-primary/50 bg-primary/20 text-primary shadow-primary/20" 
-                              : "border-white/10 hover:bg-white/10"
+                              : "border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10"
                           )}
                         >
                           <span>{emoji}</span>
@@ -635,13 +698,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                           <Smile className="h-3 w-3" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-1 bg-card/90 backdrop-blur-xl border-white/10 rounded-full">
+                      <PopoverContent className="w-auto p-1 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-full">
                         <div className="flex gap-1">
                           {REACTION_EMOJIS.map(emoji => (
                             <button 
                               key={emoji} 
                               className={cn(
-                                "h-8 w-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg",
+                                "h-8 w-8 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors text-lg",
                                 (reactions[emoji] || []).includes(user?.uid) && "bg-primary/20"
                               )}
                               onClick={() => handleReact(msg, emoji)}
@@ -671,6 +734,39 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       </div>
 
       <div className="p-4 md:p-6 bg-transparent z-10 space-y-3">
+        {showMentions && participants && (
+          <div className="max-w-4xl mx-auto glass-morphism-heavy rounded-2xl p-2 mb-2 animate-in slide-in-from-bottom-2 shadow-2xl border-primary/20">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-black/5 dark:border-white/5 mb-1">
+              <AtSign className="h-3 w-3 text-primary" />
+              <span className="text-[10px] font-bold uppercase tracking-widest">Mentions</span>
+            </div>
+            <div className="max-h-40 overflow-y-auto scrollbar-hide">
+              {participants
+                .filter(p => p.username.toLowerCase().includes(mentionFilter) && p.id !== user?.uid)
+                .map(p => (
+                  <button 
+                    key={p.id}
+                    onClick={() => insertMention(p.username)}
+                    className="w-full flex items-center gap-3 p-2 hover:bg-primary/10 rounded-xl transition-colors text-left group"
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={p.profilePictureUrl} />
+                      <AvatarFallback>{p.username[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold group-hover:text-primary">{p.username}</span>
+                      {p.onlineStatus && <span className="text-[8px] text-accent font-bold uppercase">Online</span>}
+                    </div>
+                  </button>
+                ))
+              }
+              {participants.filter(p => p.username.toLowerCase().includes(mentionFilter) && p.id !== user?.uid).length === 0 && (
+                <div className="p-4 text-center text-xs text-muted-foreground">No members found</div>
+              )}
+            </div>
+          </div>
+        )}
+
         {replyingTo && (
           <div className="max-w-4xl mx-auto flex items-center justify-between glass-morphism-heavy px-4 py-2 rounded-xl animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-3 overflow-hidden">
@@ -701,7 +797,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </div>
         )}
 
-        <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-3 glass-morphism p-2 md:p-3 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border-white/5">
+        <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-3 glass-morphism p-2 md:p-3 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border-black/5 dark:border-white/5">
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -712,7 +808,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-9 w-9 md:h-10 md:w-10 rounded-full hover:bg-white/10 shrink-0"
+            className="h-9 w-9 md:h-10 md:w-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10 shrink-0"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
           >
@@ -722,7 +818,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             <Input 
               value={inputValue} 
               onChange={handleInputChange} 
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
+              onKeyDown={(e) => e.key === 'Enter' && !showMentions && handleSend()} 
               placeholder={editingMessage ? "Update message..." : "Message kith..."} 
               className="bg-transparent border-none h-9 md:h-10 px-2 md:px-4 focus-visible:ring-0 text-sm placeholder:text-muted-foreground/40" 
             />
@@ -730,17 +826,17 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           <div className="flex items-center gap-1 shrink-0">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-full hover:bg-white/10 hidden sm:flex">
+                <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10 hidden sm:flex">
                   <Smile className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-2 bg-card/90 backdrop-blur-xl border-white/10 rounded-2xl mb-4">
+              <PopoverContent className="w-64 p-2 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-2xl mb-4">
                 <div className="grid grid-cols-4 gap-2">
                   {COMMON_EMOJIS.map(emoji => (
                     <button 
                       key={emoji} 
                       onClick={() => setInputValue(prev => prev + emoji)}
-                      className="h-10 w-10 flex items-center justify-center text-xl hover:bg-white/10 rounded-xl transition-colors"
+                      className="h-10 w-10 flex items-center justify-center text-xl hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-colors"
                     >
                       {emoji}
                     </button>

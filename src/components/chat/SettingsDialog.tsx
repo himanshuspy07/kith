@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -25,7 +24,11 @@ import {
   Camera,
   Settings,
   ChevronRight,
-  Menu
+  Menu,
+  Sun,
+  Moon,
+  Monitor,
+  Palette
 } from 'lucide-react';
 import { useUser, useFirestore } from '@/firebase';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -42,7 +45,8 @@ interface SettingsDialogProps {
 
 const VAPID_KEY = "BCg1UIFx2xNkxfPrxSeATRRO2jyjVh2c2C_9AEfN3FsbTFjcS3EN5fyF3qIDsWbSt5RN_L4UpGWlq4QTuBJwplE";
 
-type SettingsTab = 'profile' | 'notifications' | 'security';
+type SettingsTab = 'profile' | 'appearance' | 'notifications' | 'security';
+type ThemeMode = 'light' | 'dark' | 'system';
 
 export default function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { user } = useUser();
@@ -59,6 +63,24 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   const [isUploading, setIsUploading] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>('system');
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('kith-theme') as ThemeMode || 'system';
+    setTheme(savedTheme);
+  }, []);
+
+  const handleThemeChange = (mode: ThemeMode) => {
+    setTheme(mode);
+    localStorage.setItem('kith-theme', mode);
+    const html = document.documentElement;
+    if (mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      html.classList.add('dark');
+    } else {
+      html.classList.remove('dark');
+    }
+    toast({ title: `Theme set to ${mode}` });
+  };
 
   useEffect(() => {
     if (!user || !db || !open) return;
@@ -169,7 +191,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
         activeTab === id 
           ? "bg-primary/10 text-primary" 
-          : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
       )}
     >
       <Icon className="h-4 w-4" />
@@ -185,7 +207,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         isMobile ? "w-[95vw] h-[80vh] rounded-3xl" : "sm:max-w-[750px] h-[600px] rounded-[2rem]"
       )}>
         <aside className={cn(
-          "bg-black/20 border-r border-white/5 p-6 flex flex-col",
+          "bg-black/[0.02] dark:bg-black/20 border-r border-black/5 dark:border-white/5 p-6 flex flex-col",
           isMobile ? "w-full shrink-0 h-auto" : "w-1/3 h-full"
         )}>
           <div className="mb-6 md:mb-8 px-2 flex items-center justify-between">
@@ -207,14 +229,15 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
             isMobile && !showMobileNav ? "hidden" : "block"
           )}>
             <NavItem id="profile" label="Public Profile" icon={User} />
+            <NavItem id="appearance" label="Appearance" icon={Palette} />
             <NavItem id="notifications" label="Notifications" icon={Bell} />
             <NavItem id="security" label="Privacy & Security" icon={Shield} />
           </nav>
 
           {!isMobile && (
-            <div className="pt-6 border-t border-white/5 flex items-center gap-2.5 opacity-40 px-2">
+            <div className="pt-6 border-t border-black/5 dark:border-white/5 flex items-center gap-2.5 opacity-40 px-2">
               <Settings className="h-3 w-3" />
-              <span className="text-[9px] uppercase font-bold tracking-widest">Version 2.2.0</span>
+              <span className="text-[9px] uppercase font-bold tracking-widest">Version 2.3.0</span>
             </div>
           )}
         </aside>
@@ -223,9 +246,9 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
           <div className="flex-1 overflow-y-auto p-6 md:p-10 scrollbar-hide">
             {activeTab === 'profile' && (
               <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex flex-col md:flex-row items-center gap-6 pb-6 border-b border-white/5 text-center md:text-left">
+                <div className="flex flex-col md:flex-row items-center gap-6 pb-6 border-b border-black/5 dark:border-white/5 text-center md:text-left">
                   <div className="relative group">
-                    <Avatar className="h-20 w-20 md:h-24 md:24 border-2 border-white/5 shadow-xl overflow-hidden">
+                    <Avatar className="h-20 w-20 md:h-24 md:24 border-2 border-black/5 dark:border-white/5 shadow-xl overflow-hidden">
                       <AvatarImage src={avatarUrl} className="object-cover" />
                       <AvatarFallback className="text-2xl bg-secondary text-muted-foreground font-bold">
                         {username?.[0]?.toUpperCase() || 'U'}
@@ -259,7 +282,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                       value={username} 
                       onChange={(e) => setUsername(e.target.value)} 
                       placeholder="e.g. Alex Rivera" 
-                      className="bg-black/20 border-white/5 h-12 rounded-xl focus-visible:ring-primary/40"
+                      className="bg-black/5 dark:bg-black/20 border-black/5 dark:border-white/5 h-12 rounded-xl focus-visible:ring-primary/40"
                     />
                   </div>
                   <div className="space-y-2">
@@ -268,16 +291,65 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                       value={bio} 
                       onChange={(e) => setBio(e.target.value)} 
                       placeholder="Share a little bit about yourself..." 
-                      className="bg-black/20 border-white/5 rounded-xl min-h-[100px] md:min-h-[120px] resize-none focus-visible:ring-primary/40 text-sm leading-relaxed"
+                      className="bg-black/5 dark:bg-black/20 border-black/5 dark:border-white/5 rounded-xl min-h-[100px] md:min-h-[120px] resize-none focus-visible:ring-primary/40 text-sm leading-relaxed"
                     />
                   </div>
                 </div>
               </div>
             )}
 
+            {activeTab === 'appearance' && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="space-y-4">
+                  <Label className="text-xs font-bold uppercase tracking-widest text-primary">Theme Selection</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleThemeChange('light')}
+                      className={cn(
+                        "h-24 flex flex-col gap-2 rounded-2xl border-2",
+                        theme === 'light' ? "border-primary bg-primary/5" : "border-black/5"
+                      )}
+                    >
+                      <Sun className={cn("h-6 w-6", theme === 'light' ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Light</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleThemeChange('dark')}
+                      className={cn(
+                        "h-24 flex flex-col gap-2 rounded-2xl border-2",
+                        theme === 'dark' ? "border-primary bg-primary/5" : "border-black/5"
+                      )}
+                    >
+                      <Moon className={cn("h-6 w-6", theme === 'dark' ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Dark</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleThemeChange('system')}
+                      className={cn(
+                        "h-24 flex flex-col gap-2 rounded-2xl border-2",
+                        theme === 'system' ? "border-primary bg-primary/5" : "border-black/5"
+                      )}
+                    >
+                      <Monitor className={cn("h-6 w-6", theme === 'system' ? "text-primary" : "text-muted-foreground")} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">System</span>
+                    </Button>
+                  </div>
+                </div>
+                <div className="p-5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+                  <h4 className="text-sm font-bold mb-1">Adaptive Interface</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Choose between a vibrant light workspace, a focused dark environment, or let kith mirror your system settings automatically.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'notifications' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="p-5 md:p-6 rounded-2xl bg-black/10 border border-white/5 space-y-4">
+                <div className="p-5 md:p-6 rounded-2xl bg-black/10 border border-black/5 dark:border-white/5 space-y-4">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div className="space-y-0.5">
                       <h4 className="font-bold text-sm">Desktop Notifications</h4>
@@ -286,21 +358,11 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="w-full md:w-auto rounded-full border-white/10 hover:bg-white/5"
+                      className="w-full md:w-auto rounded-full border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
                       onClick={handleRequestNotifications}
                     >
                       Configure
                     </Button>
-                  </div>
-                </div>
-
-                <div className="p-5 md:p-6 rounded-2xl bg-primary/5 border border-primary/10 flex items-start gap-4">
-                  <Smartphone className="h-5 w-5 text-primary shrink-0 mt-1" />
-                  <div className="space-y-1">
-                    <h4 className="font-bold text-sm">Persistent Connection</h4>
-                    <p className="text-xs text-muted-foreground leading-normal">
-                      kith ensures real-time delivery while the app is active.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -313,12 +375,12 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                     <Shield className="h-4 w-4 text-primary" />
                     <h4 className="font-bold text-sm">Secure Identity</h4>
                   </div>
-                  <p className="text-xs text-muted-foreground bg-black/10 p-4 rounded-xl leading-relaxed border border-white/5">
+                  <p className="text-xs text-muted-foreground bg-black/5 dark:bg-black/10 p-4 rounded-xl leading-relaxed border border-black/5 dark:border-white/5">
                     Your account is secured via Firebase Authentication.
                   </p>
                   <Button 
                     variant="ghost" 
-                    className="w-full justify-between h-14 rounded-xl border border-dashed border-white/10 px-4 hover:bg-white/5 group"
+                    className="w-full justify-between h-14 rounded-xl border border-dashed border-black/10 dark:border-white/10 px-4 hover:bg-black/5 dark:hover:bg-white/5 group"
                     onClick={copyDebugToken}
                   >
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Auth Token</span>
@@ -329,7 +391,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
             )}
           </div>
 
-          <div className="p-6 md:p-8 bg-black/10 border-t border-white/5 flex justify-end">
+          <div className="p-6 md:p-8 bg-black/[0.02] dark:bg-black/10 border-t border-black/5 dark:border-white/5 flex justify-end">
             <Button 
               onClick={handleSaveProfile} 
               disabled={isSaving} 

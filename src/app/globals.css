@@ -4,6 +4,29 @@
 
 @layer base {
   :root {
+    --background: 0 0% 100%;
+    --foreground: 224 71.4% 4.1%;
+    --card: 0 0% 99%;
+    --card-foreground: 224 71.4% 4.1%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71.4% 4.1%;
+    --primary: 212 100% 50%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    --accent: 180 100% 45%;
+    --accent-foreground: 220.9 39.3% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 212 100% 50%;
+    --radius: 1.25rem;
+  }
+
+  .dark {
     --background: 224 25% 4%;
     --foreground: 0 0% 100%;
     --card: 224 25% 7%;
@@ -23,7 +46,6 @@
     --border: 224 25% 12%;
     --input: 224 25% 12%;
     --ring: 212 100% 50%;
-    --radius: 1.25rem;
   }
 }
 
@@ -37,11 +59,11 @@
 }
 
 .glass-morphism {
-  @apply bg-white/[0.03] backdrop-blur-2xl border border-white/10;
+  @apply bg-white/10 dark:bg-white/[0.03] backdrop-blur-2xl border border-black/5 dark:border-white/10;
 }
 
 .glass-morphism-heavy {
-  @apply bg-black/40 backdrop-blur-3xl border border-white/5;
+  @apply bg-white/80 dark:bg-black/40 backdrop-blur-3xl border border-black/5 dark:border-white/5;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
@@ -53,11 +75,11 @@
 }
 
 .message-shadow {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .message-shadow-me {
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
 }
 
 .animate-in-fade {
@@ -67,4 +89,12 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.mention {
+  @apply font-bold text-accent dark:text-accent bg-accent/10 px-1 rounded;
+}
+
+code {
+  @apply bg-black/10 dark:bg-black/40 px-1 rounded font-mono text-[0.9em];
 }

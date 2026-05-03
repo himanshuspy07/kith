@@ -43,10 +43,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("dark", inter.variable, plusJakarta.variable)}>
+    <html lang="en" className={cn(inter.variable, plusJakarta.variable)} suppressHydrationWarning>
       <head>
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
         <link rel="manifest" href="/manifest.json" />
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`
+            (function() {
+              const theme = localStorage.getItem('kith-theme') || 'system';
+              const html = document.documentElement;
+              if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                html.classList.add('dark');
+              } else {
+                html.classList.remove('dark');
+              }
+            })();
+          `}
+        </Script>
       </head>
       <body className="font-body antialiased bg-background text-foreground overflow-hidden">
         <FirebaseClientProvider>
@@ -63,7 +76,6 @@ export default function RootLayout({
                   console.log('SW registration failed:', err);
                 });
                 
-                // Also register firebase-messaging-sw.js
                 navigator.serviceWorker.register('/firebase-messaging-sw.js').then(function(reg) {
                   console.log('FCM SW registered');
                 });
