@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -103,11 +104,12 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
+    // Firestore documents have a 1MB limit. 800KB is a safe threshold for Base64 strings.
+    if (file.size > 800 * 1024) {
       toast({
         variant: "destructive",
         title: "File too large",
-        description: "Please select an image smaller than 5MB.",
+        description: "Please select an image smaller than 800KB for document stability.",
       });
       return;
     }

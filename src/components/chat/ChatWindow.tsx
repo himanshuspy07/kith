@@ -73,7 +73,6 @@ const WALLPAPERS = [
 const COMMON_EMOJIS = ["😊", "😂", "🥰", "👍", "🔥", "🚀", "❤️", "✨", "🙏", "😎", "🙌", "🤔", "🎉", "👋", "😭", "💯"];
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
-// Memoized Message Item for performance
 const MessageItem = memo(({ 
   msg, 
   isMe, 
@@ -89,30 +88,43 @@ const MessageItem = memo(({
 
   const renderMarkdown = (content: string) => {
     if (!content) return null;
+    
+    // Split by mentions first
     const parts = content.split(/(@\w+)/g);
+    
     return parts.map((part, i) => {
-      if (part.startsWith('@')) return <span key={i} className="mention">{part}</span>;
-      let text: any = part;
-      text = text.split(/`([^`]+)`/g).map((subPart: string, si: number) => 
-        si % 2 === 1 ? <code key={si}>{subPart}</code> : subPart
-      );
-      text = Array.isArray(text) ? text.map((item: any) => {
+      if (part.startsWith('@')) {
+        return <span key={`mention-${i}`} className="mention">{part}</span>;
+      }
+
+      // Process formatting for non-mention text
+      let formattedText: React.ReactNode[] = [part];
+
+      // Code blocks
+      formattedText = formattedText.flatMap((item, idx) => {
         if (typeof item !== 'string') return item;
-        return item.split(/\*\*([^\*\*]+)\*\*/g).map((sp: string, ssi: number) => 
-          ssi % 2 === 1 ? <strong key={ssi}>{sp}</strong> : sp
+        return item.split(/`([^`]+)`/g).map((sub, si) => 
+          si % 2 === 1 ? <code key={`code-${idx}-${si}`}>{sub}</code> : sub
         );
-      }).flat() : text.split(/\*\*([^\*\*]+)\*\*/g).map((sp: string, ssi: number) => 
-        ssi % 2 === 1 ? <strong key={ssi}>{sp}</strong> : sp
-      );
-      text = Array.isArray(text) ? text.map((item: any) => {
+      });
+
+      // Bold
+      formattedText = formattedText.flatMap((item, idx) => {
         if (typeof item !== 'string') return item;
-        return item.split(/\*([^\*]+)\*/g).map((sp: string, ssi: number) => 
-          ssi % 2 === 1 ? <em key={ssi}>{sp}</em> : sp
+        return item.split(/\*\*([^\*\*]+)\*\*/g).map((sub, si) => 
+          si % 2 === 1 ? <strong key={`bold-${idx}-${si}`}>{sub}</strong> : sub
         );
-      }).flat() : text.split(/\*([^\*]+)\*/g).map((sp: string, ssi: number) => 
-        ssi % 2 === 1 ? <em key={ssi}>{sp}</em> : sp
-      );
-      return <React.Fragment key={i}>{text}</React.Fragment>;
+      });
+
+      // Italic
+      formattedText = formattedText.flatMap((item, idx) => {
+        if (typeof item !== 'string') return item;
+        return item.split(/\*([^\*]+)\*/g).map((sub, si) => 
+          si % 2 === 1 ? <em key={`italic-${idx}-${si}`}>{sub}</em> : sub
+        );
+      });
+
+      return <React.Fragment key={`part-${i}`}>{formattedText}</React.Fragment>;
     });
   };
 
@@ -425,9 +437,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const handleTogglePin = () => {
     if (!room || !user || !roomRef) return;
-    const isPinned = room.pinnedBy?.[user.uid] === true;
+    const uid = user.uid;
+    const isPinned = room.pinnedBy?.[uid] === true;
     updateDocumentNonBlocking(roomRef, {
-      [`pinnedBy.${user.uid}`]: !isPinned
+      [`pinnedBy.${uid}`]: !isPinned
     });
     toast({
       title: !isPinned ? "Conversation Pinned" : "Conversation Unpinned",
@@ -435,12 +448,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   };
 
   const handleDeleteConversation = async () => {
-    if (!conversationId || !room) return;
+    if (!conversationId || !room || !user) return;
     try {
       if (room.isGroupChat) {
         const nextMembers = { ...room.members };
-        delete nextMembers[user!.uid];
-        const nextMemberIds = room.memberIds.filter((id: string) => id !== user!.uid);
+        delete nextMembers[user.uid];
+        const nextMemberIds = (room.memberIds || []).filter((id: string) => id !== user.uid);
         updateDocumentNonBlocking(roomRef!, {
           members: nextMembers,
           memberIds: nextMemberIds
@@ -459,7 +472,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (!room || !roomRef) return;
     const nextMembers = { ...room.members };
     delete nextMembers[memberId];
-    const nextMemberIds = room.memberIds.filter((id: string) => id !== memberId);
+    const nextMemberIds = (room.memberIds || []).filter((id: string) => id !== memberId);
     updateDocumentNonBlocking(roomRef, {
       members: nextMembers,
       memberIds: nextMemberIds
@@ -470,7 +483,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleGroupImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !roomRef) return;
-    if (file.size > 5 * 1024 * 1024) return;
+    if (file.size > 800 * 1024) {
+      toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB for document stability." });
+      return;
+    }
     setIsGroupImageUploading(true);
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -483,7 +499,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return;
+    if (file.size > 800 * 1024) {
+      toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB for document stability." });
+      return;
+    }
     setIsUploading(true);
     const reader = new FileReader();
     reader.onloadend = () => {

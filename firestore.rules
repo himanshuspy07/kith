@@ -37,32 +37,36 @@ service cloud.firestore {
     }
 
     match /chatRooms/{chatRoomId} {
-      // Allow list and get if user is in the members map
-      allow list: if isSignedIn(); // Queries are filtered by application logic
+      allow list: if isSignedIn();
       allow get: if isRoomMemberData(resource.data);
-      
-      // Allow creation if the user is including themselves as a member
       allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] == true;
-      
-      // Allow update/delete if already a member
       allow update, delete: if isRoomMemberData(resource.data);
 
       match /messages/{messageId} {
-        // Allow access if the user is a member of the parent room
         allow list, get: if isRoomMember(chatRoomId);
-        
-        // Allow creation if member and sender is self
         allow create: if isRoomMember(chatRoomId) && request.resource.data.senderId == request.auth.uid;
-          
-        // Allow update if member and (sender OR room admin OR only updating readBy/reactions)
         allow update: if isRoomMember(chatRoomId) && (
           resource.data.senderId == request.auth.uid ||
           isRoomAdmin(chatRoomId) ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'reactions'])
         );
-        
-        // Only sender or admin can delete their own message
         allow delete: if isRoomMember(chatRoomId) && (resource.data.senderId == request.auth.uid || isRoomAdmin(chatRoomId));
+      }
+    }
+
+    match /calls/{callId} {
+      allow get, list, create, update, delete: if isSignedIn() && (
+        request.auth.uid == resource.data.callerId || 
+        request.auth.uid == resource.data.receiverId ||
+        request.auth.uid == request.resource.data.callerId ||
+        request.auth.uid == request.resource.data.receiverId
+      );
+
+      match /callerCandidates/{candidateId} {
+        allow read, write: if isSignedIn();
+      }
+      match /receiverCandidates/{candidateId} {
+        allow read, write: if isSignedIn();
       }
     }
   }
