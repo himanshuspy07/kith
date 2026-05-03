@@ -36,11 +36,6 @@ export default function NotificationManager({ currentConversationId }: Notificat
       const lastMsg = room.lastMessageText;
       const lastSender = room.lastMessageSenderId;
 
-      // Only notify if:
-      // 1. There is a new message
-      // 2. It's not from the current user
-      // 3. We aren't currently looking at this specific chat
-      // 4. We've seen this room before (prevents notification on first load)
       if (
         lastMsg && 
         lastSender !== user.uid && 
@@ -48,7 +43,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
         lastProcessedMessages.current[roomId] !== undefined &&
         lastProcessedMessages.current[roomId] !== lastMsg
       ) {
-        if ("Notification" in window && Notification.permission === "granted") {
+        if (typeof window !== 'undefined' && "Notification" in window && Notification.permission === "granted") {
           new Notification(room.isGroupChat ? room.name : "kith", {
             body: lastMsg,
             icon: "/icon.svg",
@@ -56,19 +51,20 @@ export default function NotificationManager({ currentConversationId }: Notificat
         }
       }
       
-      // Update our tracker
       lastProcessedMessages.current[roomId] = lastMsg || "";
     });
   }, [rooms, user, currentConversationId]);
 
   useEffect(() => {
-    if (!user || typeof window === 'undefined' || !("Notification" in window)) return;
+    if (!user || typeof window === 'undefined' || !("Notification" in window) || !('serviceWorker' in navigator)) return;
 
     const setupFCM = async () => {
       try {
         const messaging = getMessaging();
         const registration = await navigator.serviceWorker.ready;
         
+        if (!registration) return;
+
         const token = await getToken(messaging, { 
           vapidKey: VAPID_KEY,
           serviceWorkerRegistration: registration
@@ -83,14 +79,14 @@ export default function NotificationManager({ currentConversationId }: Notificat
           }
         });
       } catch (error) {
-        console.warn("FCM setup failed or ignored.");
+        // Silent fail for environments where FCM is blocked or unavailable
       }
     };
 
     if (Notification.permission === 'granted') {
       setupFCM();
     }
-  }, [user, db, currentConversationId]);
+  }, [user, currentConversationId]);
 
   return null;
 }
