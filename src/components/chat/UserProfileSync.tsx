@@ -38,6 +38,7 @@ export default function UserProfileSync() {
               profilePictureUrl: user.photoURL || '',
               bio: '',
               onlineStatus: true,
+              hasSeenTutorial: false, // Set to false so the tutorial triggers
               lastActiveAt: serverTimestamp(),
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
@@ -59,6 +60,11 @@ export default function UserProfileSync() {
             // Ensure bio field exists
             if (existingData.bio === undefined) {
               updates.bio = '';
+            }
+
+            // Ensure tutorial field exists for older accounts
+            if (existingData.hasSeenTutorial === undefined) {
+              updates.hasSeenTutorial = false;
             }
 
             updateDocumentNonBlocking(userRef, updates);

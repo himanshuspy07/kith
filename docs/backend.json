@@ -41,6 +41,10 @@
           "type": "boolean",
           "description": "Indicates if the user is online."
         },
+        "hasSeenTutorial": {
+          "type": "boolean",
+          "description": "Indicates if the user has completed the onboarding tutorial."
+        },
         "fcmTokens": {
           "type": "array",
           "items": { "type": "string" },
