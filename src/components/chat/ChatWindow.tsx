@@ -89,7 +89,7 @@ const MessageItem = memo(({
   currentUserId 
 }: any) => {
   const reactions = msg.reactions || {};
-  const hasReactions = Object.values(reactions).some((uids: any) => uids.length > 0);
+  const hasReactions = Object.values(reactions).some((uids: any) => Array.isArray(uids) && uids.length > 0);
 
   const renderMarkdown = (content: string) => {
     if (!content) return null;
@@ -155,27 +155,27 @@ const MessageItem = memo(({
         "group relative flex items-center gap-1.5 max-w-full",
         isMe ? "flex-row" : "flex-row-reverse"
       )}>
-        {/* Actions Bar: Visible on mobile, hover-only on desktop */}
+        {/* Actions Bar: Visible on touch, hover-only on desktop */}
         <div className={cn(
           "flex items-center transition-all duration-200 gap-0.5",
           "md:opacity-0 md:group-hover:opacity-100",
-          "opacity-100" // Always visible on mobile
+          "opacity-100" 
         )}>
           {!msg.isDeleted && (
             <div className="flex items-center gap-0.5">
                <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5" 
+                className="h-10 w-10 md:h-8 md:w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5" 
                 onClick={() => onAction('reply', msg)}
               >
-                <Reply className="h-3.5 w-3.5" />
+                <Reply className="h-4 w-4 md:h-3.5 md:w-3.5" />
               </Button>
 
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
-                    <Smile className="h-3.5 w-3.5" />
+                  <Button variant="ghost" size="icon" className="h-10 w-10 md:h-8 md:w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                    <Smile className="h-4 w-4 md:h-3.5 md:w-3.5" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-1 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-full shadow-2xl z-[60]">
@@ -184,8 +184,8 @@ const MessageItem = memo(({
                       <button 
                         key={emoji} 
                         className={cn(
-                          "h-8 w-8 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors text-lg",
-                          (reactions[emoji] || []).includes(currentUserId) && "bg-primary/20"
+                          "h-10 w-10 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors text-lg",
+                          Array.isArray(reactions[emoji]) && reactions[emoji].includes(currentUserId) && "bg-primary/20"
                         )}
                         onClick={() => onReact(msg, emoji)}
                       >
@@ -199,15 +199,15 @@ const MessageItem = memo(({
               {isMe && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
-                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    <Button variant="ghost" size="icon" className="h-10 w-10 md:h-8 md:w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                      <MoreHorizontal className="h-4 w-4 md:h-3.5 md:w-3.5" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align={isMe ? "end" : "start"} className="bg-card/95 backdrop-blur-xl border-white/5">
-                    <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2">
+                    <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2 p-3">
                       <Edit2 className="h-4 w-4" /> Edit Message
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 text-destructive focus:text-destructive">
+                    <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 p-3 text-destructive focus:text-destructive">
                       <Trash2 className="h-4 w-4" /> Delete Message
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -241,7 +241,7 @@ const MessageItem = memo(({
               "absolute -bottom-4 flex flex-wrap gap-1 z-10",
               isMe ? "right-0" : "left-0"
             )}>
-              {Object.entries(reactions).map(([emoji, uids]: [string, any]) => uids.length > 0 && (
+              {Object.entries(reactions).map(([emoji, uids]: [string, any]) => Array.isArray(uids) && uids.length > 0 && (
                 <button 
                   key={emoji}
                   onClick={() => onReact(msg, emoji)}
@@ -435,11 +435,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (!user || !conversationId) return;
     const msgRef = doc(db, 'chatRooms', conversationId, 'messages', message.id);
     const reactions = { ...(message.reactions || {}) };
-    const hadThisEmoji = (reactions[emoji] || []).includes(user.uid);
+    const hadThisEmoji = Array.isArray(reactions[emoji]) && reactions[emoji].includes(user.uid);
 
     Object.keys(reactions).forEach(e => {
-      reactions[e] = (reactions[e] || []).filter((uid: string) => uid !== user.uid);
-      if (reactions[e].length === 0) delete reactions[e];
+      if (Array.isArray(reactions[e])) {
+        reactions[e] = reactions[e].filter((uid: string) => uid !== user.uid);
+        if (reactions[e].length === 0) delete reactions[e];
+      }
     });
 
     if (!hadThisEmoji) {
@@ -718,18 +720,18 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           (replyingTo || editingMessage) ? "rounded-b-[1.5rem] rounded-t-none border-t-white/10" : "rounded-[1.5rem]"
         )}>
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={() => fileInputRef.current?.click()}>
-            {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon />}
+          <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full" onClick={() => fileInputRef.current?.click()}>
+            {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon className="h-5 w-5" />}
           </Button>
           <Input 
             value={inputValue} 
             onChange={handleInputChange} 
             onKeyDown={(e) => e.key === 'Enter' && !showMentions && handleSend()} 
             placeholder={editingMessage ? "Update your message..." : "Message kith..."} 
-            className="bg-transparent border-none h-10 px-2 focus-visible:ring-0" 
+            className="bg-transparent border-none h-12 px-2 focus-visible:ring-0 text-sm md:text-base" 
           />
-          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className={cn("h-10 w-10 rounded-full", inputValue.trim() ? "bg-primary" : "bg-muted/20")}>
-            <Send className="h-4 w-4" />
+          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className={cn("h-12 w-12 rounded-full shadow-lg", inputValue.trim() ? "bg-primary" : "bg-muted/20")}>
+            <Send className="h-5 w-5" />
           </Button>
         </div>
       </div>
