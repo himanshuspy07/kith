@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -19,6 +18,17 @@ import { Card, CardTitle, CardDescription } from '@/components/ui/card';
 import { Mail, RefreshCw, LogOut } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
@@ -95,9 +105,31 @@ export default function Home() {
             <Button variant="outline" disabled={isResending} className="w-full h-14 rounded-2xl" onClick={handleResendVerification}>
               {isResending ? <RefreshCw className="animate-spin h-4 w-4" /> : 'Resend Email'}
             </Button>
-            <Button variant="ghost" className="w-full h-12 text-muted-foreground" onClick={() => signOut(auth)}>
-              <LogOut className="mr-2 h-3 w-3" /> Sign Out
-            </Button>
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" className="w-full h-12 text-muted-foreground">
+                  <LogOut className="mr-2 h-3 w-3" /> Sign Out
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="rounded-[2rem] border-none bg-card/95 backdrop-blur-xl p-8 max-w-sm">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-xl font-bold">Sign Out?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-muted-foreground">
+                    Are you sure you want to exit? You can finish your verification later.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-6 gap-3">
+                  <AlertDialogCancel className="rounded-xl border-white/10 h-12">Cancel</AlertDialogCancel>
+                  <AlertDialogAction 
+                    className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 h-12 font-bold"
+                    onClick={() => signOut(auth)}
+                  >
+                    Sign Out
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </Card>
       </div>

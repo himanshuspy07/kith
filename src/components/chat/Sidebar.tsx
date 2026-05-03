@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, memo } from 'react';
@@ -13,6 +12,17 @@ import { collection, query, where, doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import NewChatDialog from './NewChatDialog';
 import SettingsDialog from './SettingsDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface SidebarProps {
   onSelectConversation: (id: string) => void;
@@ -129,7 +139,31 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         </div>
         <div className="flex gap-1">
           <NewChatDialog onChatCreated={onSelectConversation} />
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => signOut(auth)}><LogOut className="h-4 w-4" /></Button>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="rounded-[2rem] border-none bg-card/95 backdrop-blur-xl p-8 max-w-sm">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-xl font-bold">Sign Out?</AlertDialogTitle>
+                <AlertDialogDescription className="text-muted-foreground">
+                  Are you sure you want to end your session? You'll need to log back in to access your kith conversations.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="mt-6 gap-3">
+                <AlertDialogCancel className="rounded-xl border-white/10 h-12">Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 h-12 font-bold"
+                  onClick={() => signOut(auth)}
+                >
+                  Sign Out
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
