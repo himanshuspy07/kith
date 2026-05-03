@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight, UserPlus, Users, ChevronLeft, Palette, Quote } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, MoreVertical, Pencil, Trash2, X, Check, Reply, CornerDownRight, UserPlus, Users, ChevronLeft, Palette, Quote, Phone, Video, Sparkles } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,10 @@ import { Label } from '@/components/ui/label';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, arrayRemove, deleteField, where, limitToLast } from 'firebase/firestore';
+import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, arrayRemove, deleteField, where, limitToLast, addDoc } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
+import { generateSmartReplies } from '@/ai/flows/smart-reply-flow';
 
 interface ChatWindowProps {
   conversationId?: string;
@@ -44,6 +45,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [newRoomName, setNewRoomName] = useState('');
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [seenByMessage, setSeenByMessage] = useState<any>(null);
+  const [smartReplies, setSmartReplies] = useState<string[]>([]);
+  const [isGeneratingReplies, setIsGeneratingReplies] = useState(false);
   
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -90,6 +93,26 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     );
   }, [db, conversationId, messageLimit]);
   const { data: messages, isLoading } = useCollection(messagesQuery);
+
+  // Generate Smart Replies when new messages arrive
+  useEffect(() => {
+    if (messages && messages.length > 0 && !room?.isGroupChat) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.senderId !== user?.uid) {
+        setIsGeneratingReplies(true);
+        const history = messages.slice(-5).map(m => ({
+          role: (m.senderId === user?.uid ? 'model' : 'user') as 'model' | 'user',
+          content: m.content
+        }));
+        generateSmartReplies({ history: history as any })
+          .then(res => setSmartReplies(res.suggestions))
+          .catch(() => setSmartReplies([]))
+          .finally(() => setIsGeneratingReplies(false));
+      } else {
+        setSmartReplies([]);
+      }
+    }
+  }, [messages, user?.uid, room?.isGroupChat]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -191,6 +214,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     
     if (type === 'text') setInputValue('');
     setReplyToMessage(null);
+    setSmartReplies([]);
   };
 
   const handleEditMessage = () => {
@@ -254,6 +278,45 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     });
   };
 
+  const initiateCall = async (type: 'audio' | 'video') => {
+    if (!db || !user || !room) return;
+    const targetUserId = room.memberIds.find(id => id !== user.uid);
+    if (!targetUserId) return;
+
+    try {
+      // Setup WebRTC and call metadata
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' });
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+      const offerDescription = await pc.createOffer();
+      await pc.setLocalDescription(offerDescription);
+
+      const callData = {
+        callerId: user.uid,
+        callerName: user.displayName || 'kith User',
+        receiverId: targetUserId,
+        status: 'ringing',
+        type: type,
+        offer: {
+          type: offerDescription.type,
+          sdp: offerDescription.sdp,
+        },
+        createdAt: serverTimestamp(),
+      };
+
+      const callRef = await addDoc(collection(db, 'calls'), callData);
+      
+      // Close peer connection temporarily as CallManager will take over
+      pc.close();
+      stream.getTracks().forEach(t => t.stop());
+      
+      toast({ title: `Calling ${chatDisplayName}...` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Call Failed', description: e.message });
+    }
+  };
+
   const handleUpdateRoom = () => {
     if (!roomRef || !newRoomName.trim()) return;
     updateDocumentNonBlocking(roomRef, { 
@@ -306,6 +369,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {!room?.isGroupChat && (
+            <>
+              <Button variant="ghost" size="icon" className="text-muted-foreground/40 hover:text-accent hover:bg-white/5 rounded-full" onClick={() => initiateCall('audio')}>
+                <Phone className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="text-muted-foreground/40 hover:text-accent hover:bg-white/5 rounded-full" onClick={() => initiateCall('video')}>
+                <Video className="h-5 w-5" />
+              </Button>
+            </>
+          )}
           <Sheet open={isInfoOpen} onOpenChange={setIsInfoOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="text-muted-foreground/40 hover:text-primary hover:bg-white/5 rounded-full"><Info className="h-5 w-5" /></Button>
@@ -529,7 +602,25 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-6 md:p-8 border-t border-white/5 bg-background/60 backdrop-blur-3xl z-30">
+      <div className="px-6 md:px-8 pb-6 md:pb-8 pt-4 border-t border-white/5 bg-background/60 backdrop-blur-3xl z-30">
+        {smartReplies.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4 max-w-4xl mx-auto animate-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-1.5 mr-2 text-[10px] font-bold text-accent uppercase tracking-widest bg-accent/10 px-3 py-1.5 rounded-full">
+              <Sparkles className="h-3 w-3" />
+              AI Suggetions
+            </div>
+            {smartReplies.map((reply, i) => (
+              <button
+                key={i}
+                onClick={() => handleSend('text', reply)}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95"
+              >
+                {reply}
+              </button>
+            ))}
+          </div>
+        )}
+        
         {replyToMessage && (
           <div className="max-w-4xl mx-auto mb-4 p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between animate-in slide-in-from-bottom-4">
             <div className="flex flex-col gap-1 border-l-2 border-primary pl-4 overflow-hidden">

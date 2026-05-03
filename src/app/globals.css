@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -53,4 +54,8 @@
 
 .glass-morphism {
   @apply bg-white/5 backdrop-blur-2xl border border-white/10;
+}
+
+.mirror {
+  transform: scaleX(-1);
 }

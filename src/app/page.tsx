@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -6,6 +7,7 @@ import ChatWindow from '@/components/chat/ChatWindow';
 import AuthScreen from '@/components/auth/AuthScreen';
 import UserProfileSync from '@/components/chat/UserProfileSync';
 import NotificationManager from '@/components/chat/NotificationManager';
+import CallManager from '@/components/chat/CallManager';
 import BrandLogo from '@/components/ui/brand-logo';
 import { useUser, useAuth } from '@/firebase';
 import { initiateResendVerification } from '@/firebase/non-blocking-login';
@@ -126,6 +128,7 @@ export default function Home() {
     <div className="flex h-screen w-full bg-background overflow-hidden">
       <UserProfileSync />
       <NotificationManager currentConversationId={selectedConversationId} />
+      <CallManager />
       
       {showSidebar && (
         <Sidebar 
