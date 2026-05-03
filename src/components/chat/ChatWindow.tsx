@@ -117,7 +117,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   }, [messages?.length]);
 
-  // Handle typing status
   const updateTypingStatus = (isTyping: boolean) => {
     if (!roomRef || !user) return;
     updateDocumentNonBlocking(roomRef, {
@@ -130,10 +129,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     
     if (!user) return;
 
-    // Reset typing timeout
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    
-    // Only update if not already marked as typing recently (to save writes)
     updateTypingStatus(true);
 
     typingTimeoutRef.current = setTimeout(() => {
@@ -145,7 +141,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     const finalContent = content || inputValue.trim();
     if (!finalContent || !conversationId || !user || !room) return;
     
-    // Clear typing status on send
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     updateTypingStatus(false);
 
@@ -214,19 +209,24 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleReact = (message: any, emoji: string) => {
     if (!user || !conversationId) return;
     const msgRef = doc(db, 'chatRooms', conversationId, 'messages', message.id);
-    const reactions = message.reactions || {};
-    const userReactions = reactions[emoji] || [];
     
-    let nextReactions;
-    if (userReactions.includes(user.uid)) {
-      nextReactions = userReactions.filter((id: string) => id !== user.uid);
-    } else {
-      nextReactions = [...userReactions, user.uid];
+    const reactions = { ...(message.reactions || {}) };
+    const hadThisEmoji = (reactions[emoji] || []).includes(user.uid);
+
+    // Enforce one reaction: remove user from ALL current reactions
+    Object.keys(reactions).forEach(e => {
+      reactions[e] = (reactions[e] || []).filter((uid: string) => uid !== user.uid);
+      // Clean up empty arrays to keep data neat
+      if (reactions[e].length === 0) delete reactions[e];
+    });
+
+    // If they didn't have this specific emoji already, add it now
+    if (!hadThisEmoji) {
+      if (!reactions[emoji]) reactions[emoji] = [];
+      reactions[emoji].push(user.uid);
     }
 
-    updateDocumentNonBlocking(msgRef, {
-      [`reactions.${emoji}`]: nextReactions
-    });
+    updateDocumentNonBlocking(msgRef, { reactions });
   };
 
   const handleTogglePin = () => {
@@ -528,21 +528,22 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           const isMe = msg.senderId === user?.uid;
           const prevMsg = idx > 0 ? messages[idx - 1] : null;
           const sender = participants?.find(p => p.id === msg.senderId);
-          const hasReactions = msg.reactions && Object.values(msg.reactions).some((uids: any) => uids.length > 0);
+          const reactions = msg.reactions || {};
+          const hasReactions = Object.values(reactions).some((uids: any) => uids.length > 0);
           
-          // Grouping logic: Same sender, same day, and within 5 minutes
           const isGrouped = prevMsg && 
             prevMsg.senderId === msg.senderId && 
             msg.createdAt && prevMsg.createdAt &&
             isSameDay(msg.createdAt.toDate(), prevMsg.createdAt.toDate()) &&
             differenceInMinutes(msg.createdAt.toDate(), prevMsg.createdAt.toDate()) < 5 &&
-            !msg.replyToId; // Don't group if it's a reply
+            !msg.replyToId;
 
           return (
             <div key={msg.id} className={cn(
               "flex flex-col animate-in-fade", 
               isMe ? "items-end" : "items-start",
-              !isGrouped && "mt-4"
+              !isGrouped && "mt-4",
+              hasReactions && "mb-5"
             )}>
               {!isMe && room?.isGroupChat && !isGrouped && (
                 <span className="text-[10px] font-bold text-muted-foreground/60 ml-2 mb-1 uppercase tracking-widest">
@@ -561,8 +562,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               )}
 
               <div className={cn(
-                "group relative flex items-center gap-2 max-w-[90%] md:max-w-[85%]",
-                hasReactions && "mb-4"
+                "group relative flex items-center gap-2 max-w-[90%] md:max-w-[85%]"
               )}>
                 {isMe && (
                   <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
@@ -602,19 +602,22 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   
                   {hasReactions && (
                     <div className={cn(
-                      "absolute -bottom-3 flex flex-wrap gap-1 z-10",
+                      "absolute -bottom-4 flex flex-wrap gap-1 z-10",
                       isMe ? "right-0" : "left-0"
                     )}>
-                      {Object.entries(msg.reactions).map(([emoji, uids]: [string, any]) => uids.length > 0 && (
+                      {Object.entries(reactions).map(([emoji, uids]: [string, any]) => uids.length > 0 && (
                         <button 
                           key={emoji}
                           onClick={() => handleReact(msg, emoji)}
                           className={cn(
-                            "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] glass-morphism-heavy shadow-xl border border-white/10",
-                            uids.includes(user?.uid) ? "border-primary/40 bg-primary/20" : "border-white/5"
+                            "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] glass-morphism-heavy shadow-2xl border transition-all active:scale-90",
+                            uids.includes(user?.uid) 
+                              ? "border-primary/50 bg-primary/20 text-primary shadow-primary/20" 
+                              : "border-white/10 hover:bg-white/10"
                           )}
                         >
-                          {emoji} <span className="font-bold">{uids.length}</span>
+                          <span>{emoji}</span>
+                          <span className="font-bold opacity-80">{uids.length}</span>
                         </button>
                       ))}
                     </div>
@@ -637,7 +640,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                           {REACTION_EMOJIS.map(emoji => (
                             <button 
                               key={emoji} 
-                              className="h-8 w-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg"
+                              className={cn(
+                                "h-8 w-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg",
+                                (reactions[emoji] || []).includes(user?.uid) && "bg-primary/20"
+                              )}
                               onClick={() => handleReact(msg, emoji)}
                             >
                               {emoji}
