@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -62,40 +63,6 @@ service cloud.firestore {
         
         // Only sender or admin can delete their own message
         allow delete: if isRoomMember(chatRoomId) && (resource.data.senderId == request.auth.uid || isRoomAdmin(chatRoomId));
-      }
-    }
-
-    // --- Call Signaling Rules ---
-
-    match /calls/{callId} {
-      // Allow listing calls (queries are filtered by receiverId in app)
-      allow list: if isSignedIn();
-      
-      // Allow get/update if the user is the caller or receiver
-      allow get, update: if isSignedIn() && (
-        resource.data.callerId == request.auth.uid || 
-        resource.data.receiverId == request.auth.uid
-      );
-      
-      // Allow creation if user is the caller
-      allow create: if isSignedIn() && request.resource.data.callerId == request.auth.uid;
-      
-      // Allow deletion by the caller
-      allow delete: if isSignedIn() && resource.data.callerId == request.auth.uid;
-
-      // ICE Candidate signaling subcollections
-      match /callerCandidates/{id} {
-        allow read, write: if isSignedIn() && (
-          get(/databases/$(database)/documents/calls/$(callId)).data.callerId == request.auth.uid ||
-          get(/databases/$(database)/documents/calls/$(callId)).data.receiverId == request.auth.uid
-        );
-      }
-      
-      match /receiverCandidates/{id} {
-        allow read, write: if isSignedIn() && (
-          get(/databases/$(database)/documents/calls/$(callId)).data.callerId == request.auth.uid ||
-          get(/databases/$(database)/documents/calls/$(callId)).data.receiverId == request.auth.uid
-        );
       }
     }
   }
