@@ -115,7 +115,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden bg-card border-white/5 rounded-[2.5rem] shadow-2xl">
         <DialogHeader className="p-0">
-          <div className="relative h-32 bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20 flex items-end px-8 pb-0">
+          <div className="relative h-32 bg-black/20 border-b border-white/5 flex items-end px-8 pb-0">
             <div className="absolute top-4 right-4 flex gap-2">
                <div className="px-3 py-1 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center gap-1.5">
                   <Sparkles className="h-3 w-3 text-accent" />
