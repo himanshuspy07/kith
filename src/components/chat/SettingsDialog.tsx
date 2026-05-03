@@ -115,11 +115,11 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden bg-card border-white/5 rounded-[2.5rem] shadow-2xl">
         <DialogHeader className="p-0">
-          <div className="relative h-32 bg-black/20 border-b border-white/5 flex items-end px-8 pb-0">
-            <div className="absolute top-4 right-4 flex gap-2">
-               <div className="px-3 py-1 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center gap-1.5">
-                  <Sparkles className="h-3 w-3 text-accent" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/70">Pro Account</span>
+          <div className="relative h-40 bg-gradient-to-b from-black/40 to-transparent border-b border-white/5 flex items-end px-8 pb-0">
+            <div className="absolute top-6 right-6 flex gap-2">
+               <div className="px-3 py-1 rounded-full bg-primary/10 backdrop-blur-md border border-primary/20 flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Pro Account</span>
                </div>
             </div>
             <div className="flex items-center gap-6 translate-y-6">
@@ -155,7 +155,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="profile" className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <TabsContent value="profile" className="space-y-6 mt-0 bg-transparent animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="grid gap-6">
                 <div className="space-y-2.5">
                   <Label className="text-[10px] uppercase font-black text-primary tracking-widest ml-1">Username</Label>
@@ -194,7 +194,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
               </Button>
             </TabsContent>
 
-            <TabsContent value="notifications" className="space-y-8 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <TabsContent value="notifications" className="space-y-8 mt-0 bg-transparent animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="space-y-4">
                 <Label className="text-[10px] uppercase font-black text-primary tracking-widest ml-1">System Alerts</Label>
                 <div className="grid gap-3">
