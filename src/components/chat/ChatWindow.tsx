@@ -34,6 +34,12 @@ import {
   SheetFooter
 } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { format, isSameDay, differenceInMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -124,7 +130,7 @@ const MessageItem = memo(({
 
   return (
     <div className={cn(
-      "flex flex-col animate-in-fade", 
+      "flex flex-col animate-in-fade px-2", 
       isMe ? "items-end" : "items-start",
       !isGrouped && "mt-4",
       hasReactions && "mb-5"
@@ -146,28 +152,74 @@ const MessageItem = memo(({
       )}
 
       <div className={cn(
-        "group relative flex items-center gap-2 max-w-[90%] md:max-w-[85%]"
+        "group relative flex items-center gap-1.5 max-w-full",
+        isMe ? "flex-row" : "flex-row-reverse"
       )}>
-        {isMe && (
-          <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onAction('reply', msg)}>
-              <Reply className="h-3 w-3" />
-            </Button>
-            {!msg.isDeleted && (
-              <>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onAction('edit', msg)}>
-                  <Edit2 className="h-3 w-3" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-destructive" onClick={() => onAction('delete', msg)}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </>
-            )}
-          </div>
-        )}
-
+        {/* Actions Bar: Visible on mobile, hover-only on desktop */}
         <div className={cn(
-          "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-transform relative",
+          "flex items-center transition-all duration-200 gap-0.5",
+          "md:opacity-0 md:group-hover:opacity-100",
+          "opacity-100" // Always visible on mobile
+        )}>
+          {!msg.isDeleted && (
+            <div className="flex items-center gap-0.5">
+               <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5" 
+                onClick={() => onAction('reply', msg)}
+              >
+                <Reply className="h-3.5 w-3.5" />
+              </Button>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                    <Smile className="h-3.5 w-3.5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-1 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-full shadow-2xl z-[60]">
+                  <div className="flex gap-1">
+                    {REACTION_EMOJIS.map(emoji => (
+                      <button 
+                        key={emoji} 
+                        className={cn(
+                          "h-8 w-8 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors text-lg",
+                          (reactions[emoji] || []).includes(currentUserId) && "bg-primary/20"
+                        )}
+                        onClick={() => onReact(msg, emoji)}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {isMe && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align={isMe ? "end" : "start"} className="bg-card/95 backdrop-blur-xl border-white/5">
+                    <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2">
+                      <Edit2 className="h-4 w-4" /> Edit Message
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 text-destructive focus:text-destructive">
+                      <Trash2 className="h-4 w-4" /> Delete Message
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Message Bubble */}
+        <div className={cn(
+          "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-transform relative max-w-[85vw] md:max-w-[400px]",
           isMe 
             ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
             : "bg-black/[0.05] dark:bg-white/[0.05] backdrop-blur-md border border-black/5 dark:border-white/5 text-foreground rounded-bl-none message-shadow",
@@ -181,7 +233,7 @@ const MessageItem = memo(({
             renderMarkdown(msg.content)
           )}
           {msg.isEdited && !msg.isDeleted && (
-            <span className="block text-[8px] opacity-40 mt-1 text-right">edited</span>
+            <span className="block text-[8px] opacity-40 mt-1 text-right uppercase tracking-widest font-bold">edited</span>
           )}
           
           {hasReactions && (
@@ -207,37 +259,6 @@ const MessageItem = memo(({
             </div>
           )}
         </div>
-
-        {!isMe && (
-          <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onAction('reply', msg)}>
-              <Reply className="h-3 w-3" />
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                  <Smile className="h-3 w-3" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-1 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-full">
-                <div className="flex gap-1">
-                  {REACTION_EMOJIS.map(emoji => (
-                    <button 
-                      key={emoji} 
-                      className={cn(
-                        "h-8 w-8 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors text-lg",
-                        (reactions[emoji] || []).includes(currentUserId) && "bg-primary/20"
-                      )}
-                      onClick={() => onReact(msg, emoji)}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
       </div>
 
       {!isGrouped && (
@@ -626,7 +647,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 md:py-8 space-y-2 scrollbar-hide z-[1]">
+      <div className="flex-1 overflow-y-auto px-2 md:px-6 py-6 md:py-8 space-y-2 scrollbar-hide z-[1]">
         {messages?.map((msg, idx) => {
           const isMe = msg.senderId === user?.uid;
           const prevMsg = idx > 0 ? messages[idx - 1] : null;
