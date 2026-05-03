@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, LogOut, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, MoreVertical, Trash2, Copy, Check, Bell } from 'lucide-react';
+import { Search, LogOut, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, MoreVertical, Trash2, Copy, Check, Bell, Smartphone } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,20 +29,13 @@ interface SidebarProps {
 export default function Sidebar({ onSelectConversation, selectedConversationId, className }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [copiedToken, setCopiedToken] = useState(false);
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const db = useFirestore();
   const auth = useAuth();
   const { toast } = useToast();
-
-  const [newUsername, setNewUsername] = useState('');
-  const [newAvatar, setNewAvatar] = useState('');
-  const [newBio, setNewBio] = useState('');
 
   useEffect(() => {
     setCurrentTime(Date.now());
@@ -99,13 +92,26 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
   const handleRequestNotifications = async () => {
     if (!("Notification" in window)) {
-      toast({ variant: "destructive", title: "Not Supported" });
+      toast({ variant: "destructive", title: "Not Supported", description: "Your browser doesn't support notifications." });
       return;
     }
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      toast({ title: "Notifications Enabled" });
-      window.location.reload(); // Reload to trigger FCM registration
+      toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages." });
+      // Small delay to allow FCM registration
+      setTimeout(() => window.location.reload(), 1000);
+    }
+  };
+
+  const sendTestNotification = () => {
+    if (Notification.permission === 'granted') {
+      new Notification("kith Test", {
+        body: "This is a test notification. It works!",
+        icon: "/icon.svg"
+      });
+      toast({ title: "Test Sent", description: "Check your notification center." });
+    } else {
+      toast({ variant: "destructive", title: "Permission Required", description: "Please enable notifications first." });
     }
   };
 
@@ -117,7 +123,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         await navigator.clipboard.writeText(token);
         setCopiedToken(true);
         setTimeout(() => setCopiedToken(false), 2000);
-        toast({ title: "Token Copied" });
+        toast({ title: "Token Copied", description: "Ready for manual testing in Firebase Console." });
       }
     } catch (e) {
       toast({ variant: "destructive", title: "Failed to get token" });
@@ -141,21 +147,25 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Settings className="h-4 w-4" /></Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-white/10 rounded-2xl">
+            <DialogContent className="bg-card border-white/10 rounded-2xl sm:max-w-md">
               <DialogHeader><DialogTitle>Settings</DialogTitle></DialogHeader>
               <div className="space-y-6 py-4">
                 <div className="space-y-4">
                   <Label className="text-[10px] uppercase font-bold tracking-widest text-primary">Notifications</Label>
-                  <Button variant="outline" className="w-full justify-start gap-2 h-12 rounded-xl" onClick={handleRequestNotifications}>
+                  <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl" onClick={handleRequestNotifications}>
                     <Bell className="h-4 w-4" /> Enable Push Notifications
                   </Button>
-                  <Button variant="ghost" className="w-full justify-start gap-2 h-12 rounded-xl text-xs" onClick={copyDebugToken}>
+                  <Button variant="secondary" className="w-full justify-start gap-3 h-12 rounded-xl" onClick={sendTestNotification}>
+                    <Smartphone className="h-4 w-4" /> Send Test Notification
+                  </Button>
+                  <Button variant="ghost" className="w-full justify-start gap-3 h-12 rounded-xl text-xs" onClick={copyDebugToken}>
                     {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
-                    {copiedToken ? 'Copied!' : 'Copy Debug Token (For Testing)'}
+                    {copiedToken ? 'Copied!' : 'Copy Debug Token (Expert Mode)'}
                   </Button>
                 </div>
-                <div className="pt-4 border-t border-white/5">
+                <div className="pt-4 border-t border-white/5 flex flex-col gap-3">
                   <Button variant="destructive" className="w-full h-12 rounded-xl" onClick={() => signOut(auth)}>Log Out</Button>
+                  <p className="text-[10px] text-center text-muted-foreground">kith Version 1.2.0-stable</p>
                 </div>
               </div>
             </DialogContent>
@@ -169,21 +179,32 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       </div>
 
       <div className="flex-1 overflow-y-auto px-3">
-        {conversationListData.filter(r => r.displayName.toLowerCase().includes(searchQuery.toLowerCase())).map((room) => (
+        {isLoading ? (
+          <div className="flex flex-col gap-2 p-4">
+            {[1, 2, 3].map(i => <div key={i} className="h-16 w-full bg-white/5 animate-pulse rounded-2xl" />)}
+          </div>
+        ) : conversationListData.filter(r => r.displayName.toLowerCase().includes(searchQuery.toLowerCase())).map((room) => (
           <div
             key={room.id}
             onClick={() => onSelectConversation(room.id)}
             className={cn("p-4 mb-1 flex items-center gap-3 rounded-2xl cursor-pointer transition-all", selectedConversationId === room.id ? "bg-white/10" : "hover:bg-white/5")}
           >
-            <Avatar className="h-12 w-12">
+            <Avatar className="h-12 w-12 shrink-0">
               <AvatarImage src={room.displayAvatar} />
               <AvatarFallback>{room.displayName?.[0]}</AvatarFallback>
             </Avatar>
             <div className="flex-1 overflow-hidden">
-              <h3 className="text-sm font-bold truncate">{room.displayName}</h3>
+              <div className="flex justify-between items-center mb-0.5">
+                <h3 className="text-sm font-bold truncate">{room.displayName}</h3>
+                {room.updatedAt && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatDistanceToNow(room.updatedAt.toDate(), { addSuffix: false })}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground truncate">{room.lastMessageText || 'No messages yet'}</p>
             </div>
-            {room.isPinned && <Pin className="h-3 w-3 text-primary fill-primary" />}
+            {room.isPinned && <Pin className="h-3 w-3 text-primary fill-primary shrink-0" />}
           </div>
         ))}
       </div>
