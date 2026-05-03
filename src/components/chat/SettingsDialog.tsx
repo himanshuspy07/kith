@@ -1,19 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Bell, Smartphone, Copy, Check, Shield, Loader2 } from 'lucide-react';
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { User, Bell, Smartphone, Copy, Check, Shield, Loader2, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { useUser, useFirestore } from '@/firebase';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { getMessaging, getToken } from 'firebase/messaging';
+import { cn } from '@/lib/utils';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -69,7 +70,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         title: "Profile Updated",
         description: "Your changes have been saved successfully.",
       });
-    }, 500);
+    }, 600);
   };
 
   const handleRequestNotifications = async () => {
@@ -112,108 +113,131 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-card border-white/5 rounded-[2rem]">
+      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden bg-card border-white/5 rounded-[2.5rem] shadow-2xl">
         <DialogHeader className="p-0">
-          <div className="bg-primary/10 p-8 flex items-center gap-4">
-            <Avatar className="h-16 w-16 border-2 border-primary/20">
-              <AvatarImage src={avatarUrl} />
-              <AvatarFallback className="text-xl bg-primary/20 text-primary">
-                {username?.[0] || user?.email?.[0]?.toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col text-left">
-              <DialogTitle className="text-xl font-bold">{username || 'User Profile'}</DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground uppercase tracking-widest">
-                {user?.email}
-              </DialogDescription>
+          <div className="relative h-32 bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20 flex items-end px-8 pb-0">
+            <div className="absolute top-4 right-4 flex gap-2">
+               <div className="px-3 py-1 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-accent" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/70">Pro Account</span>
+               </div>
+            </div>
+            <div className="flex items-center gap-6 translate-y-6">
+              <div className="relative group">
+                <Avatar className="h-24 w-24 border-4 border-background shadow-2xl ring-1 ring-white/10">
+                  <AvatarImage src={avatarUrl} />
+                  <AvatarFallback className="text-3xl bg-primary/20 text-primary font-black uppercase">
+                    {username?.[0] || user?.email?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                  <ImageIcon className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              <div className="flex flex-col text-left mb-6">
+                <DialogTitle className="text-2xl font-black tracking-tighter text-white">Settings</DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground font-medium uppercase tracking-[0.2em]">
+                  Manage your kith identity
+                </DialogDescription>
+              </div>
             </div>
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="profile" className="w-full">
-          <div className="px-8 pt-4">
-            <TabsList className="grid w-full grid-cols-2 bg-white/5 h-12 rounded-xl">
-              <TabsTrigger value="profile" className="rounded-lg gap-2">
-                <User className="h-4 w-4" /> Profile
+        <div className="mt-12 px-8 pb-10">
+          <Tabs defaultValue="profile" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-white/5 h-12 p-1 rounded-2xl mb-8">
+              <TabsTrigger value="profile" className="rounded-xl gap-2 font-bold text-xs uppercase tracking-widest transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <User className="h-3.5 w-3.5" /> Identity
               </TabsTrigger>
-              <TabsTrigger value="notifications" className="rounded-lg gap-2">
-                <Bell className="h-4 w-4" /> Notifications
+              <TabsTrigger value="notifications" className="rounded-xl gap-2 font-bold text-xs uppercase tracking-widest transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Bell className="h-3.5 w-3.5" /> Presence
               </TabsTrigger>
             </TabsList>
-          </div>
 
-          <div className="p-8">
-            <TabsContent value="profile" className="space-y-4 mt-0">
-              <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-primary tracking-widest">Username</Label>
-                <Input 
-                  value={username} 
-                  onChange={(e) => setUsername(e.target.value)} 
-                  placeholder="e.g. Alex" 
-                  className="bg-white/5 border-none h-12 rounded-xl"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-primary tracking-widest">Bio</Label>
-                <Textarea 
-                  value={bio} 
-                  onChange={(e) => setBio(e.target.value)} 
-                  placeholder="Tell others about yourself..." 
-                  className="bg-white/5 border-none rounded-xl min-h-[100px] resize-none"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-primary tracking-widest">Avatar URL</Label>
-                <Input 
-                  value={avatarUrl} 
-                  onChange={(e) => setAvatarUrl(e.target.value)} 
-                  placeholder="https://..." 
-                  className="bg-white/5 border-none h-12 rounded-xl"
-                />
+            <TabsContent value="profile" className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="grid gap-6">
+                <div className="space-y-2.5">
+                  <Label className="text-[10px] uppercase font-black text-primary tracking-widest ml-1">Username</Label>
+                  <Input 
+                    value={username} 
+                    onChange={(e) => setUsername(e.target.value)} 
+                    placeholder="How should we call you?" 
+                    className="bg-white/5 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
+                  />
+                </div>
+                <div className="space-y-2.5">
+                  <Label className="text-[10px] uppercase font-black text-primary tracking-widest ml-1">Personal Bio</Label>
+                  <Textarea 
+                    value={bio} 
+                    onChange={(e) => setBio(e.target.value)} 
+                    placeholder="Tell your kith a bit about yourself..." 
+                    className="bg-white/5 border-none rounded-2xl p-6 min-h-[120px] resize-none focus-visible:ring-primary/30 text-sm font-medium leading-relaxed"
+                  />
+                </div>
+                <div className="space-y-2.5">
+                  <Label className="text-[10px] uppercase font-black text-primary tracking-widest ml-1">Profile Picture URL</Label>
+                  <Input 
+                    value={avatarUrl} 
+                    onChange={(e) => setAvatarUrl(e.target.value)} 
+                    placeholder="Paste a link to your image" 
+                    className="bg-white/5 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
+                  />
+                </div>
               </div>
               <Button 
                 onClick={handleSaveProfile} 
                 disabled={isSaving} 
-                className="w-full h-12 rounded-xl font-bold uppercase tracking-widest text-xs mt-4"
+                className="w-full h-14 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-primary/20 transition-all active:scale-95 mt-2"
               >
-                {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'Save Profile'}
+                {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'Apply Changes'}
               </Button>
             </TabsContent>
 
-            <TabsContent value="notifications" className="space-y-6 mt-0">
-              <div className="space-y-3">
-                <Label className="text-[10px] uppercase font-bold text-primary tracking-widest">Alert Settings</Label>
-                <Button variant="outline" className="w-full justify-start gap-3 h-14 rounded-xl border-white/5 hover:bg-white/5" onClick={handleRequestNotifications}>
-                  <Bell className="h-5 w-5 text-primary" />
-                  <div className="flex flex-col items-start text-left">
-                    <span className="text-sm font-bold">Request Permission</span>
-                    <span className="text-[10px] text-muted-foreground">Enable browser system alerts</span>
-                  </div>
-                </Button>
-                <Button variant="outline" className="w-full justify-start gap-3 h-14 rounded-xl border-white/5 hover:bg-white/5" onClick={sendTestNotification}>
-                  <Smartphone className="h-5 w-5 text-accent" />
-                  <div className="flex flex-col items-start text-left">
-                    <span className="text-sm font-bold">Send Test Alert</span>
-                    <span className="text-[10px] text-muted-foreground">Verify foreground notifications</span>
-                  </div>
-                </Button>
+            <TabsContent value="notifications" className="space-y-8 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="space-y-4">
+                <Label className="text-[10px] uppercase font-black text-primary tracking-widest ml-1">System Alerts</Label>
+                <div className="grid gap-3">
+                  <Button variant="outline" className="w-full justify-start gap-4 h-20 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-white/10 transition-all group" onClick={handleRequestNotifications}>
+                    <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Bell className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-sm font-black text-white">Push Notifications</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5 font-bold">Stay connected in background</span>
+                    </div>
+                  </Button>
+                  
+                  <Button variant="outline" className="w-full justify-start gap-4 h-20 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-white/10 transition-all group" onClick={sendTestNotification}>
+                    <div className="h-12 w-12 rounded-xl bg-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Smartphone className="h-6 w-6 text-accent" />
+                    </div>
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-sm font-black text-white">Send Test Alert</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5 font-bold">Verify delivery pipeline</span>
+                    </div>
+                  </Button>
+                </div>
               </div>
               
-              <div className="space-y-3">
-                <Label className="text-[10px] uppercase font-bold text-primary tracking-widest">Developer Tools</Label>
-                <Button variant="ghost" className="w-full justify-start gap-3 h-12 rounded-xl text-xs hover:bg-white/5" onClick={copyDebugToken}>
-                  {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
-                  {copiedToken ? 'Token Copied!' : 'Copy FCM Device Token'}
+              <div className="space-y-4">
+                <Label className="text-[10px] uppercase font-black text-primary tracking-widest ml-1">Developer & Support</Label>
+                <Button variant="ghost" className="w-full justify-between h-14 rounded-2xl px-6 text-xs hover:bg-white/5 group border border-dashed border-white/10" onClick={copyDebugToken}>
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-bold text-muted-foreground uppercase tracking-widest">Device Token</span>
+                  </div>
+                  {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity" />}
                 </Button>
               </div>
 
-              <div className="pt-4 border-t border-white/5 flex items-center justify-center gap-2 opacity-30">
-                <Shield className="h-3 w-3" />
-                <span className="text-[9px] uppercase font-bold tracking-widest">kith secure connection active</span>
+              <div className="pt-6 border-t border-white/5 flex items-center justify-center gap-2.5 opacity-40">
+                <Shield className="h-3 w-3 text-accent" />
+                <span className="text-[9px] uppercase font-black tracking-[0.3em] text-white">kith security standard v2.0</span>
               </div>
             </TabsContent>
-          </div>
-        </Tabs>
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
