@@ -171,7 +171,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </Avatar>
           <div className="flex flex-col">
             <h3 className="text-sm font-bold leading-none">{chatDisplayName}</h3>
-            <span className="text-[10px] text-accent uppercase tracking-widest mt-1 font-bold animate-pulse">Live Link</span>
+            <span className="text-[10px] text-muted-foreground truncate mt-1 max-w-[150px] md:max-w-[300px] font-medium italic">
+              {room?.isGroupChat ? "Group Conversation" : (otherUserProfile?.bio || 'No bio available')}
+            </span>
           </div>
         </div>
         <Sheet>
