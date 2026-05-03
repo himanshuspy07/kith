@@ -115,7 +115,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden bg-card border-white/5 rounded-[2.5rem] shadow-2xl">
         <DialogHeader className="p-0">
-          <div className="relative h-40 bg-gradient-to-b from-black/40 to-transparent border-b border-white/5 flex items-end px-8 pb-0">
+          <div className="relative h-40 bg-black/40 border-b border-white/5 flex items-end px-8 pb-0">
             <div className="absolute top-6 right-6 flex gap-2">
                <div className="px-3 py-1 rounded-full bg-primary/10 backdrop-blur-md border border-primary/20 flex items-center gap-1.5">
                   <Sparkles className="h-3 w-3 text-primary" />
@@ -163,7 +163,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                     value={username} 
                     onChange={(e) => setUsername(e.target.value)} 
                     placeholder="How should we call you?" 
-                    className="bg-muted/30 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
+                    className="bg-black/20 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
                   />
                 </div>
                 <div className="space-y-2.5">
@@ -172,7 +172,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                     value={bio} 
                     onChange={(e) => setBio(e.target.value)} 
                     placeholder="Tell your kith a bit about yourself..." 
-                    className="bg-muted/30 border-none rounded-2xl p-6 min-h-[120px] resize-none focus-visible:ring-primary/30 text-sm font-medium leading-relaxed"
+                    className="bg-black/20 border-none rounded-2xl p-6 min-h-[120px] resize-none focus-visible:ring-primary/30 text-sm font-medium leading-relaxed"
                   />
                 </div>
                 <div className="space-y-2.5">
@@ -181,7 +181,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                     value={avatarUrl} 
                     onChange={(e) => setAvatarUrl(e.target.value)} 
                     placeholder="Paste a link to your image" 
-                    className="bg-muted/30 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
+                    className="bg-black/20 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
                   />
                 </div>
               </div>
