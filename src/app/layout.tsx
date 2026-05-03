@@ -46,6 +46,7 @@ export default function RootLayout({
     <html lang="en" className={cn("dark", inter.variable, plusJakarta.variable)}>
       <head>
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-body antialiased bg-background text-foreground overflow-hidden">
         <FirebaseClientProvider>
@@ -56,10 +57,15 @@ export default function RootLayout({
           {`
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js').then(function(registration) {
-                  console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                }, function(err) {
-                  console.log('ServiceWorker registration failed: ', err);
+                navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                  console.log('SW registered:', reg.scope);
+                }).catch(function(err) {
+                  console.log('SW registration failed:', err);
+                });
+                
+                // Also register firebase-messaging-sw.js
+                navigator.serviceWorker.register('/firebase-messaging-sw.js').then(function(reg) {
+                  console.log('FCM SW registered');
                 });
               });
             }

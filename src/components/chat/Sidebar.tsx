@@ -1,8 +1,7 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, Bell, BellRing, MoreVertical, Trash2, TextQuote } from 'lucide-react';
+import { Search, LogOut, MessageSquare, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, Bell, BellRing, MoreVertical, Trash2, TextQuote, Copy, Check } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +17,7 @@ import { signOut, updateProfile } from 'firebase/auth';
 import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import NewChatDialog from './NewChatDialog';
 import { useToast } from '@/hooks/use-toast';
+import { getMessaging, getToken } from 'firebase/messaging';
 
 interface SidebarProps {
   onSelectConversation: (id: string) => void;
@@ -32,6 +32,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [notificationPermission, setNotificationPermission] = useState<string>('default');
+  const [copiedToken, setCopiedToken] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
@@ -86,13 +87,29 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       setNotificationPermission(permission);
       
       if (permission === 'granted') {
-        toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages, even in the background." });
-        // The NotificationManager handles FCM token registration once permission is granted
+        toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages." });
       } else {
-        toast({ variant: "destructive", title: "Permission Denied", description: "Notifications are blocked by your browser settings." });
+        toast({ variant: "destructive", title: "Permission Denied", description: "Notifications are blocked by your settings." });
       }
     } catch (e) {
       console.error("Notification request failed:", e);
+    }
+  };
+
+  const copyDebugToken = async () => {
+    try {
+      const messaging = getMessaging();
+      const token = await getToken(messaging, { 
+        vapidKey: "BCg1UIFx2xNkxfPrxSeATRRO2jyjVh2c2C_9AEfN3FsbTFjcS3EN5fyF3qIDsWbSt5RN_L4UpGWlq4QTuBJwplE" 
+      });
+      if (token) {
+        await navigator.clipboard.writeText(token);
+        setCopiedToken(true);
+        setTimeout(() => setCopiedToken(false), 2000);
+        toast({ title: "Token Copied", description: "Paste this into Firebase Console to test push notifications." });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Failed", description: "Could not get push token." });
     }
   };
 
@@ -307,21 +324,35 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                     </Button>
                   </div>
                   
-                  <div className="flex items-center justify-between bg-white/5 p-4 rounded-xl">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium">Push Notifications</span>
-                      <span className="text-[9px] text-muted-foreground uppercase tracking-widest">Enable 100% background alerts</span>
+                  <div className="flex flex-col gap-4 bg-white/5 p-4 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-medium">Push Notifications</span>
+                        <span className="text-[9px] text-muted-foreground uppercase tracking-widest">Enable 100% background alerts</span>
+                      </div>
+                      <Button 
+                        variant="ghost"
+                        size="sm" 
+                        onClick={handleRequestNotifications} 
+                        className={cn("h-9 px-4 rounded-full text-xs font-bold transition-all", notificationPermission === 'granted' ? "text-accent bg-accent/10 hover:bg-accent/20" : "text-muted-foreground bg-white/5 hover:bg-white/10")}
+                      >
+                        {notificationPermission === 'granted' ? (
+                          <div className="flex items-center gap-2"><BellRing className="h-3.5 w-3.5" /> Enabled</div>
+                        ) : 'Enable'}
+                      </Button>
                     </div>
-                    <Button 
-                      variant="ghost"
-                      size="sm" 
-                      onClick={handleRequestNotifications} 
-                      className={cn("h-9 px-4 rounded-full text-xs font-bold transition-all", notificationPermission === 'granted' ? "text-accent bg-accent/10 hover:bg-accent/20" : "text-muted-foreground bg-white/5 hover:bg-white/10")}
-                    >
-                      {notificationPermission === 'granted' ? (
-                        <div className="flex items-center gap-2"><BellRing className="h-3.5 w-3.5" /> Enabled</div>
-                      ) : 'Enable'}
-                    </Button>
+                    
+                    {notificationPermission === 'granted' && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={copyDebugToken}
+                        className="w-full text-[10px] uppercase tracking-widest font-bold gap-2 border-white/5 bg-white/5 hover:bg-white/10"
+                      >
+                        {copiedToken ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                        {copiedToken ? 'Copied' : 'Copy Debug Token'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
