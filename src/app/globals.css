@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    --background: 216 11% 12%;
+    --background: 224 25% 4%;
     --foreground: 0 0% 100%;
-    --card: 216 11% 15%;
+    --card: 224 25% 7%;
     --card-foreground: 0 0% 100%;
-    --popover: 216 11% 12%;
+    --popover: 224 25% 4%;
     --popover-foreground: 0 0% 100%;
-    --primary: 212 74% 59%;
+    --primary: 212 100% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 216 11% 20%;
+    --secondary: 224 25% 12%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 216 11% 18%;
-    --muted-foreground: 216 5% 70%;
-    --accent: 166 45% 67%;
-    --accent-foreground: 216 11% 12%;
+    --muted: 224 25% 10%;
+    --muted-foreground: 224 10% 60%;
+    --accent: 180 100% 50%;
+    --accent-foreground: 224 25% 4%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 216 11% 22%;
-    --input: 216 11% 22%;
-    --ring: 212 74% 59%;
-    --radius: 1.5rem;
+    --border: 224 25% 12%;
+    --input: 224 25% 12%;
+    --ring: 212 100% 50%;
+    --radius: 1.25rem;
   }
 }
 
@@ -34,9 +34,14 @@
   body {
     @apply bg-background text-foreground font-body antialiased overflow-hidden;
   }
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-headline;
-  }
+}
+
+.glass-morphism {
+  @apply bg-white/[0.03] backdrop-blur-2xl border border-white/10;
+}
+
+.glass-morphism-heavy {
+  @apply bg-black/40 backdrop-blur-3xl border border-white/5;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
@@ -47,19 +52,19 @@
   scrollbar-width: none;
 }
 
-.chat-bubble-shadow {
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+.message-shadow {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.glass-morphism {
-  @apply bg-white/5 backdrop-blur-3xl border border-white/10;
+.message-shadow-me {
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25);
 }
 
-.mirror {
-  transform: scaleX(-1);
+.animate-in-fade {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Tab transitions */
-[data-state="active"] {
-  @apply bg-primary/20 text-primary !important;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
