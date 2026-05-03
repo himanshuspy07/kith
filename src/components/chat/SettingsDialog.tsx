@@ -163,7 +163,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                     value={username} 
                     onChange={(e) => setUsername(e.target.value)} 
                     placeholder="How should we call you?" 
-                    className="bg-white/5 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
+                    className="bg-muted/30 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
                   />
                 </div>
                 <div className="space-y-2.5">
@@ -172,7 +172,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                     value={bio} 
                     onChange={(e) => setBio(e.target.value)} 
                     placeholder="Tell your kith a bit about yourself..." 
-                    className="bg-white/5 border-none rounded-2xl p-6 min-h-[120px] resize-none focus-visible:ring-primary/30 text-sm font-medium leading-relaxed"
+                    className="bg-muted/30 border-none rounded-2xl p-6 min-h-[120px] resize-none focus-visible:ring-primary/30 text-sm font-medium leading-relaxed"
                   />
                 </div>
                 <div className="space-y-2.5">
@@ -181,7 +181,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                     value={avatarUrl} 
                     onChange={(e) => setAvatarUrl(e.target.value)} 
                     placeholder="Paste a link to your image" 
-                    className="bg-white/5 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
+                    className="bg-muted/30 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/30 text-sm font-medium"
                   />
                 </div>
               </div>
