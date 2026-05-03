@@ -1,20 +1,17 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Info, CheckCheck, MessageSquare, Loader2, X, ChevronLeft, Palette, Quote } from 'lucide-react';
+import { Send, Info, MessageSquare, ChevronLeft, Image as ImageIcon, Plus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, serverTimestamp, doc, arrayUnion, where, limitToLast } from 'firebase/firestore';
+import { collection, query, orderBy, serverTimestamp, doc, where, limitToLast } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { useToast } from '@/hooks/use-toast';
 
 interface ChatWindowProps {
   conversationId?: string;
@@ -25,23 +22,16 @@ const WALLPAPERS = [
   { id: 'default', name: 'Standard', value: 'transparent' },
   { id: 'slate', name: 'Dark Slate', value: 'hsl(var(--background))' },
   { id: 'ocean', name: 'Deep Sea', value: 'linear-gradient(135deg, #0f172a, #1e293b)' },
+  { id: 'emerald', name: 'Forest', value: 'linear-gradient(135deg, #064e3b, #065f46)' },
 ];
 
 export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [messageLimit, setMessageLimit] = useState(30);
-  const [currentTime, setCurrentTime] = useState<number>(Date.now());
+  const [messageLimit] = useState(50);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const db = useFirestore();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
-    return () => clearInterval(interval);
-  }, []);
 
   const roomRef = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
@@ -63,7 +53,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       limitToLast(messageLimit)
     );
   }, [db, conversationId, messageLimit]);
-  const { data: messages, isLoading } = useCollection(messagesQuery);
+  const { data: messages } = useCollection(messagesQuery);
 
   useEffect(() => {
     if (messages && messages.length > 0) {
@@ -71,16 +61,15 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   }, [messages?.length]);
 
-  const handleSend = (type: 'text' | 'image' = 'text', contentString?: string) => {
-    const content = contentString || inputValue.trim();
+  const handleSend = () => {
+    const content = inputValue.trim();
     if (!content || !conversationId || !user || !room) return;
     
     const messageData = {
       chatRoomId: conversationId,
       senderId: user.uid,
-      content: type === 'text' ? content : 'Sent an image',
-      fileUrl: type === 'image' ? content : null,
-      type: type,
+      content: content,
+      type: 'text',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       readBy: [user.uid],
@@ -94,11 +83,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       readBy: [user.uid],
     });
     
-    if (type === 'text') setInputValue('');
+    setInputValue('');
   };
 
   const chatDisplayName = React.useMemo(() => {
-    if (!room) return 'Loading...';
+    if (!room) return '...';
     if (!room.isGroupChat && participants && user) {
       const otherUser = participants.find(p => p.id !== user.uid);
       if (otherUser) return otherUser.username;
@@ -106,45 +95,82 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return room.name || 'Chat';
   }, [room, participants, user]);
 
+  const chatAvatar = React.useMemo(() => {
+    if (!room.isGroupChat && participants && user) {
+      const otherUser = participants.find(p => p.id !== user.uid);
+      return otherUser?.profilePictureUrl;
+    }
+    return null;
+  }, [room, participants, user]);
+
   if (!conversationId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-background">
-        <MessageSquare className="h-16 w-16 text-primary opacity-20 mb-4" />
-        <h2 className="text-2xl font-bold">Your messages</h2>
-        <p className="text-muted-foreground text-sm">Select a conversation to start chatting.</p>
+      <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-background relative overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px]" />
+        <div className="relative z-10 space-y-6 flex flex-col items-center">
+          <div className="h-24 w-24 rounded-[2rem] bg-white/5 flex items-center justify-center shadow-2xl">
+            <MessageSquare className="h-10 w-10 text-primary opacity-40" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold tracking-tighter">Your Workspace</h2>
+            <p className="text-muted-foreground text-sm max-w-[280px]">Select a conversation from the sidebar to start chatting with your kith.</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-      <div className="h-20 px-6 flex items-center justify-between border-b border-white/5 bg-background/40 backdrop-blur-3xl sticky top-0 z-30">
+      <div className="h-24 px-8 flex items-center justify-between border-b border-white/5 bg-background/40 backdrop-blur-3xl sticky top-0 z-30">
         <div className="flex items-center gap-4">
           {onBack && (
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
+            <Button variant="ghost" size="icon" className="md:hidden mr-2" onClick={onBack}>
               <ChevronLeft className="h-6 w-6" />
             </Button>
           )}
+          <Avatar className="h-12 w-12 border border-white/10">
+            <AvatarImage src={chatAvatar || undefined} />
+            <AvatarFallback className="bg-primary/20 text-primary">{chatDisplayName?.[0]}</AvatarFallback>
+          </Avatar>
           <div className="flex flex-col">
-            <h3 className="text-sm font-bold">{chatDisplayName}</h3>
+            <h3 className="text-sm font-bold leading-none">{chatDisplayName}</h3>
+            <span className="text-[10px] text-accent uppercase tracking-widest mt-1 font-bold">Secure Connection</span>
           </div>
         </div>
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon"><Info className="h-5 w-5 text-muted-foreground" /></Button>
+            <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5">
+              <Info className="h-5 w-5 text-muted-foreground" />
+            </Button>
           </SheetTrigger>
-          <SheetContent className="bg-card border-white/10">
-            <SheetHeader><SheetTitle>Details</SheetTitle></SheetHeader>
-            <div className="py-8 space-y-6">
-              <div className="flex flex-col items-center gap-4">
-                <Avatar className="h-24 w-24"><AvatarFallback className="text-2xl">{chatDisplayName?.[0]}</AvatarFallback></Avatar>
-                <h2 className="text-xl font-bold">{chatDisplayName}</h2>
+          <SheetContent className="bg-card border-white/10 p-0 sm:max-w-md">
+            <div className="bg-primary/5 p-12 flex flex-col items-center text-center gap-4">
+              <Avatar className="h-24 w-24 border-4 border-background shadow-2xl">
+                <AvatarImage src={chatAvatar || undefined} />
+                <AvatarFallback className="text-3xl bg-primary/20 text-primary">{chatDisplayName?.[0]}</AvatarFallback>
+              </Avatar>
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold">{chatDisplayName}</h2>
+                <p className="text-xs text-muted-foreground uppercase tracking-widest">Conversation Details</p>
               </div>
+            </div>
+            
+            <div className="p-8 space-y-8">
               <div className="space-y-4">
-                <Label className="text-[10px] uppercase font-bold text-primary">Theme</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <Label className="text-[10px] uppercase font-bold text-primary tracking-widest">Chat Customization</Label>
+                <div className="grid grid-cols-4 gap-3">
                   {WALLPAPERS.map(wp => (
-                    <button key={wp.id} className="h-12 rounded-lg border border-white/10" style={{ background: wp.value }} onClick={() => updateDocumentNonBlocking(roomRef!, { wallpaper: wp.value })} />
+                    <button 
+                      key={wp.id} 
+                      title={wp.name}
+                      className={cn(
+                        "h-12 w-full rounded-xl border-2 transition-all hover:scale-105",
+                        room?.wallpaper === wp.value ? "border-primary" : "border-transparent"
+                      )} 
+                      style={{ background: wp.value }} 
+                      onClick={() => updateDocumentNonBlocking(roomRef!, { wallpaper: wp.value })} 
+                    />
                   ))}
                 </div>
               </div>
@@ -153,16 +179,22 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </Sheet>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ background: room?.wallpaper || 'transparent' }}>
+      <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide" style={{ background: room?.wallpaper || 'transparent' }}>
         {messages?.map((msg) => {
           const isMe = msg.senderId === user?.uid;
           return (
-            <div key={msg.id} className={cn("flex", isMe ? "justify-end" : "justify-start")}>
-              <div className={cn("max-w-[70%] p-3 rounded-2xl text-sm", isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card border border-white/5 rounded-bl-none")}>
-                {msg.type === 'image' ? <img src={msg.fileUrl} className="rounded-lg max-h-60" /> : <p>{msg.content}</p>}
-                <div className="text-[9px] opacity-50 text-right mt-1">
-                  {msg.createdAt && format(msg.createdAt.toDate(), 'HH:mm')}
-                </div>
+            <div key={msg.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
+              <div className={cn(
+                "max-w-[75%] p-4 rounded-[1.5rem] text-sm shadow-xl transition-all hover:scale-[1.01]", 
+                isMe 
+                  ? "bg-primary text-primary-foreground rounded-br-none" 
+                  : "bg-card border border-white/5 rounded-bl-none"
+              )}>
+                <p className="leading-relaxed">{msg.content}</p>
+              </div>
+              <div className="text-[9px] opacity-40 mt-1.5 px-2 flex items-center gap-2">
+                {msg.createdAt && format(msg.createdAt.toDate(), 'HH:mm')}
+                {isMe && <div className="h-1 w-1 rounded-full bg-accent" />}
               </div>
             </div>
           );
@@ -170,16 +202,28 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-6 border-t border-white/5 bg-background/60 backdrop-blur-3xl">
-        <div className="flex items-center gap-4 max-w-4xl mx-auto">
-          <Input 
-            value={inputValue} 
-            onChange={(e) => setInputValue(e.target.value)} 
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
-            placeholder="Type a message..." 
-            className="bg-white/5 border-none h-12 rounded-xl" 
-          />
-          <Button onClick={() => handleSend()} disabled={!inputValue.trim()} className="h-12 px-6 rounded-xl">Send</Button>
+      <div className="p-8 border-t border-white/5 bg-background/60 backdrop-blur-3xl">
+        <div className="flex items-center gap-4 max-w-5xl mx-auto">
+          <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl bg-white/5 shrink-0">
+            <Plus className="h-5 w-5 text-muted-foreground" />
+          </Button>
+          <div className="flex-1 relative">
+            <Input 
+              value={inputValue} 
+              onChange={(e) => setInputValue(e.target.value)} 
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
+              placeholder="Type your message..." 
+              className="bg-white/5 border-none h-14 rounded-2xl px-6 focus-visible:ring-primary/20" 
+            />
+          </div>
+          <Button 
+            onClick={handleSend} 
+            disabled={!inputValue.trim()} 
+            className="h-14 px-8 rounded-2xl shadow-2xl shadow-primary/20 transition-all active:scale-95"
+          >
+            <Send className="h-5 w-5 mr-2" />
+            Send
+          </Button>
         </div>
       </div>
     </div>
