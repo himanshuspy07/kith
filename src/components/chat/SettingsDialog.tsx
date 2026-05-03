@@ -104,12 +104,12 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Firestore documents have a 1MB limit. 800KB is a safe threshold for Base64 strings.
-    if (file.size > 800 * 1024) {
+    // Firestore documents have a 1MB limit. 600KB is a safe threshold for Base64 strings (which add ~33% overhead).
+    if (file.size > 600 * 1024) {
       toast({
         variant: "destructive",
         title: "File too large",
-        description: "Please select an image smaller than 800KB for document stability.",
+        description: "Please select an image smaller than 600KB for document stability.",
       });
       return;
     }

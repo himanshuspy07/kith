@@ -20,7 +20,9 @@ import {
   Pin,
   PinOff,
   Camera,
-  AtSign
+  AtSign,
+  Phone,
+  Video
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -89,7 +91,6 @@ const MessageItem = memo(({
   const renderMarkdown = (content: string) => {
     if (!content) return null;
     
-    // Split by mentions first
     const parts = content.split(/(@\w+)/g);
     
     return parts.map((part, i) => {
@@ -97,10 +98,8 @@ const MessageItem = memo(({
         return <span key={`mention-${i}`} className="mention">{part}</span>;
       }
 
-      // Process formatting for non-mention text
       let formattedText: React.ReactNode[] = [part];
 
-      // Code blocks
       formattedText = formattedText.flatMap((item, idx) => {
         if (typeof item !== 'string') return item;
         return item.split(/`([^`]+)`/g).map((sub, si) => 
@@ -108,7 +107,6 @@ const MessageItem = memo(({
         );
       });
 
-      // Bold
       formattedText = formattedText.flatMap((item, idx) => {
         if (typeof item !== 'string') return item;
         return item.split(/\*\*([^\*\*]+)\*\*/g).map((sub, si) => 
@@ -116,7 +114,6 @@ const MessageItem = memo(({
         );
       });
 
-      // Italic
       formattedText = formattedText.flatMap((item, idx) => {
         if (typeof item !== 'string') return item;
         return item.split(/\*([^\*]+)\*/g).map((sub, si) => 
@@ -468,23 +465,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   };
 
-  const handleRemoveMember = (memberId: string) => {
-    if (!room || !roomRef) return;
-    const nextMembers = { ...room.members };
-    delete nextMembers[memberId];
-    const nextMemberIds = (room.memberIds || []).filter((id: string) => id !== memberId);
-    updateDocumentNonBlocking(roomRef, {
-      members: nextMembers,
-      memberIds: nextMemberIds
-    });
-    toast({ title: "Member Removed" });
-  };
-
   const handleGroupImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !roomRef) return;
-    if (file.size > 800 * 1024) {
-      toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB for document stability." });
+    if (file.size > 600 * 1024) {
+      toast({ variant: "destructive", title: "File too large", description: "Limit is 600KB for stability." });
       return;
     }
     setIsGroupImageUploading(true);
@@ -499,8 +484,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 800 * 1024) {
-      toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB for document stability." });
+    if (file.size > 600 * 1024) {
+      toast({ variant: "destructive", title: "File too large", description: "Limit is 600KB for stability." });
       return;
     }
     setIsUploading(true);
@@ -510,6 +495,24 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       setIsUploading(false);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleStartCall = (type: 'audio' | 'video') => {
+    if (!user || !db || !conversationId || room?.isGroupChat) {
+      toast({ title: "Group calls not supported yet." });
+      return;
+    }
+    const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
+    if (!otherUserId) return;
+
+    addDocumentNonBlocking(collection(db, 'calls'), {
+      callerId: user.uid,
+      receiverId: otherUserId,
+      callerName: user.displayName || 'Kith User',
+      status: 'ringing',
+      type: type,
+      createdAt: serverTimestamp(),
+    });
   };
 
   const otherUserProfile = useMemo(() => {
@@ -587,59 +590,71 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             </span>
           </div>
         </div>
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full hover:bg-black/5 dark:hover:bg-white/5 shrink-0">
-              <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="bg-card/95 backdrop-blur-xl border-black/5 dark:border-white/10 w-full sm:max-w-md flex flex-col">
-            <SheetHeader className="pb-8">
-              <SheetTitle>Settings</SheetTitle>
-            </SheetHeader>
-            <div className="flex-1 overflow-y-auto space-y-8 pr-2 scrollbar-hide">
-              {room?.isGroupChat && (
-                <div className="space-y-4">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-primary">Group Identity</Label>
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-black/5 dark:bg-white/5">
-                    <div className="relative group">
-                      <Avatar className="h-16 w-16 shadow-lg">
-                        <AvatarImage src={room.groupImageUrl} className="object-cover" />
-                        <AvatarFallback className="text-xl">{room.name?.[0]}</AvatarFallback>
-                      </Avatar>
-                      {room.createdBy === user?.uid && (
-                        <button onClick={() => groupImageInputRef.current?.click()} className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center">
-                          <Camera className="h-4 w-4" />
-                        </button>
-                      )}
-                      <input type="file" ref={groupImageInputRef} className="hidden" accept="image/*" onChange={handleGroupImageUpload} />
+        <div className="flex items-center gap-1 md:gap-2">
+          {!room?.isGroupChat && (
+            <>
+              <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 rounded-full" onClick={() => handleStartCall('audio')}>
+                <Phone className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 rounded-full" onClick={() => handleStartCall('video')}>
+                <Video className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
+              </Button>
+            </>
+          )}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-black/5 dark:hover:bg-white/5 shrink-0">
+                <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="bg-card/95 backdrop-blur-xl border-black/5 dark:border-white/10 w-full sm:max-w-md flex flex-col">
+              <SheetHeader className="pb-8">
+                <SheetTitle>Settings</SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto space-y-8 pr-2 scrollbar-hide">
+                {room?.isGroupChat && (
+                  <div className="space-y-4">
+                    <Label className="text-xs font-bold uppercase tracking-widest text-primary">Group Identity</Label>
+                    <div className="flex items-center gap-4 p-4 rounded-xl bg-black/5 dark:bg-white/5">
+                      <div className="relative group">
+                        <Avatar className="h-16 w-16 shadow-lg">
+                          <AvatarImage src={room.groupImageUrl} className="object-cover" />
+                          <AvatarFallback className="text-xl">{room.name?.[0]}</AvatarFallback>
+                        </Avatar>
+                        {room.createdBy === user?.uid && (
+                          <button onClick={() => groupImageInputRef.current?.click()} className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center">
+                            <Camera className="h-4 w-4" />
+                          </button>
+                        )}
+                        <input type="file" ref={groupImageInputRef} className="hidden" accept="image/*" onChange={handleGroupImageUpload} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              <div className="space-y-4">
-                <Label className="text-xs font-bold uppercase tracking-widest text-primary">Wallpapers</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  {WALLPAPERS.map(wp => (
-                    <button key={wp.id} onClick={() => roomRef && updateDocumentNonBlocking(roomRef, { wallpaper: wp.value })} className={cn("h-20 rounded-xl overflow-hidden border-2", room?.wallpaper === wp.value ? "border-primary" : "border-black/5")}>
-                      <div className={cn("h-full w-full", wp.preview)} style={{ background: wp.value }} />
-                    </button>
-                  ))}
+                )}
+                <div className="space-y-4">
+                  <Label className="text-xs font-bold uppercase tracking-widest text-primary">Wallpapers</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {WALLPAPERS.map(wp => (
+                      <button key={wp.id} onClick={() => roomRef && updateDocumentNonBlocking(roomRef, { wallpaper: wp.value })} className={cn("h-20 rounded-xl overflow-hidden border-2", room?.wallpaper === wp.value ? "border-primary" : "border-black/5")}>
+                        <div className={cn("h-full w-full", wp.preview)} style={{ background: wp.value }} />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-            <SheetFooter className="pt-8 flex flex-col gap-2">
-              <Button variant="outline" className="w-full rounded-xl" onClick={handleTogglePin}>
-                {room?.pinnedBy?.[user?.uid || ''] ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
-                {room?.pinnedBy?.[user?.uid || ''] ? 'Unpin' : 'Pin'}
-              </Button>
-              <Button variant="destructive" className="w-full rounded-xl" onClick={handleDeleteConversation}>
-                {room?.isGroupChat ? <LogOut className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                {room?.isGroupChat ? "Leave Group" : "Delete Conversation"}
-              </Button>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
+              <SheetFooter className="pt-8 flex flex-col gap-2">
+                <Button variant="outline" className="w-full rounded-xl" onClick={handleTogglePin}>
+                  {room?.pinnedBy?.[user?.uid || ''] ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
+                  {room?.pinnedBy?.[user?.uid || ''] ? 'Unpin' : 'Pin'}
+                </Button>
+                <Button variant="destructive" className="w-full rounded-xl" onClick={handleDeleteConversation}>
+                  {room?.isGroupChat ? <LogOut className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  {room?.isGroupChat ? "Leave Group" : "Delete Conversation"}
+                </Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 md:py-8 space-y-2 scrollbar-hide z-[1]">

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -49,6 +50,17 @@ export default function CallManager() {
   }, [db, user?.uid]);
   const { data: incomingCalls } = useCollection(incomingCallsQuery);
 
+  // Listen for outgoing calls started by the user to manage caller flow
+  const outgoingCallsQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return query(
+      collection(db, 'calls'),
+      where('callerId', '==', user.uid),
+      where('status', '==', 'ringing')
+    );
+  }, [db, user?.uid]);
+  const { data: outgoingCalls } = useCollection(outgoingCallsQuery);
+
   useEffect(() => {
     if (incomingCalls && incomingCalls.length > 0 && !activeCall) {
       setActiveCall(incomingCalls[0]);
@@ -56,7 +68,12 @@ export default function CallManager() {
     }
   }, [incomingCalls, activeCall]);
 
-  // Clean up WebRTC on end
+  useEffect(() => {
+    if (outgoingCalls && outgoingCalls.length > 0 && !activeCall) {
+      handleInitiateOutgoingCall(outgoingCalls[0]);
+    }
+  }, [outgoingCalls, activeCall]);
+
   const cleanup = async () => {
     if (iceUnsubscribeRef.current) {
       iceUnsubscribeRef.current();
@@ -86,7 +103,6 @@ export default function CallManager() {
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
       return stream;
     } catch (error) {
-      console.error('Error accessing media:', error);
       setHasCameraPermission(false);
       toast({
         variant: 'destructive',
@@ -118,6 +134,52 @@ export default function CallManager() {
     return pc;
   };
 
+  const handleInitiateOutgoingCall = async (call: any) => {
+    setActiveCall(call);
+    setCallStatus('calling');
+
+    const stream = await setupMedia(call.type);
+    if (!stream) {
+      handleHangup();
+      return;
+    }
+
+    const pc = createPeerConnection(call.id);
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+    try {
+      const offerDescription = await pc.createOffer();
+      await pc.setLocalDescription(offerDescription);
+
+      const callRef = doc(db, 'calls', call.id);
+      updateDocumentNonBlocking(callRef, {
+        offer: {
+          type: offerDescription.type,
+          sdp: offerDescription.sdp,
+        }
+      });
+
+      // Listen for receiver ICE candidates
+      const candidatesCol = collection(db, 'calls', call.id, 'receiverCandidates');
+      const unsubscribe = onSnapshot(candidatesCol, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+          }
+        });
+      }, async (serverError) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: candidatesCol.path,
+          operation: 'list'
+        }));
+      });
+      
+      iceUnsubscribeRef.current = unsubscribe;
+    } catch (error) {
+      cleanup();
+    }
+  };
+
   const handleAnswer = async () => {
     if (!activeCall || !db || !user) return;
 
@@ -143,7 +205,7 @@ export default function CallManager() {
 
       setCallStatus('ongoing');
 
-      // Listen for caller ICE candidates with proper cleanup tracking
+      // Listen for caller ICE candidates
       const candidatesCol = collection(db, 'calls', activeCall.id, 'callerCandidates');
       const unsubscribe = onSnapshot(candidatesCol, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
@@ -160,7 +222,6 @@ export default function CallManager() {
       
       iceUnsubscribeRef.current = unsubscribe;
     } catch (error) {
-      console.error("Signaling error:", error);
       cleanup();
     }
   };
@@ -212,7 +273,7 @@ export default function CallManager() {
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-6">
               <Avatar className="h-32 w-32 border-4 border-primary/20 animate-pulse">
                 <AvatarFallback className="text-4xl">
-                  {activeCall?.callerId === user?.uid ? '...' : activeCall?.callerName?.[0]}
+                  {activeCall?.callerId === user?.uid ? activeCall?.receiverName?.[0] : activeCall?.callerName?.[0]}
                 </AvatarFallback>
               </Avatar>
               <div className="text-center">
