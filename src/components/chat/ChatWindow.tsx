@@ -528,6 +528,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           const isMe = msg.senderId === user?.uid;
           const prevMsg = idx > 0 ? messages[idx - 1] : null;
           const sender = participants?.find(p => p.id === msg.senderId);
+          const hasReactions = msg.reactions && Object.values(msg.reactions).some((uids: any) => uids.length > 0);
           
           // Grouping logic: Same sender, same day, and within 5 minutes
           const isGrouped = prevMsg && 
@@ -559,7 +560,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 </div>
               )}
 
-              <div className="group relative flex items-center gap-2 max-w-[90%] md:max-w-[85%]">
+              <div className={cn(
+                "group relative flex items-center gap-2 max-w-[90%] md:max-w-[85%]",
+                hasReactions && "mb-4"
+              )}>
                 {isMe && (
                   <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAction('reply', msg)}>
@@ -579,7 +583,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 )}
 
                 <div className={cn(
-                  "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-transform overflow-hidden relative",
+                  "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-transform relative",
                   isMe 
                     ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
                     : "bg-white/[0.05] backdrop-blur-md border border-white/5 text-foreground rounded-bl-none message-shadow",
@@ -596,9 +600,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     <span className="block text-[8px] opacity-40 mt-1 text-right">edited</span>
                   )}
                   
-                  {msg.reactions && Object.keys(msg.reactions).some(k => msg.reactions[k].length > 0) && (
+                  {hasReactions && (
                     <div className={cn(
-                      "absolute -bottom-3 flex flex-wrap gap-1",
+                      "absolute -bottom-3 flex flex-wrap gap-1 z-10",
                       isMe ? "right-0" : "left-0"
                     )}>
                       {Object.entries(msg.reactions).map(([emoji, uids]: [string, any]) => uids.length > 0 && (
@@ -606,8 +610,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                           key={emoji}
                           onClick={() => handleReact(msg, emoji)}
                           className={cn(
-                            "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] glass-morphism-heavy",
-                            uids.includes(user?.uid) ? "border-primary/40 bg-primary/10" : "border-white/5"
+                            "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] glass-morphism-heavy shadow-xl border border-white/10",
+                            uids.includes(user?.uid) ? "border-primary/40 bg-primary/20" : "border-white/5"
                           )}
                         >
                           {emoji} <span className="font-bold">{uids.length}</span>
