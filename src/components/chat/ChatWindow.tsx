@@ -214,7 +214,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (!conversationId || !room) return;
     try {
       if (room.isGroupChat) {
-        // Leave group
         const nextMembers = { ...room.members };
         delete nextMembers[user!.uid];
         const nextMemberIds = room.memberIds.filter((id: string) => id !== user!.uid);
@@ -223,7 +222,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           memberIds: nextMemberIds
         });
       } else {
-        // Delete private room
         await deleteDoc(roomRef!);
       }
       onBack?.();
@@ -338,31 +336,31 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         style={{ background: room?.wallpaper || 'transparent' }}
       />
       
-      <header className="h-20 px-6 flex items-center justify-between glass-morphism sticky top-0 z-10 mx-4 mt-4 rounded-2xl shadow-lg border-white/5">
-        <div className="flex items-center gap-4">
+      <header className="h-16 md:h-20 px-4 md:px-6 flex items-center justify-between glass-morphism sticky top-0 z-10 mx-2 mt-2 md:mx-4 md:mt-4 rounded-xl md:rounded-2xl shadow-lg border-white/5">
+        <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
           {onBack && (
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
+            <Button variant="ghost" size="icon" className="md:hidden shrink-0" onClick={onBack}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
           )}
-          <Avatar className="h-10 w-10 border border-white/10 ring-2 ring-primary/10">
+          <Avatar className="h-8 w-8 md:h-10 md:w-10 border border-white/10 shrink-0">
             <AvatarImage src={chatAvatar || undefined} className="object-cover" />
-            <AvatarFallback className="bg-primary/20 text-primary font-bold">{chatDisplayName?.[0]}</AvatarFallback>
+            <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs md:text-sm">{chatDisplayName?.[0]}</AvatarFallback>
           </Avatar>
-          <div className="flex flex-col">
-            <h3 className="text-sm font-bold leading-none">{chatDisplayName}</h3>
-            <span className="text-[10px] text-muted-foreground truncate mt-1 max-w-[150px] md:max-w-[300px] font-medium italic">
+          <div className="flex flex-col overflow-hidden">
+            <h3 className="text-xs md:text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
+            <span className="text-[9px] md:text-[10px] text-muted-foreground truncate mt-0.5 md:mt-1 font-medium italic">
               {room?.isGroupChat ? "Group Conversation" : (otherUserProfile?.bio || 'No bio available')}
             </span>
           </div>
         </div>
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5">
+            <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5 shrink-0">
               <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
             </Button>
           </SheetTrigger>
-          <SheetContent className="bg-card/95 backdrop-blur-xl border-white/10 sm:max-w-md flex flex-col">
+          <SheetContent className="bg-card/95 backdrop-blur-xl border-white/10 w-full sm:max-w-md flex flex-col">
             <SheetHeader className="pb-8">
               <SheetTitle>Conversation Settings</SheetTitle>
               <SheetDescription>Personalize your chat experience.</SheetDescription>
@@ -471,7 +469,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </Sheet>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6 scrollbar-hide z-[1]">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 md:py-8 space-y-6 scrollbar-hide z-[1]">
         {messages?.map((msg, idx) => {
           const isMe = msg.senderId === user?.uid;
           const sender = participants?.find(p => p.id === msg.senderId);
@@ -486,7 +484,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
               {msg.replyToId && (
                 <div className={cn(
-                  "px-3 py-1 mb-[-4px] rounded-t-xl bg-white/5 border-l-2 border-primary text-[10px] text-muted-foreground/80 max-w-[60%] truncate",
+                  "px-3 py-1 mb-[-4px] rounded-t-xl bg-white/5 border-l-2 border-primary text-[10px] text-muted-foreground/80 max-w-[80%] md:max-w-[60%] truncate",
                   isMe ? "mr-2" : "ml-2"
                 )}>
                   <Reply className="h-3 w-3 inline mr-1 opacity-50" />
@@ -494,9 +492,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 </div>
               )}
 
-              <div className="group relative flex items-center gap-2 max-w-[85%]">
+              <div className="group relative flex items-center gap-2 max-w-[90%] md:max-w-[85%]">
                 {isMe && (
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAction('reply', msg)}>
                       <Reply className="h-3 w-3" />
                     </Button>
@@ -518,11 +516,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   isMe 
                     ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
                     : "bg-white/[0.05] backdrop-blur-md border border-white/5 text-foreground rounded-bl-none message-shadow",
-                  msg.type === 'image' ? 'p-1' : 'p-4',
+                  msg.type === 'image' ? 'p-1' : 'p-3 md:p-4',
                   msg.isDeleted && "italic opacity-50"
                 )}>
                   {msg.type === 'image' ? (
-                    <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-96" />
+                    <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64 md:max-h-96" />
                   ) : (
                     msg.content
                   )}
@@ -530,7 +528,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     <span className="block text-[8px] opacity-40 mt-1 text-right">edited</span>
                   )}
                   
-                  {/* Reactions */}
                   {msg.reactions && Object.keys(msg.reactions).some(k => msg.reactions[k].length > 0) && (
                     <div className={cn(
                       "absolute -bottom-3 flex flex-wrap gap-1",
@@ -553,7 +550,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 </div>
 
                 {!isMe && (
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAction('reply', msg)}>
                       <Reply className="h-3 w-3" />
                     </Button>
@@ -593,8 +590,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-6 bg-transparent z-10 space-y-3">
-        {/* Reply/Edit Previews */}
+      <div className="p-4 md:p-6 bg-transparent z-10 space-y-3">
         {replyingTo && (
           <div className="max-w-4xl mx-auto flex items-center justify-between glass-morphism-heavy px-4 py-2 rounded-xl animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-3 overflow-hidden">
@@ -625,7 +621,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </div>
         )}
 
-        <div className="max-w-4xl mx-auto flex items-end gap-3 glass-morphism p-3 rounded-[2rem] shadow-2xl border-white/5">
+        <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-3 glass-morphism p-2 md:p-3 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border-white/5">
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -636,26 +632,26 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-10 w-10 rounded-full hover:bg-white/10 shrink-0"
+            className="h-9 w-9 md:h-10 md:w-10 rounded-full hover:bg-white/10 shrink-0"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
           >
-            {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5 text-muted-foreground" />}
+            {isUploading ? <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin" /> : <ImageIcon className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />}
           </Button>
           <div className="flex-1">
             <Input 
               value={inputValue} 
               onChange={(e) => setInputValue(e.target.value)} 
               onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
-              placeholder={editingMessage ? "Update your message..." : "Message kith..."} 
-              className="bg-transparent border-none h-10 px-4 focus-visible:ring-0 text-sm placeholder:text-muted-foreground/40" 
+              placeholder={editingMessage ? "Update message..." : "Message kith..."} 
+              className="bg-transparent border-none h-9 md:h-10 px-2 md:px-4 focus-visible:ring-0 text-sm placeholder:text-muted-foreground/40" 
             />
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-white/10 hidden sm:flex">
-                  <Smile className="h-5 w-5 text-muted-foreground" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-full hover:bg-white/10 hidden sm:flex">
+                  <Smile className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-2 bg-card/90 backdrop-blur-xl border-white/10 rounded-2xl mb-4">
@@ -676,7 +672,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               onClick={() => handleSend()} 
               disabled={!inputValue.trim() || isUploading} 
               className={cn(
-                "h-10 w-10 rounded-full transition-all active:scale-90",
+                "h-9 w-9 md:h-10 md:w-10 rounded-full transition-all active:scale-90",
                 inputValue.trim() ? (editingMessage ? "bg-accent" : "bg-primary") + " text-white" : "bg-muted/20 text-muted-foreground"
               )}
             >
