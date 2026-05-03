@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Info, MessageSquare, ChevronLeft, Image as ImageIcon, Plus } from 'lucide-react';
+import { Send, Info, MessageSquare, ChevronLeft, Plus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -96,6 +96,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [room, participants, user]);
 
   const chatAvatar = React.useMemo(() => {
+    if (!room) return null;
     if (!room.isGroupChat && participants && user) {
       const otherUser = participants.find(p => p.id !== user.uid);
       return otherUser?.profilePictureUrl;
@@ -169,7 +170,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         room?.wallpaper === wp.value ? "border-primary" : "border-transparent"
                       )} 
                       style={{ background: wp.value }} 
-                      onClick={() => updateDocumentNonBlocking(roomRef!, { wallpaper: wp.value })} 
+                      onClick={() => roomRef && updateDocumentNonBlocking(roomRef, { wallpaper: wp.value })} 
                     />
                   ))}
                 </div>
