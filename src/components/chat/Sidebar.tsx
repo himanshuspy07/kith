@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -57,7 +58,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     if (!rooms) return [];
     return rooms.map(room => {
       let displayName = room.name || 'Conversation';
-      let displayAvatar = null;
+      let displayAvatar = room.isGroupChat ? room.groupImageUrl : null;
+      
       if (!room.isGroupChat && participantProfiles && user) {
         const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
         const otherUserProfile = participantProfiles.find(u => u.id === otherUserId);
@@ -73,7 +75,9 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         isPinned: room.pinnedBy?.[user?.uid || ''] === true 
       };
     }).sort((a, b) => {
+      // Sort by pin status first
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+      // Then by updatedAt
       return (b.updatedAt?.toDate?.()?.getTime() || 0) - (a.updatedAt?.toDate?.()?.getTime() || 0);
     });
   }, [rooms, participantProfiles, user]);

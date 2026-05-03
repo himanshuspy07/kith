@@ -89,6 +89,11 @@
         "isGroupChat": {
           "type": "boolean"
         },
+        "groupImageUrl": {
+          "type": "string",
+          "description": "Profile image for group chats.",
+          "format": "uri"
+        },
         "memberIds": {
           "type": "array",
           "items": { "type": "string" }
@@ -98,7 +103,8 @@
           "description": "Map of user IDs to booleans."
         },
         "pinnedBy": {
-          "type": "object"
+          "type": "object",
+          "description": "Map of user IDs to booleans for pinning status."
         },
         "typing": {
           "type": "object",
@@ -117,6 +123,10 @@
         "readBy": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "The UID of the user who created the room."
         },
         "updatedAt": {
           "type": "string",
@@ -142,6 +152,7 @@
         "type": { "type": "string" },
         "fileUrl": { "type": "string" },
         "replyToId": { "type": "string" },
+        "replyToContent": { "type": "string" },
         "isEdited": { "type": "boolean" },
         "isDeleted": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" },
