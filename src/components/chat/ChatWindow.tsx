@@ -655,6 +655,30 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       </div>
 
       <div className="p-4 md:p-6 bg-transparent z-10 space-y-3">
+        {(replyingTo || editingMessage) && (
+          <div className="max-w-4xl mx-auto glass-morphism-heavy rounded-t-2xl p-3 border-b-0 flex items-center justify-between animate-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="h-8 w-1 rounded-full bg-primary" />
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                  {replyingTo ? "Replying to" : "Editing message"}
+                </span>
+                <span className="text-xs text-muted-foreground truncate">
+                  {replyingTo ? (replyingTo.type === 'image' ? "Image" : replyingTo.content) : editingMessage.content}
+                </span>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 rounded-full hover:bg-black/10 dark:hover:bg-white/10" 
+              onClick={() => { setReplyingTo(null); setEditingMessage(null); if(editingMessage) setInputValue(''); }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
         {showMentions && participants && (
           <div className="max-w-4xl mx-auto glass-morphism-heavy rounded-2xl p-2 mb-2 shadow-2xl">
             <div className="max-h-40 overflow-y-auto scrollbar-hide">
@@ -667,7 +691,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             </div>
           </div>
         )}
-        <div className="max-w-4xl mx-auto flex items-end gap-2 glass-morphism p-2 rounded-[1.5rem] shadow-2xl">
+
+        <div className={cn(
+          "max-w-4xl mx-auto flex items-end gap-2 glass-morphism p-2 shadow-2xl transition-all",
+          (replyingTo || editingMessage) ? "rounded-b-[1.5rem] rounded-t-none border-t-white/10" : "rounded-[1.5rem]"
+        )}>
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
           <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={() => fileInputRef.current?.click()}>
             {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon />}
@@ -676,7 +704,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             value={inputValue} 
             onChange={handleInputChange} 
             onKeyDown={(e) => e.key === 'Enter' && !showMentions && handleSend()} 
-            placeholder="Message kith..." 
+            placeholder={editingMessage ? "Update your message..." : "Message kith..."} 
             className="bg-transparent border-none h-10 px-2 focus-visible:ring-0" 
           />
           <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className={cn("h-10 w-10 rounded-full", inputValue.trim() ? "bg-primary" : "bg-muted/20")}>

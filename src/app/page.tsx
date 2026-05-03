@@ -93,7 +93,6 @@ export default function Home() {
           </div>
           <div className="space-y-2">
             <CardTitle className="text-2xl font-bold">Verify your email</CardTitle>
-            <CardTitle className="text-2xl font-bold">Verify your email</CardTitle>
             <CardDescription>
               Please verify your email <span className="text-foreground font-bold">{user.email}</span> to continue.
             </CardDescription>
