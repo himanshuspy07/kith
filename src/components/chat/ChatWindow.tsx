@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -20,9 +19,7 @@ import {
   Pin,
   PinOff,
   Camera,
-  AtSign,
-  Phone,
-  Video
+  AtSign
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -497,24 +494,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     reader.readAsDataURL(file);
   };
 
-  const handleStartCall = (type: 'audio' | 'video') => {
-    if (!user || !db || !conversationId || room?.isGroupChat) {
-      toast({ title: "Group calls not supported yet." });
-      return;
-    }
-    const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
-    if (!otherUserId) return;
-
-    addDocumentNonBlocking(collection(db, 'calls'), {
-      callerId: user.uid,
-      receiverId: otherUserId,
-      callerName: user.displayName || 'Kith User',
-      status: 'ringing',
-      type: type,
-      createdAt: serverTimestamp(),
-    });
-  };
-
   const otherUserProfile = useMemo(() => {
     if (!room || room.isGroupChat || !participants || !user) return null;
     return participants.find(p => p.id !== user.uid);
@@ -591,16 +570,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </div>
         </div>
         <div className="flex items-center gap-1 md:gap-2">
-          {!room?.isGroupChat && (
-            <>
-              <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 rounded-full" onClick={() => handleStartCall('audio')}>
-                <Phone className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 rounded-full" onClick={() => handleStartCall('video')}>
-                <Video className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
-              </Button>
-            </>
-          )}
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full hover:bg-black/5 dark:hover:bg-white/5 shrink-0">

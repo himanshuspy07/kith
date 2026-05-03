@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -178,24 +177,6 @@
         "type",
         "createdAt"
       ]
-    },
-    "Call": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Call",
-      "type": "object",
-      "description": "Represents a voice or video call session.",
-      "properties": {
-        "id": { "type": "string" },
-        "callerId": { "type": "string" },
-        "receiverId": { "type": "string" },
-        "callerName": { "type": "string" },
-        "status": { "type": "string", "enum": ["ringing", "ongoing", "ended"] },
-        "type": { "type": "string", "enum": ["audio", "video"] },
-        "offer": { "type": "object" },
-        "answer": { "type": "object" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "callerId", "receiverId", "status", "type"]
     }
   },
   "auth": {
@@ -224,13 +205,6 @@
         "definition": {
           "entityName": "Message",
           "schema": { "$ref": "#/backend/entities/Message" }
-        }
-      },
-      {
-        "path": "/calls/{callId}",
-        "definition": {
-          "entityName": "Call",
-          "schema": { "$ref": "#/backend/entities/Call" }
         }
       }
     ]

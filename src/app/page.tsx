@@ -7,7 +7,6 @@ import AuthScreen from '@/components/auth/AuthScreen';
 import UserProfileSync from '@/components/chat/UserProfileSync';
 import NotificationManager from '@/components/chat/NotificationManager';
 import AppTutorial from '@/components/chat/AppTutorial';
-import CallManager from '@/components/chat/CallManager';
 import BrandLogo from '@/components/ui/brand-logo';
 import { useUser, useAuth } from '@/firebase';
 import { initiateResendVerification } from '@/firebase/non-blocking-login';
@@ -94,6 +93,7 @@ export default function Home() {
           </div>
           <div className="space-y-2">
             <CardTitle className="text-2xl font-bold">Verify your email</CardTitle>
+            <CardTitle className="text-2xl font-bold">Verify your email</CardTitle>
             <CardDescription>
               Please verify your email <span className="text-foreground font-bold">{user.email}</span> to continue.
             </CardDescription>
@@ -144,7 +144,6 @@ export default function Home() {
       <UserProfileSync />
       <NotificationManager currentConversationId={selectedConversationId} />
       <AppTutorial />
-      <CallManager />
       
       {showSidebar && (
         <Sidebar 
