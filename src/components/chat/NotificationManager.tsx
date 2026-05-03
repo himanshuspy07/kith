@@ -3,9 +3,8 @@
 
 import { useEffect, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, arrayUnion, query, collection, where, onSnapshot } from 'firebase/firestore';
+import { query, collection, where } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 
 interface NotificationManagerProps {
@@ -75,13 +74,6 @@ export default function NotificationManager({ currentConversationId }: Notificat
           serviceWorkerRegistration: registration
         });
         
-        if (token) {
-          const userRef = doc(db, 'users', user.uid);
-          updateDocumentNonBlocking(userRef, {
-            fcmTokens: arrayUnion(token)
-          });
-        }
-
         onMessage(messaging, (payload) => {
           if (payload.notification && payload.data?.roomId !== currentConversationId) {
             new Notification(payload.notification.title || "kith", {
@@ -91,7 +83,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
           }
         });
       } catch (error) {
-        console.warn("FCM setup failed.", error);
+        console.warn("FCM setup failed or ignored.");
       }
     };
 

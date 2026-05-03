@@ -1,21 +1,18 @@
 
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, LogOut, Settings, User, Upload, Loader2, Moon, Sun, Pin, PinOff, MoreVertical, Trash2, Copy, Check, Bell, Smartphone } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Settings, User, Bell, Smartphone, Copy, Check, LogOut, Search, Plus, Pin } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { useCollection, useDoc, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, deleteField, serverTimestamp } from 'firebase/firestore';
-import { signOut, updateProfile } from 'firebase/auth';
-import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, query, where, doc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 import NewChatDialog from './NewChatDialog';
 import { useToast } from '@/hooks/use-toast';
 import { getMessaging, getToken } from 'firebase/messaging';
@@ -29,19 +26,12 @@ interface SidebarProps {
 export default function Sidebar({ onSelectConversation, selectedConversationId, className }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState<number>(0);
   const [copiedToken, setCopiedToken] = useState(false);
   
   const { user } = useUser();
   const db = useFirestore();
   const auth = useAuth();
   const { toast } = useToast();
-
-  useEffect(() => {
-    setCurrentTime(Date.now());
-    const interval = setInterval(() => setCurrentTime(Date.now()), 10000);
-    return () => clearInterval(interval);
-  }, []);
 
   const currentUserRef = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
@@ -98,8 +88,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
       toast({ title: "Notifications Enabled", description: "You will now receive alerts for new messages." });
-      // Small delay to allow FCM registration
-      setTimeout(() => window.location.reload(), 1000);
     }
   };
 
@@ -153,19 +141,19 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                 <div className="space-y-4">
                   <Label className="text-[10px] uppercase font-bold tracking-widest text-primary">Notifications</Label>
                   <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl" onClick={handleRequestNotifications}>
-                    <Bell className="h-4 w-4" /> Enable Push Notifications
+                    <Bell className="h-4 w-4" /> Enable Notifications
                   </Button>
                   <Button variant="secondary" className="w-full justify-start gap-3 h-12 rounded-xl" onClick={sendTestNotification}>
-                    <Smartphone className="h-4 w-4" /> Send Test Notification
+                    <Smartphone className="h-4 w-4" /> Send Test Alert
                   </Button>
                   <Button variant="ghost" className="w-full justify-start gap-3 h-12 rounded-xl text-xs" onClick={copyDebugToken}>
                     {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
-                    {copiedToken ? 'Copied!' : 'Copy Debug Token (Expert Mode)'}
+                    {copiedToken ? 'Token Copied!' : 'Copy Device Token'}
                   </Button>
                 </div>
                 <div className="pt-4 border-t border-white/5 flex flex-col gap-3">
                   <Button variant="destructive" className="w-full h-12 rounded-xl" onClick={() => signOut(auth)}>Log Out</Button>
-                  <p className="text-[10px] text-center text-muted-foreground">kith Version 1.2.0-stable</p>
+                  <p className="text-[10px] text-center text-muted-foreground">kith v1.0.0-pwa</p>
                 </div>
               </div>
             </DialogContent>
