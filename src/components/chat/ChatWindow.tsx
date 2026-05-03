@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -126,18 +125,18 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     setInputValue(prev => prev + emoji);
   };
 
+  const otherUserProfile = React.useMemo(() => {
+    if (!room || room.isGroupChat || !participants || !user) return null;
+    return participants.find(p => p.id !== user.uid);
+  }, [room, participants, user]);
+
   const chatDisplayName = React.useMemo(() => {
     if (!room) return 'Loading...';
     if (!room.isGroupChat && participants && user) {
       const otherUser = participants.find(p => p.id !== user.uid);
-      if (otherUser) return otherUserProfile?.username || otherUser.username;
+      if (otherUser) return otherUser.username;
     }
     return room.name || 'Conversation';
-  }, [room, participants, user]);
-
-  const otherUserProfile = React.useMemo(() => {
-    if (!room || room.isGroupChat || !participants || !user) return null;
-    return participants.find(p => p.id !== user.uid);
   }, [room, participants, user]);
 
   if (!conversationId) {
