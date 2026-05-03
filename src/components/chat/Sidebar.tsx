@@ -59,6 +59,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     return rooms.map(room => {
       let displayName = room.name || 'Conversation';
       let displayAvatar = room.isGroupChat ? room.groupImageUrl : null;
+      let isOnline = false;
       
       if (!room.isGroupChat && participantProfiles && user) {
         const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
@@ -66,12 +67,14 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         if (otherUserProfile) {
           displayName = otherUserProfile.username;
           displayAvatar = otherUserProfile.profilePictureUrl;
+          isOnline = otherUserProfile.onlineStatus === true;
         }
       }
       return { 
         ...room, 
         displayName, 
         displayAvatar, 
+        isOnline,
         isPinned: room.pinnedBy?.[user?.uid || ''] === true 
       };
     }).sort((a, b) => {
@@ -160,6 +163,9 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                   {room.displayName?.[0]}
                 </AvatarFallback>
               </Avatar>
+              {room.isOnline && (
+                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-background" />
+              )}
               {room.isPinned && <Pin className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-background rounded-full p-0.5 text-primary fill-primary" />}
             </div>
 
@@ -175,7 +181,9 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground/60 truncate leading-snug">
-                {room.lastMessageText || 'Start a conversation'}
+                {room.typing && Object.keys(room.typing).length > 0 && Object.keys(room.typing).some(id => id !== user?.uid)
+                  ? 'Typing...'
+                  : (room.lastMessageText || 'Start a conversation')}
               </p>
             </div>
             

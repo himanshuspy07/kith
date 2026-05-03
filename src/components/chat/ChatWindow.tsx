@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
-import { format } from 'date-fns';
+import { format, isSameDay, differenceInMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { 
@@ -46,7 +46,8 @@ import {
   doc, 
   where, 
   limitToLast,
-  deleteDoc
+  deleteDoc,
+  deleteField
 } from 'firebase/firestore';
 import { 
   addDocumentNonBlocking, 
@@ -82,6 +83,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const groupImageInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
@@ -114,10 +117,38 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   }, [messages?.length]);
 
+  // Handle typing status
+  const updateTypingStatus = (isTyping: boolean) => {
+    if (!roomRef || !user) return;
+    updateDocumentNonBlocking(roomRef, {
+      [`typing.${user.uid}`]: isTyping ? serverTimestamp() : deleteField()
+    });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    
+    if (!user) return;
+
+    // Reset typing timeout
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    
+    // Only update if not already marked as typing recently (to save writes)
+    updateTypingStatus(true);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      updateTypingStatus(false);
+    }, 3000);
+  };
+
   const handleSend = (type: 'text' | 'image' = 'text', content?: string) => {
     const finalContent = content || inputValue.trim();
     if (!finalContent || !conversationId || !user || !room) return;
     
+    // Clear typing status on send
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    updateTypingStatus(false);
+
     if (editingMessage) {
       const msgRef = doc(db, 'chatRooms', conversationId, 'messages', editingMessage.id);
       updateDocumentNonBlocking(msgRef, {
@@ -317,6 +348,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return null;
   }, [room, participants, user]);
 
+  const typingUsers = React.useMemo(() => {
+    if (!room?.typing || !participants || !user) return [];
+    return Object.keys(room.typing)
+      .filter(id => id !== user.uid)
+      .map(id => participants.find(p => p.id === id)?.username)
+      .filter(Boolean);
+  }, [room?.typing, participants, user]);
+
   if (!conversationId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-background">
@@ -343,14 +382,26 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               <ChevronLeft className="h-5 w-5" />
             </Button>
           )}
-          <Avatar className="h-8 w-8 md:h-10 md:w-10 border border-white/10 shrink-0">
-            <AvatarImage src={chatAvatar || undefined} className="object-cover" />
-            <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs md:text-sm">{chatDisplayName?.[0]}</AvatarFallback>
-          </Avatar>
+          <div className="relative shrink-0">
+            <Avatar className="h-8 w-8 md:h-10 md:w-10 border border-white/10">
+              <AvatarImage src={chatAvatar || undefined} className="object-cover" />
+              <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs md:text-sm">{chatDisplayName?.[0]}</AvatarFallback>
+            </Avatar>
+            {!room?.isGroupChat && otherUserProfile?.onlineStatus && (
+              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-background" />
+            )}
+          </div>
           <div className="flex flex-col overflow-hidden">
-            <h3 className="text-xs md:text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs md:text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
+              {!room?.isGroupChat && otherUserProfile?.onlineStatus && (
+                <span className="text-[8px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider hidden sm:inline-block">Online</span>
+              )}
+            </div>
             <span className="text-[9px] md:text-[10px] text-muted-foreground truncate mt-0.5 md:mt-1 font-medium italic">
-              {room?.isGroupChat ? "Group Conversation" : (otherUserProfile?.bio || 'No bio available')}
+              {typingUsers.length > 0 
+                ? `${typingUsers.join(', ')} ${typingUsers.length > 1 ? 'are' : 'is'} typing...`
+                : (room?.isGroupChat ? "Group Conversation" : (otherUserProfile?.bio || 'No bio available'))}
             </span>
           </div>
         </div>
@@ -426,7 +477,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                           <AvatarImage src={member.profilePictureUrl} />
                           <AvatarFallback>{member.username?.[0]}</AvatarFallback>
                         </Avatar>
-                        <span className="text-xs font-medium">{member.username}</span>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium">{member.username}</span>
+                          {member.onlineStatus && <span className="text-[8px] text-accent font-bold uppercase">Online</span>}
+                        </div>
                       </div>
                       {room?.isGroupChat && room.createdBy === user?.uid && member.id !== user?.uid && (
                         <Button 
@@ -469,14 +523,27 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </Sheet>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 md:py-8 space-y-6 scrollbar-hide z-[1]">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 md:py-8 space-y-2 scrollbar-hide z-[1]">
         {messages?.map((msg, idx) => {
           const isMe = msg.senderId === user?.uid;
+          const prevMsg = idx > 0 ? messages[idx - 1] : null;
           const sender = participants?.find(p => p.id === msg.senderId);
           
+          // Grouping logic: Same sender, same day, and within 5 minutes
+          const isGrouped = prevMsg && 
+            prevMsg.senderId === msg.senderId && 
+            msg.createdAt && prevMsg.createdAt &&
+            isSameDay(msg.createdAt.toDate(), prevMsg.createdAt.toDate()) &&
+            differenceInMinutes(msg.createdAt.toDate(), prevMsg.createdAt.toDate()) < 5 &&
+            !msg.replyToId; // Don't group if it's a reply
+
           return (
-            <div key={msg.id} className={cn("flex flex-col animate-in-fade", isMe ? "items-end" : "items-start")}>
-              {!isMe && room?.isGroupChat && (
+            <div key={msg.id} className={cn(
+              "flex flex-col animate-in-fade", 
+              isMe ? "items-end" : "items-start",
+              !isGrouped && "mt-4"
+            )}>
+              {!isMe && room?.isGroupChat && !isGrouped && (
                 <span className="text-[10px] font-bold text-muted-foreground/60 ml-2 mb-1 uppercase tracking-widest">
                   {sender?.username}
                 </span>
@@ -517,7 +584,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
                     : "bg-white/[0.05] backdrop-blur-md border border-white/5 text-foreground rounded-bl-none message-shadow",
                   msg.type === 'image' ? 'p-1' : 'p-3 md:p-4',
-                  msg.isDeleted && "italic opacity-50"
+                  msg.isDeleted && "italic opacity-50",
+                  isGrouped && (isMe ? "rounded-tr-none" : "rounded-tl-none")
                 )}>
                   {msg.type === 'image' ? (
                     <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64 md:max-h-96" />
@@ -578,12 +646,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 )}
               </div>
 
-              <div className="mt-2.5 px-1 flex items-center gap-1.5">
-                <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">
-                  {msg.createdAt && format(msg.createdAt.toDate(), 'HH:mm')}
-                </span>
-                {isMe && <div className="h-1 w-1 rounded-full bg-accent" />}
-              </div>
+              {!isGrouped && (
+                <div className="mt-1 px-1 flex items-center gap-1.5">
+                  <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">
+                    {msg.createdAt && format(msg.createdAt.toDate(), 'HH:mm')}
+                  </span>
+                  {isMe && <div className="h-1 w-1 rounded-full bg-accent" />}
+                </div>
+              )}
             </div>
           );
         })}
@@ -641,7 +711,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           <div className="flex-1">
             <Input 
               value={inputValue} 
-              onChange={(e) => setInputValue(e.target.value)} 
+              onChange={handleInputChange} 
               onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
               placeholder={editingMessage ? "Update message..." : "Message kith..."} 
               className="bg-transparent border-none h-9 md:h-10 px-2 md:px-4 focus-visible:ring-0 text-sm placeholder:text-muted-foreground/40" 
