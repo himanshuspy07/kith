@@ -113,18 +113,22 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-card border-white/5 rounded-[2rem]">
-        <div className="bg-primary/10 p-8 flex items-center gap-4">
-          <Avatar className="h-16 w-16 border-2 border-primary/20">
-            <AvatarImage src={avatarUrl} />
-            <AvatarFallback className="text-xl bg-primary/20 text-primary">
-              {username?.[0] || user?.email?.[0]?.toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h2 className="text-xl font-bold">{username || 'User Profile'}</h2>
-            <p className="text-xs text-muted-foreground uppercase tracking-widest">{user?.email}</p>
+        <DialogHeader className="p-0">
+          <div className="bg-primary/10 p-8 flex items-center gap-4">
+            <Avatar className="h-16 w-16 border-2 border-primary/20">
+              <AvatarImage src={avatarUrl} />
+              <AvatarFallback className="text-xl bg-primary/20 text-primary">
+                {username?.[0] || user?.email?.[0]?.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col text-left">
+              <DialogTitle className="text-xl font-bold">{username || 'User Profile'}</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground uppercase tracking-widest">
+                {user?.email}
+              </DialogDescription>
+            </div>
           </div>
-        </div>
+        </DialogHeader>
 
         <Tabs defaultValue="profile" className="w-full">
           <div className="px-8 pt-4">
