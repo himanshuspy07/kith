@@ -14,7 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardTitle, CardDescription } from '@/components/ui/card';
-import { Mail, RefreshCw, LogOut } from 'lucide-react';
+import { Mail, RefreshCw, LogOut, Loader2 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -70,11 +70,27 @@ export default function Home() {
 
   if (isUserLoading || !hasMounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-background relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] animate-pulse" />
-        <div className="flex flex-col items-center gap-6 relative z-10">
-          <BrandLogo size="lg" showText={false} className="animate-bounce" />
-          <h1 className="text-2xl font-bold tracking-tighter">kith</h1>
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-background relative overflow-hidden transition-colors duration-500">
+        {/* Animated Background Accents */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] bg-accent/5 rounded-full blur-[100px] animate-bounce duration-[10s]" />
+        
+        <div className="flex flex-col items-center gap-8 relative z-10 animate-in fade-in zoom-in-95 duration-700">
+          <div className="relative">
+            <BrandLogo size="lg" showText={false} className="animate-pulse scale-110" />
+            <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full -z-10 animate-ping opacity-20" />
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <h1 className="text-4xl font-black tracking-tighter uppercase italic text-foreground">kith</h1>
+            <div className="flex items-center gap-2 text-muted-foreground/40 text-[10px] uppercase tracking-[0.3em] font-bold">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Initializing Workspace
+            </div>
+          </div>
+        </div>
+        
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2">
+          <p className="text-[9px] text-muted-foreground/20 uppercase tracking-[0.5em] font-bold">Connecting You Simply</p>
         </div>
       </div>
     );
@@ -98,16 +114,16 @@ export default function Home() {
             </CardDescription>
           </div>
           <div className="w-full space-y-3 pt-4">
-            <Button className="w-full h-14 rounded-2xl bg-primary font-bold" onClick={handleManualRefresh}>
+            <Button className="w-full h-14 rounded-2xl bg-primary font-bold shadow-xl shadow-primary/20" onClick={handleManualRefresh}>
               <RefreshCw className="mr-2 h-4 w-4" /> I've Verified
             </Button>
-            <Button variant="outline" disabled={isResending} className="w-full h-14 rounded-2xl" onClick={handleResendVerification}>
+            <Button variant="outline" disabled={isResending} className="w-full h-14 rounded-2xl border-white/10" onClick={handleResendVerification}>
               {isResending ? <RefreshCw className="animate-spin h-4 w-4" /> : 'Resend Email'}
             </Button>
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" className="w-full h-12 text-muted-foreground">
+                <Button variant="ghost" className="w-full h-12 text-muted-foreground hover:bg-white/5">
                   <LogOut className="mr-2 h-3 w-3" /> Sign Out
                 </Button>
               </AlertDialogTrigger>

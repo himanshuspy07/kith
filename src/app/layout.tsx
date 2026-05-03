@@ -47,19 +47,25 @@ export default function RootLayout({
       <head>
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
         <link rel="manifest" href="/manifest.json" />
-        <Script id="theme-init" strategy="beforeInteractive">
-          {`
-            (function() {
-              const theme = localStorage.getItem('kith-theme') || 'system';
-              const html = document.documentElement;
-              if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                html.classList.add('dark');
-              } else {
-                html.classList.remove('dark');
-              }
-            })();
-          `}
-        </Script>
+        {/* Inline script to prevent theme flash (FOUC) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const theme = localStorage.getItem('kith-theme') || 'system';
+                  const html = document.documentElement;
+                  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  if (isDark) {
+                    html.classList.add('dark');
+                  } else {
+                    html.classList.remove('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
       </head>
       <body className="font-body antialiased bg-background text-foreground overflow-hidden">
         <FirebaseClientProvider>
