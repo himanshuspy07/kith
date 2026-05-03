@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -19,7 +20,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
   const lastNotifiedRef = useRef<Record<string, string>>({});
   const isFirstLoad = useRef(true);
 
-  // Setup FCM for 100% reliable background notifications
+  // Setup FCM and Token Registration
   useEffect(() => {
     if (!user || typeof window === 'undefined' || !("Notification" in window)) return;
 
@@ -33,25 +34,29 @@ export default function NotificationManager({ currentConversationId }: Notificat
         }
 
         if (Notification.permission === 'granted') {
+          // Register Service Worker explicitly for FCM
+          const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+          
           // Get registration token
-          const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+          const token = await getToken(messaging, { 
+            vapidKey: VAPID_KEY,
+            serviceWorkerRegistration: registration
+          });
           
           if (token) {
-            // Save token to user profile for server-side push targeting
             const userRef = doc(db, 'users', user.uid);
             updateDocumentNonBlocking(userRef, {
               fcmTokens: arrayUnion(token)
             });
           }
 
-          // Listen for foreground messages
+          // Foreground messages
           onMessage(messaging, (payload) => {
-            console.log('Message received. ', payload);
-            // Optionally show a custom in-app notification here
+            console.log('Foreground message received:', payload);
           });
         }
       } catch (error) {
-        console.warn("FCM setup failed. This might be due to browser restrictions or VAPID mismatch.", error);
+        console.warn("FCM setup failed:", error);
       }
     };
 
@@ -68,7 +73,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
 
   const { data: rooms } = useCollection(roomsQuery);
 
-  // Foreground notification logic (while tab is open)
+  // Client-side background listener (works if browser hasn't killed the process)
   useEffect(() => {
     if (!rooms || !user || Notification.permission !== 'granted') return;
 
@@ -82,7 +87,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
       return;
     }
 
-    rooms.forEach(room => {
+    rooms.forEach(async (room) => {
       const lastUpdate = room.updatedAt?.toDate?.()?.getTime() || Date.now();
       const isRecent = (Date.now() - lastUpdate) < 300000; 
       const isNewMessage = room.lastMessageText && lastNotifiedRef.current[room.id] !== room.lastMessageText;
@@ -91,22 +96,19 @@ export default function NotificationManager({ currentConversationId }: Notificat
 
       if (isNewMessage && isFromOther && isNotCurrent && isRecent) {
         try {
-          const n = new Notification(room.displayName || room.name || "kith", {
+          const registration = await navigator.serviceWorker.ready;
+          
+          // Use showNotification for 100% mobile compatibility
+          await registration.showNotification(room.displayName || room.name || "kith", {
             body: room.lastMessageText,
             icon: "/icon.svg",
             badge: "/icon.svg",
-            tag: room.id, 
-            renotify: true
+            tag: room.id,
+            renotify: true,
+            data: { url: window.location.origin }
           });
-          
-          n.onclick = () => {
-            window.focus();
-            n.close();
-          };
-          
-          setTimeout(() => n.close(), 5000);
         } catch (e) {
-          console.error("Failed to show foreground notification:", e);
+          console.error("Failed to show notification:", e);
         }
         lastNotifiedRef.current[room.id] = room.lastMessageText;
       } else if (!isFromOther || !isNotCurrent) {
