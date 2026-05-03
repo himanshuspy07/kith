@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Settings, LogOut, Search, Plus, Pin, User, Bell, ChevronRight } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,12 @@ interface SidebarProps {
 }
 
 const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any) => {
+  const [hasMounted, setHasMounted] = useState(false);
+  
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
   return (
     <div
       onClick={() => onClick(room.id)}
@@ -51,7 +58,11 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       <div className="flex-1 overflow-hidden">
         <div className="flex justify-between items-center mb-0.5">
           <h3 className={cn("text-xs font-bold truncate", isSelected ? "text-primary" : "text-foreground")}>{room.displayName}</h3>
-          {room.updatedAt && <span className="text-[8px] text-muted-foreground/40 font-bold uppercase">{formatDistanceToNow(room.updatedAt.toDate())}</span>}
+          {hasMounted && room.updatedAt && (
+            <span className="text-[8px] text-muted-foreground/40 font-bold uppercase">
+              {formatDistanceToNow(room.updatedAt.toDate())}
+            </span>
+          )}
         </div>
         <p className="text-[11px] text-muted-foreground/60 truncate leading-snug">
           {room.typing && Object.keys(room.typing).length > 0 && Object.keys(room.typing).some(id => id !== currentUserId)
@@ -123,7 +134,9 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       };
     }).sort((a, b) => {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-      return (b.updatedAt?.toDate?.()?.getTime() || 0) - (a.updatedAt?.toDate?.()?.getTime() || 0);
+      const timeA = a.updatedAt?.toDate?.()?.getTime() || 0;
+      const timeB = b.updatedAt?.toDate?.()?.getTime() || 0;
+      return timeB - timeA;
     });
   }, [rooms, participantProfiles, user]);
 

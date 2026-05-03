@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -13,24 +14,17 @@ import {
   Edit2, 
   Trash2, 
   X, 
-  Check,
-  UserMinus,
-  LogOut,
-  Pin,
-  PinOff,
-  Camera,
-  AtSign
+  Camera
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Sheet, 
   SheetContent, 
   SheetHeader, 
   SheetTitle, 
   SheetTrigger, 
-  SheetDescription,
   SheetFooter
 } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -75,7 +69,6 @@ const WALLPAPERS = [
   { id: 'nordic', name: 'Nordic Blue', value: 'linear-gradient(to right, #0f172a, #334155)', preview: 'bg-blue-900' },
 ];
 
-const COMMON_EMOJIS = ["😊", "😂", "🥰", "👍", "🔥", "🚀", "❤️", "✨", "🙏", "😎", "🙌", "🤔", "🎉", "👋", "😭", "💯"];
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 const MessageItem = memo(({ 
@@ -93,37 +86,22 @@ const MessageItem = memo(({
 
   const renderMarkdown = (content: string) => {
     if (!content) return null;
-    
     const parts = content.split(/(@\w+)/g);
-    
     return parts.map((part, i) => {
-      if (part.startsWith('@')) {
-        return <span key={`mention-${i}`} className="mention">{part}</span>;
-      }
-
+      if (part.startsWith('@')) return <span key={`mention-${i}`} className="mention">{part}</span>;
       let formattedText: React.ReactNode[] = [part];
-
       formattedText = formattedText.flatMap((item, idx) => {
         if (typeof item !== 'string') return item;
-        return item.split(/`([^`]+)`/g).map((sub, si) => 
-          si % 2 === 1 ? <code key={`code-${idx}-${si}`}>{sub}</code> : sub
-        );
+        return item.split(/`([^`]+)`/g).map((sub, si) => si % 2 === 1 ? <code key={`code-${idx}-${si}`}>{sub}</code> : sub);
       });
-
       formattedText = formattedText.flatMap((item, idx) => {
         if (typeof item !== 'string') return item;
-        return item.split(/\*\*([^\*\*]+)\*\*/g).map((sub, si) => 
-          si % 2 === 1 ? <strong key={`bold-${idx}-${si}`}>{sub}</strong> : sub
-        );
+        return item.split(/\*\*([^\*\*]+)\*\*/g).map((sub, si) => si % 2 === 1 ? <strong key={`bold-${idx}-${si}`}>{sub}</strong> : sub);
       });
-
       formattedText = formattedText.flatMap((item, idx) => {
         if (typeof item !== 'string') return item;
-        return item.split(/\*([^\*]+)\*/g).map((sub, si) => 
-          si % 2 === 1 ? <em key={`italic-${idx}-${si}`}>{sub}</em> : sub
-        );
+        return item.split(/\*([^\*]+)\*/g).map((sub, si) => si % 2 === 1 ? <em key={`italic-${idx}-${si}`}>{sub}</em> : sub);
       });
-
       return <React.Fragment key={`part-${i}`}>{formattedText}</React.Fragment>;
     });
   };
@@ -155,7 +133,6 @@ const MessageItem = memo(({
         "group relative flex items-center gap-1.5 max-w-full",
         isMe ? "flex-row" : "flex-row-reverse"
       )}>
-        {/* Actions Bar: Visible on touch, hover-only on desktop */}
         <div className={cn(
           "flex items-center transition-all duration-200 gap-0.5",
           "md:opacity-0 md:group-hover:opacity-100",
@@ -217,7 +194,6 @@ const MessageItem = memo(({
           )}
         </div>
 
-        {/* Message Bubble */}
         <div className={cn(
           "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-transform relative max-w-[85vw] md:max-w-[400px]",
           isMe 
@@ -261,10 +237,10 @@ const MessageItem = memo(({
         </div>
       </div>
 
-      {!isGrouped && (
+      {!isGrouped && msg.createdAt && (
         <div className="mt-1 px-1 flex items-center gap-1.5">
           <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">
-            {msg.createdAt && format(msg.createdAt.toDate(), 'HH:mm')}
+            {format(msg.createdAt.toDate(), 'HH:mm')}
           </span>
           {isMe && <div className="h-1 w-1 rounded-full bg-accent" />}
         </div>
@@ -328,7 +304,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     });
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInputValue(val);
     
@@ -344,7 +320,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     const lastAtPos = val.lastIndexOf('@');
     if (lastAtPos !== -1 && room?.isGroupChat) {
       const textAfterAt = val.substring(lastAtPos + 1);
-      if (!textAfterAt.includes(' ')) {
+      if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
         setShowMentions(true);
         setMentionFilter(textAfterAt.toLowerCase());
       } else {
@@ -636,7 +612,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               </div>
               <SheetFooter className="pt-8 flex flex-col gap-2">
                 <Button variant="outline" className="w-full rounded-xl" onClick={handleTogglePin}>
-                  {room?.pinnedBy?.[user?.uid || ''] ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
+                  <Pin className="mr-2 h-4 w-4" />
                   {room?.pinnedBy?.[user?.uid || ''] ? 'Unpin' : 'Pin'}
                 </Button>
                 <Button variant="destructive" className="w-full rounded-xl" onClick={handleDeleteConversation}>
@@ -723,14 +699,19 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full" onClick={() => fileInputRef.current?.click()}>
             {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon className="h-5 w-5" />}
           </Button>
-          <Input 
+          <Textarea 
             value={inputValue} 
             onChange={handleInputChange} 
-            onKeyDown={(e) => e.key === 'Enter' && !showMentions && handleSend()} 
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !showMentions) {
+                e.preventDefault();
+                handleSend();
+              }
+            }} 
             placeholder={editingMessage ? "Update your message..." : "Message kith..."} 
-            className="bg-transparent border-none h-12 px-2 focus-visible:ring-0 text-sm md:text-base" 
+            className="bg-transparent border-none min-h-[48px] h-auto max-h-32 py-3 px-2 focus-visible:ring-0 text-sm md:text-base resize-none" 
           />
-          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className={cn("h-12 w-12 rounded-full shadow-lg", inputValue.trim() ? "bg-primary" : "bg-muted/20")}>
+          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className={cn("h-12 w-12 rounded-full shadow-lg shrink-0", inputValue.trim() ? "bg-primary" : "bg-muted/20")}>
             <Send className="h-5 w-5" />
           </Button>
         </div>

@@ -1,11 +1,12 @@
+
 {
   "name": "kith",
   "short_name": "kith",
-  "description": "Connecting You Simply",
+  "description": "Connecting You Simply - Professional Real-time Chat",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1B1E22",
-  "theme_color": "#4A90E2",
+  "background_color": "#ffffff",
+  "theme_color": "#3B82F6",
   "icons": [
     {
       "src": "/icon.svg",
