@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
 import { 
   Send, 
   MessageSquare, 
@@ -72,6 +73,180 @@ const WALLPAPERS = [
 const COMMON_EMOJIS = ["😊", "😂", "🥰", "👍", "🔥", "🚀", "❤️", "✨", "🙏", "😎", "🙌", "🤔", "🎉", "👋", "😭", "💯"];
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
+// Memoized Message Item for performance
+const MessageItem = memo(({ 
+  msg, 
+  isMe, 
+  isGrouped, 
+  sender, 
+  isGroupChat, 
+  onAction, 
+  onReact, 
+  currentUserId 
+}: any) => {
+  const reactions = msg.reactions || {};
+  const hasReactions = Object.values(reactions).some((uids: any) => uids.length > 0);
+
+  const renderMarkdown = (content: string) => {
+    if (!content) return null;
+    const parts = content.split(/(@\w+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) return <span key={i} className="mention">{part}</span>;
+      let text: any = part;
+      text = text.split(/`([^`]+)`/g).map((subPart: string, si: number) => 
+        si % 2 === 1 ? <code key={si}>{subPart}</code> : subPart
+      );
+      text = Array.isArray(text) ? text.map((item: any) => {
+        if (typeof item !== 'string') return item;
+        return item.split(/\*\*([^\*\*]+)\*\*/g).map((sp: string, ssi: number) => 
+          ssi % 2 === 1 ? <strong key={ssi}>{sp}</strong> : sp
+        );
+      }).flat() : text.split(/\*\*([^\*\*]+)\*\*/g).map((sp: string, ssi: number) => 
+        ssi % 2 === 1 ? <strong key={ssi}>{sp}</strong> : sp
+      );
+      text = Array.isArray(text) ? text.map((item: any) => {
+        if (typeof item !== 'string') return item;
+        return item.split(/\*([^\*]+)\*/g).map((sp: string, ssi: number) => 
+          ssi % 2 === 1 ? <em key={ssi}>{sp}</em> : sp
+        );
+      }).flat() : text.split(/\*([^\*]+)\*/g).map((sp: string, ssi: number) => 
+        ssi % 2 === 1 ? <em key={ssi}>{sp}</em> : sp
+      );
+      return <React.Fragment key={i}>{text}</React.Fragment>;
+    });
+  };
+
+  return (
+    <div className={cn(
+      "flex flex-col animate-in-fade", 
+      isMe ? "items-end" : "items-start",
+      !isGrouped && "mt-4",
+      hasReactions && "mb-5"
+    )}>
+      {!isMe && isGroupChat && !isGrouped && (
+        <span className="text-[10px] font-bold text-muted-foreground/60 ml-2 mb-1 uppercase tracking-widest">
+          {sender?.username}
+        </span>
+      )}
+
+      {msg.replyToId && (
+        <div className={cn(
+          "px-3 py-1 mb-[-4px] rounded-t-xl bg-black/5 dark:bg-white/5 border-l-2 border-primary text-[10px] text-muted-foreground/80 max-w-[80%] md:max-w-[60%] truncate",
+          isMe ? "mr-2" : "ml-2"
+        )}>
+          <Reply className="h-3 w-3 inline mr-1 opacity-50" />
+          {msg.replyToContent}
+        </div>
+      )}
+
+      <div className={cn(
+        "group relative flex items-center gap-2 max-w-[90%] md:max-w-[85%]"
+      )}>
+        {isMe && (
+          <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onAction('reply', msg)}>
+              <Reply className="h-3 w-3" />
+            </Button>
+            {!msg.isDeleted && (
+              <>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onAction('edit', msg)}>
+                  <Edit2 className="h-3 w-3" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-destructive" onClick={() => onAction('delete', msg)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className={cn(
+          "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-transform relative",
+          isMe 
+            ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
+            : "bg-black/[0.05] dark:bg-white/[0.05] backdrop-blur-md border border-black/5 dark:border-white/5 text-foreground rounded-bl-none message-shadow",
+          msg.type === 'image' ? 'p-1' : 'p-3 md:p-4',
+          msg.isDeleted && "italic opacity-50",
+          isGrouped && (isMe ? "rounded-tr-none" : "rounded-tl-none")
+        )}>
+          {msg.type === 'image' ? (
+            <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64 md:max-h-96" />
+          ) : (
+            renderMarkdown(msg.content)
+          )}
+          {msg.isEdited && !msg.isDeleted && (
+            <span className="block text-[8px] opacity-40 mt-1 text-right">edited</span>
+          )}
+          
+          {hasReactions && (
+            <div className={cn(
+              "absolute -bottom-4 flex flex-wrap gap-1 z-10",
+              isMe ? "right-0" : "left-0"
+            )}>
+              {Object.entries(reactions).map(([emoji, uids]: [string, any]) => uids.length > 0 && (
+                <button 
+                  key={emoji}
+                  onClick={() => onReact(msg, emoji)}
+                  className={cn(
+                    "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] glass-morphism-heavy shadow-2xl border transition-all active:scale-90",
+                    uids.includes(currentUserId) 
+                      ? "border-primary/50 bg-primary/20 text-primary shadow-primary/20" 
+                      : "border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10"
+                  )}
+                >
+                  <span>{emoji}</span>
+                  <span className="font-bold opacity-80">{uids.length}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {!isMe && (
+          <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onAction('reply', msg)}>
+              <Reply className="h-3 w-3" />
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                  <Smile className="h-3 w-3" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-1 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-full">
+                <div className="flex gap-1">
+                  {REACTION_EMOJIS.map(emoji => (
+                    <button 
+                      key={emoji} 
+                      className={cn(
+                        "h-8 w-8 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors text-lg",
+                        (reactions[emoji] || []).includes(currentUserId) && "bg-primary/20"
+                      )}
+                      onClick={() => onReact(msg, emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
+      </div>
+
+      {!isGrouped && (
+        <div className="mt-1 px-1 flex items-center gap-1.5">
+          <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">
+            {msg.createdAt && format(msg.createdAt.toDate(), 'HH:mm')}
+          </span>
+          {isMe && <div className="h-1 w-1 rounded-full bg-accent" />}
+        </div>
+      )}
+    </div>
+  );
+});
+MessageItem.displayName = 'MessageItem';
+
 export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
   const [messageLimit] = useState(50);
@@ -99,7 +274,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const participantsQuery = useMemoFirebase(() => {
     if (!db || !room?.memberIds || room.memberIds.length === 0) return null;
-    return query(collection(db, 'users'), where('id', 'in', room.memberIds));
+    return query(collection(db, 'users'), where('id', 'in', room.memberIds.slice(0, 30)));
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
@@ -139,7 +314,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       updateTypingStatus(false);
     }, 3000);
 
-    // Mention detection
     const lastAtPos = val.lastIndexOf('@');
     if (lastAtPos !== -1 && room?.isGroupChat) {
       const textAfterAt = val.substring(lastAtPos + 1);
@@ -233,7 +407,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleReact = (message: any, emoji: string) => {
     if (!user || !conversationId) return;
     const msgRef = doc(db, 'chatRooms', conversationId, 'messages', message.id);
-    
     const reactions = { ...(message.reactions || {}) };
     const hadThisEmoji = (reactions[emoji] || []).includes(user.uid);
 
@@ -258,7 +431,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     });
     toast({
       title: !isPinned ? "Conversation Pinned" : "Conversation Unpinned",
-      description: !isPinned ? "This chat will stay at the top." : "Chat removed from top."
     });
   };
 
@@ -279,7 +451,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       onBack?.();
       toast({ title: room.isGroupChat ? "Left Group" : "Conversation Deleted" });
     } catch (e) {
-      toast({ variant: "destructive", title: "Error", description: "Could not perform action." });
+      toast({ variant: "destructive", title: "Error" });
     }
   };
 
@@ -298,22 +470,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleGroupImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !roomRef) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ variant: "destructive", title: "File too large", description: "Image must be under 5MB." });
-      return;
-    }
-
+    if (file.size > 5 * 1024 * 1024) return;
     setIsGroupImageUploading(true);
     const reader = new FileReader();
     reader.onloadend = () => {
       updateDocumentNonBlocking(roomRef, { groupImageUrl: reader.result as string });
       setIsGroupImageUploading(false);
-      toast({ title: "Group Photo Updated" });
-    };
-    reader.onerror = () => {
-      setIsGroupImageUploading(false);
-      toast({ variant: "destructive", title: "Upload Failed" });
     };
     reader.readAsDataURL(file);
   };
@@ -321,36 +483,22 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        variant: "destructive",
-        title: "File too large",
-        description: "Image must be under 5MB.",
-      });
-      return;
-    }
-
+    if (file.size > 5 * 1024 * 1024) return;
     setIsUploading(true);
     const reader = new FileReader();
     reader.onloadend = () => {
       handleSend('image', reader.result as string);
       setIsUploading(false);
-      toast({ title: "Image Sent" });
-    };
-    reader.onerror = () => {
-      setIsUploading(false);
-      toast({ variant: "destructive", title: "Failed to send image" });
     };
     reader.readAsDataURL(file);
   };
 
-  const otherUserProfile = React.useMemo(() => {
+  const otherUserProfile = useMemo(() => {
     if (!room || room.isGroupChat || !participants || !user) return null;
     return participants.find(p => p.id !== user.uid);
   }, [room, participants, user]);
 
-  const chatDisplayName = React.useMemo(() => {
+  const chatDisplayName = useMemo(() => {
     if (!room) return 'Loading...';
     if (!room.isGroupChat && participants && user) {
       const otherUser = participants.find(p => p.id !== user.uid);
@@ -359,7 +507,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return room.name || 'Conversation';
   }, [room, participants, user]);
 
-  const chatAvatar = React.useMemo(() => {
+  const chatAvatar = useMemo(() => {
     if (!room) return null;
     if (room.isGroupChat) return room.groupImageUrl;
     if (participants && user) {
@@ -369,55 +517,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return null;
   }, [room, participants, user]);
 
-  const typingUsers = React.useMemo(() => {
+  const typingUsers = useMemo(() => {
     if (!room?.typing || !participants || !user) return [];
     return Object.keys(room.typing)
       .filter(id => id !== user.uid)
       .map(id => participants.find(p => p.id === id)?.username)
       .filter(Boolean);
   }, [room?.typing, participants, user]);
-
-  const renderMarkdown = (content: string) => {
-    if (!content) return null;
-
-    // Handle Mentions
-    const parts = content.split(/(@\w+)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('@')) {
-        return <span key={i} className="mention">{part}</span>;
-      }
-      
-      // Simple Markdown Parsing for Bold, Italic, Code
-      let text: any = part;
-      
-      // Code: `code`
-      text = text.split(/`([^`]+)`/g).map((subPart: string, si: number) => 
-        si % 2 === 1 ? <code key={si}>{subPart}</code> : subPart
-      );
-
-      // Bold: **text**
-      text = Array.isArray(text) ? text.map((item: any) => {
-        if (typeof item !== 'string') return item;
-        return item.split(/\*\*([^\*\*]+)\*\*/g).map((sp: string, ssi: number) => 
-          ssi % 2 === 1 ? <strong key={ssi}>{sp}</strong> : sp
-        );
-      }).flat() : text.split(/\*\*([^\*\*]+)\*\*/g).map((sp: string, ssi: number) => 
-        ssi % 2 === 1 ? <strong key={ssi}>{sp}</strong> : sp
-      );
-
-      // Italic: *text*
-      text = Array.isArray(text) ? text.map((item: any) => {
-        if (typeof item !== 'string') return item;
-        return item.split(/\*([^\*]+)\*/g).map((sp: string, ssi: number) => 
-          ssi % 2 === 1 ? <em key={ssi}>{sp}</em> : sp
-        );
-      }).flat() : text.split(/\*([^\*]+)\*/g).map((sp: string, ssi: number) => 
-        ssi % 2 === 1 ? <em key={ssi}>{sp}</em> : sp
-      );
-
-      return <React.Fragment key={i}>{text}</React.Fragment>;
-    });
-  };
 
   if (!conversationId) {
     return (
@@ -426,7 +532,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           <MessageSquare className="h-10 w-10 text-muted-foreground opacity-20" />
         </div>
         <h2 className="text-xl font-bold tracking-tight mb-2">Select a Conversation</h2>
-        <p className="text-muted-foreground text-sm max-w-[250px]">Choose a friend or group from the sidebar to start messaging.</p>
       </div>
     );
   }
@@ -455,12 +560,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             )}
           </div>
           <div className="flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs md:text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
-              {!room?.isGroupChat && otherUserProfile?.onlineStatus && (
-                <span className="text-[8px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider hidden sm:inline-block">Online</span>
-              )}
-            </div>
+            <h3 className="text-xs md:text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
             <span className="text-[9px] md:text-[10px] text-muted-foreground truncate mt-0.5 md:mt-1 font-medium italic">
               {typingUsers.length > 0 
                 ? `${typingUsers.join(', ')} ${typingUsers.length > 1 ? 'are' : 'is'} typing...`
@@ -476,109 +576,46 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </SheetTrigger>
           <SheetContent className="bg-card/95 backdrop-blur-xl border-black/5 dark:border-white/10 w-full sm:max-w-md flex flex-col">
             <SheetHeader className="pb-8">
-              <SheetTitle>Conversation Settings</SheetTitle>
-              <SheetDescription>Personalize your chat experience.</SheetDescription>
+              <SheetTitle>Settings</SheetTitle>
             </SheetHeader>
-            
             <div className="flex-1 overflow-y-auto space-y-8 pr-2 scrollbar-hide">
               {room?.isGroupChat && (
                 <div className="space-y-4">
                   <Label className="text-xs font-bold uppercase tracking-widest text-primary">Group Identity</Label>
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+                  <div className="flex items-center gap-4 p-4 rounded-xl bg-black/5 dark:bg-white/5">
                     <div className="relative group">
-                      <Avatar className="h-16 w-16 border-2 border-black/5 dark:border-white/10 shadow-lg">
+                      <Avatar className="h-16 w-16 shadow-lg">
                         <AvatarImage src={room.groupImageUrl} className="object-cover" />
                         <AvatarFallback className="text-xl">{room.name?.[0]}</AvatarFallback>
                       </Avatar>
                       {room.createdBy === user?.uid && (
-                        <button 
-                          onClick={() => groupImageInputRef.current?.click()}
-                          disabled={isGroupImageUploading}
-                          className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                        >
-                          {isGroupImageUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                        <button onClick={() => groupImageInputRef.current?.click()} className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center">
+                          <Camera className="h-4 w-4" />
                         </button>
                       )}
                       <input type="file" ref={groupImageInputRef} className="hidden" accept="image/*" onChange={handleGroupImageUpload} />
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold">{room.name}</h4>
-                      <p className="text-[10px] text-muted-foreground">Click photo to update group profile.</p>
-                    </div>
                   </div>
                 </div>
               )}
-
               <div className="space-y-4">
-                <Label className="text-xs font-bold uppercase tracking-widest text-primary">Aesthetic Wallpapers</Label>
+                <Label className="text-xs font-bold uppercase tracking-widest text-primary">Wallpapers</Label>
                 <div className="grid grid-cols-2 gap-3">
                   {WALLPAPERS.map(wp => (
-                    <button 
-                      key={wp.id} 
-                      onClick={() => roomRef && updateDocumentNonBlocking(roomRef, { wallpaper: wp.value })}
-                      className={cn(
-                        "group relative h-20 w-full rounded-xl overflow-hidden border-2 transition-all hover:scale-[1.02]",
-                        room?.wallpaper === wp.value ? "border-primary shadow-lg shadow-primary/20" : "border-black/5 dark:border-white/5"
-                      )}
-                    >
-                      <div className={cn("absolute inset-0", wp.preview)} style={{ background: wp.value }} />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-white">{wp.name}</span>
-                      </div>
+                    <button key={wp.id} onClick={() => roomRef && updateDocumentNonBlocking(roomRef, { wallpaper: wp.value })} className={cn("h-20 rounded-xl overflow-hidden border-2", room?.wallpaper === wp.value ? "border-primary" : "border-black/5")}>
+                      <div className={cn("h-full w-full", wp.preview)} style={{ background: wp.value }} />
                     </button>
                   ))}
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <Label className="text-xs font-bold uppercase tracking-widest text-primary">Conversation Members</Label>
-                <div className="space-y-2">
-                  {participants?.map(member => (
-                    <div key={member.id} className="flex items-center justify-between p-2 rounded-lg bg-black/5 dark:bg-white/5">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={member.profilePictureUrl} />
-                          <AvatarFallback>{member.username?.[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-medium">{member.username}</span>
-                          {member.onlineStatus && <span className="text-[8px] text-accent font-bold uppercase">Online</span>}
-                        </div>
-                      </div>
-                      {room?.isGroupChat && room.createdBy === user?.uid && member.id !== user?.uid && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                          onClick={() => handleRemoveMember(member.id)}
-                        >
-                          <UserMinus className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
-
-            <SheetFooter className="pt-8 border-t border-black/5 dark:border-white/5 flex flex-col gap-2">
-              <Button 
-                variant="outline" 
-                className="w-full gap-2 rounded-xl"
-                onClick={handleTogglePin}
-              >
-                {room?.pinnedBy?.[user?.uid || ''] ? (
-                  <><PinOff className="h-4 w-4" /> Unpin Chat</>
-                ) : (
-                  <><Pin className="h-4 w-4" /> Pin Chat</>
-                )}
+            <SheetFooter className="pt-8 flex flex-col gap-2">
+              <Button variant="outline" className="w-full rounded-xl" onClick={handleTogglePin}>
+                {room?.pinnedBy?.[user?.uid || ''] ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
+                {room?.pinnedBy?.[user?.uid || ''] ? 'Unpin' : 'Pin'}
               </Button>
-              <Button 
-                variant="destructive" 
-                className="w-full gap-2 rounded-xl"
-                onClick={handleDeleteConversation}
-              >
-                {room?.isGroupChat ? <LogOut className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+              <Button variant="destructive" className="w-full rounded-xl" onClick={handleDeleteConversation}>
+                {room?.isGroupChat ? <LogOut className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
                 {room?.isGroupChat ? "Leave Group" : "Delete Conversation"}
               </Button>
             </SheetFooter>
@@ -590,10 +627,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         {messages?.map((msg, idx) => {
           const isMe = msg.senderId === user?.uid;
           const prevMsg = idx > 0 ? messages[idx - 1] : null;
-          const sender = participants?.find(p => p.id === msg.senderId);
-          const reactions = msg.reactions || {};
-          const hasReactions = Object.values(reactions).some((uids: any) => uids.length > 0);
-          
           const isGrouped = prevMsg && 
             prevMsg.senderId === msg.senderId && 
             msg.createdAt && prevMsg.createdAt &&
@@ -602,132 +635,17 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             !msg.replyToId;
 
           return (
-            <div key={msg.id} className={cn(
-              "flex flex-col animate-in-fade", 
-              isMe ? "items-end" : "items-start",
-              !isGrouped && "mt-4",
-              hasReactions && "mb-5"
-            )}>
-              {!isMe && room?.isGroupChat && !isGrouped && (
-                <span className="text-[10px] font-bold text-muted-foreground/60 ml-2 mb-1 uppercase tracking-widest">
-                  {sender?.username}
-                </span>
-              )}
-
-              {msg.replyToId && (
-                <div className={cn(
-                  "px-3 py-1 mb-[-4px] rounded-t-xl bg-black/5 dark:bg-white/5 border-l-2 border-primary text-[10px] text-muted-foreground/80 max-w-[80%] md:max-w-[60%] truncate",
-                  isMe ? "mr-2" : "ml-2"
-                )}>
-                  <Reply className="h-3 w-3 inline mr-1 opacity-50" />
-                  {msg.replyToContent}
-                </div>
-              )}
-
-              <div className={cn(
-                "group relative flex items-center gap-2 max-w-[90%] md:max-w-[85%]"
-              )}>
-                {isMe && (
-                  <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAction('reply', msg)}>
-                      <Reply className="h-3 w-3" />
-                    </Button>
-                    {!msg.isDeleted && (
-                      <>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAction('edit', msg)}>
-                          <Edit2 className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-destructive" onClick={() => handleAction('delete', msg)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                <div className={cn(
-                  "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-transform relative",
-                  isMe 
-                    ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
-                    : "bg-black/[0.05] dark:bg-white/[0.05] backdrop-blur-md border border-black/5 dark:border-white/5 text-foreground rounded-bl-none message-shadow",
-                  msg.type === 'image' ? 'p-1' : 'p-3 md:p-4',
-                  msg.isDeleted && "italic opacity-50",
-                  isGrouped && (isMe ? "rounded-tr-none" : "rounded-tl-none")
-                )}>
-                  {msg.type === 'image' ? (
-                    <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64 md:max-h-96" />
-                  ) : (
-                    renderMarkdown(msg.content)
-                  )}
-                  {msg.isEdited && !msg.isDeleted && (
-                    <span className="block text-[8px] opacity-40 mt-1 text-right">edited</span>
-                  )}
-                  
-                  {hasReactions && (
-                    <div className={cn(
-                      "absolute -bottom-4 flex flex-wrap gap-1 z-10",
-                      isMe ? "right-0" : "left-0"
-                    )}>
-                      {Object.entries(reactions).map(([emoji, uids]: [string, any]) => uids.length > 0 && (
-                        <button 
-                          key={emoji}
-                          onClick={() => handleReact(msg, emoji)}
-                          className={cn(
-                            "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] glass-morphism-heavy shadow-2xl border transition-all active:scale-90",
-                            uids.includes(user?.uid) 
-                              ? "border-primary/50 bg-primary/20 text-primary shadow-primary/20" 
-                              : "border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10"
-                          )}
-                        >
-                          <span>{emoji}</span>
-                          <span className="font-bold opacity-80">{uids.length}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {!isMe && (
-                  <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAction('reply', msg)}>
-                      <Reply className="h-3 w-3" />
-                    </Button>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                          <Smile className="h-3 w-3" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-1 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-full">
-                        <div className="flex gap-1">
-                          {REACTION_EMOJIS.map(emoji => (
-                            <button 
-                              key={emoji} 
-                              className={cn(
-                                "h-8 w-8 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors text-lg",
-                                (reactions[emoji] || []).includes(user?.uid) && "bg-primary/20"
-                              )}
-                              onClick={() => handleReact(msg, emoji)}
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                )}
-              </div>
-
-              {!isGrouped && (
-                <div className="mt-1 px-1 flex items-center gap-1.5">
-                  <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">
-                    {msg.createdAt && format(msg.createdAt.toDate(), 'HH:mm')}
-                  </span>
-                  {isMe && <div className="h-1 w-1 rounded-full bg-accent" />}
-                </div>
-              )}
-            </div>
+            <MessageItem 
+              key={msg.id}
+              msg={msg}
+              isMe={isMe}
+              isGrouped={isGrouped}
+              sender={participants?.find(p => p.id === msg.senderId)}
+              isGroupChat={room?.isGroupChat}
+              onAction={handleAction}
+              onReact={handleReact}
+              currentUserId={user?.uid}
+            />
           );
         })}
         <div ref={messagesEndRef} />
@@ -735,126 +653,32 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <div className="p-4 md:p-6 bg-transparent z-10 space-y-3">
         {showMentions && participants && (
-          <div className="max-w-4xl mx-auto glass-morphism-heavy rounded-2xl p-2 mb-2 animate-in slide-in-from-bottom-2 shadow-2xl border-primary/20">
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-black/5 dark:border-white/5 mb-1">
-              <AtSign className="h-3 w-3 text-primary" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Mentions</span>
-            </div>
+          <div className="max-w-4xl mx-auto glass-morphism-heavy rounded-2xl p-2 mb-2 shadow-2xl">
             <div className="max-h-40 overflow-y-auto scrollbar-hide">
-              {participants
-                .filter(p => p.username.toLowerCase().includes(mentionFilter) && p.id !== user?.uid)
-                .map(p => (
-                  <button 
-                    key={p.id}
-                    onClick={() => insertMention(p.username)}
-                    className="w-full flex items-center gap-3 p-2 hover:bg-primary/10 rounded-xl transition-colors text-left group"
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={p.profilePictureUrl} />
-                      <AvatarFallback>{p.username[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold group-hover:text-primary">{p.username}</span>
-                      {p.onlineStatus && <span className="text-[8px] text-accent font-bold uppercase">Online</span>}
-                    </div>
-                  </button>
-                ))
-              }
-              {participants.filter(p => p.username.toLowerCase().includes(mentionFilter) && p.id !== user?.uid).length === 0 && (
-                <div className="p-4 text-center text-xs text-muted-foreground">No members found</div>
-              )}
+              {participants.filter(p => p.username.toLowerCase().includes(mentionFilter) && p.id !== user?.uid).map(p => (
+                <button key={p.id} onClick={() => insertMention(p.username)} className="w-full flex items-center gap-3 p-2 hover:bg-primary/10 rounded-xl">
+                  <Avatar className="h-8 w-8"><AvatarImage src={p.profilePictureUrl} /><AvatarFallback>{p.username[0]}</AvatarFallback></Avatar>
+                  <span className="text-sm font-bold">{p.username}</span>
+                </button>
+              ))}
             </div>
           </div>
         )}
-
-        {replyingTo && (
-          <div className="max-w-4xl mx-auto flex items-center justify-between glass-morphism-heavy px-4 py-2 rounded-xl animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <Reply className="h-4 w-4 text-primary shrink-0" />
-              <div className="overflow-hidden">
-                <span className="text-[10px] font-bold text-primary block uppercase">Replying to</span>
-                <p className="text-xs text-muted-foreground truncate">{replyingTo.content}</p>
-              </div>
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setReplyingTo(null)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {editingMessage && (
-          <div className="max-w-4xl mx-auto flex items-center justify-between glass-morphism-heavy px-4 py-2 rounded-xl border-accent/20 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <Edit2 className="h-4 w-4 text-accent shrink-0" />
-              <div className="overflow-hidden">
-                <span className="text-[10px] font-bold text-accent block uppercase">Editing message</span>
-                <p className="text-xs text-muted-foreground truncate">{editingMessage.content}</p>
-              </div>
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setEditingMessage(null); setInputValue(''); }}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-3 glass-morphism p-2 md:p-3 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border-black/5 dark:border-white/5">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            accept="image/*" 
-            onChange={handleImageUpload}
-          />
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-9 w-9 md:h-10 md:w-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10 shrink-0"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-          >
-            {isUploading ? <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin" /> : <ImageIcon className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />}
+        <div className="max-w-4xl mx-auto flex items-end gap-2 glass-morphism p-2 rounded-[1.5rem] shadow-2xl">
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={() => fileInputRef.current?.click()}>
+            {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon />}
           </Button>
-          <div className="flex-1">
-            <Input 
-              value={inputValue} 
-              onChange={handleInputChange} 
-              onKeyDown={(e) => e.key === 'Enter' && !showMentions && handleSend()} 
-              placeholder={editingMessage ? "Update message..." : "Message kith..."} 
-              className="bg-transparent border-none h-9 md:h-10 px-2 md:px-4 focus-visible:ring-0 text-sm placeholder:text-muted-foreground/40" 
-            />
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10 hidden sm:flex">
-                  <Smile className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-2 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-2xl mb-4">
-                <div className="grid grid-cols-4 gap-2">
-                  {COMMON_EMOJIS.map(emoji => (
-                    <button 
-                      key={emoji} 
-                      onClick={() => setInputValue(prev => prev + emoji)}
-                      className="h-10 w-10 flex items-center justify-center text-xl hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-colors"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-            <Button 
-              onClick={() => handleSend()} 
-              disabled={!inputValue.trim() || isUploading} 
-              className={cn(
-                "h-9 w-9 md:h-10 md:w-10 rounded-full transition-all active:scale-90",
-                inputValue.trim() ? (editingMessage ? "bg-accent" : "bg-primary") + " text-white" : "bg-muted/20 text-muted-foreground"
-              )}
-            >
-              {editingMessage ? <Check className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </div>
+          <Input 
+            value={inputValue} 
+            onChange={handleInputChange} 
+            onKeyDown={(e) => e.key === 'Enter' && !showMentions && handleSend()} 
+            placeholder="Message kith..." 
+            className="bg-transparent border-none h-10 px-2 focus-visible:ring-0" 
+          />
+          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className={cn("h-10 w-10 rounded-full", inputValue.trim() ? "bg-primary" : "bg-muted/20")}>
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>
