@@ -304,6 +304,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !conversationId || !room || !user) return null;
+    // Defensive check: only start listener if user is a current member and room document exists
     if (!room.members || !room.members[user.uid]) return null;
 
     return query(
@@ -430,12 +431,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     const msgRef = doc(db, 'chatRooms', conversationId, 'messages', message.id);
     const reactions = { ...(message.reactions || {}) };
     const hadThisEmoji = Array.isArray(reactions[emoji]) && reactions[emoji].includes(user.uid);
+    
     Object.keys(reactions).forEach(e => {
       if (Array.isArray(reactions[e])) {
         reactions[e] = reactions[e].filter((uid: string) => uid !== user.uid);
         if (reactions[e].length === 0) delete reactions[e];
       }
     });
+
     if (!hadThisEmoji) {
       if (!reactions[emoji]) reactions[emoji] = [];
       reactions[emoji].push(user.uid);
@@ -549,8 +552,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-background">
         <MessageSquare className="h-16 w-16 text-muted-foreground/10 mb-6" />
         <h2 className="text-xl font-bold tracking-tight">Select a conversation</h2>
-        <p className="text-sm text-muted-foreground mt-2 max-w-[200px]">
-          Choose a chat from the sidebar to start messaging securely.
+        <p className="text-sm text-muted-foreground mt-2">
+          Choose a chat from the sidebar to start messaging.
         </p>
       </div>
     );
@@ -773,7 +776,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
         <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">
-          <DialogTitle className="sr-only">Full-size Shared Image</DialogTitle>
+          <DialogTitle className="sr-only">Shared Image Lightbox</DialogTitle>
           <div className="relative group w-full h-full flex items-center justify-center">
             {lightboxImage && (
               <img src={lightboxImage} alt="Shared content" className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" />
