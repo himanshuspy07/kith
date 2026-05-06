@@ -1,10 +1,10 @@
 {
-  "name": "kith - Connecting You Simply",
+  "name": "kith",
   "short_name": "kith",
-  "description": "A modern, professional real-time chat application.",
+  "description": "Connecting You Simply - Professional Real-time Chat",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
+  "background_color": "#ffffff",
   "theme_color": "#3B82F6",
   "icons": [
     {

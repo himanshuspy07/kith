@@ -1,12 +1,12 @@
-self.addEventListener('install', (event) => {
+self.addEventListener('install', function(event) {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+self.addEventListener('activate', function(event) {
+  event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', (event) => {
-  // Basic pass-through for now, can be extended for offline caching
+self.addEventListener('fetch', function(event) {
+  // Pass-through strategy for real-time app
   event.respondWith(fetch(event.request));
 });

@@ -48,7 +48,6 @@ export default function RootLayout({
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon.svg" />
-        {/* Inline script to prevent theme flash (FOUC) */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -78,15 +77,15 @@ export default function RootLayout({
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
                 navigator.serviceWorker.register('/sw.js').then(function(reg) {
-                  console.log('Main SW registered');
+                  // SW registered
                 }).catch(function(err) {
-                  console.log('Main SW registration failed:', err);
+                  // SW registration failed
                 });
                 
                 navigator.serviceWorker.register('/firebase-messaging-sw.js').then(function(reg) {
-                  console.log('FCM SW registered');
+                  // FCM SW registered
                 }).catch(function(err) {
-                  console.log('FCM SW registration failed:', err);
+                  // FCM SW registration failed
                 });
               });
             }

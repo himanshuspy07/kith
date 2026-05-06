@@ -37,6 +37,15 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     setHasMounted(true);
   }, []);
 
+  const timeAgo = useMemo(() => {
+    if (!hasMounted || !room.updatedAt || !room.updatedAt.toDate) return null;
+    try {
+      return formatDistanceToNow(room.updatedAt.toDate());
+    } catch (e) {
+      return null;
+    }
+  }, [hasMounted, room.updatedAt]);
+
   return (
     <div
       onClick={() => onClick(room.id)}
@@ -57,9 +66,9 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       <div className="flex-1 overflow-hidden">
         <div className="flex justify-between items-center mb-0.5">
           <h3 className={cn("text-xs font-bold truncate", isSelected ? "text-primary" : "text-foreground")}>{room.displayName}</h3>
-          {hasMounted && room.updatedAt && room.updatedAt.toDate && (
+          {timeAgo && (
             <span className="text-[8px] text-muted-foreground/40 font-bold uppercase">
-              {formatDistanceToNow(room.updatedAt.toDate())}
+              {timeAgo}
             </span>
           )}
         </div>
@@ -81,6 +90,11 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const { user } = useUser();
   const db = useFirestore();
   const auth = useAuth();
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const currentUserRef = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
@@ -110,7 +124,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const { data: participantProfiles } = useCollection(usersQuery);
 
   const conversationListData = useMemo(() => {
-    if (!rooms) return [];
+    if (!rooms || !hasMounted) return [];
     return rooms.map(room => {
       let displayName = room.name || 'Conversation';
       let displayAvatar = room.isGroupChat ? room.groupImageUrl : null;
@@ -122,7 +136,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           displayName = otherUserProfile.username;
           displayAvatar = otherUserProfile.profilePictureUrl;
           
-          // Check online status: must be true AND active in the last 3 minutes
           const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
           const isRecentlyActive = differenceInMinutes(new Date(), lastActive) < 3;
           isOnline = otherUserProfile.onlineStatus === true && isRecentlyActive;
@@ -141,7 +154,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       const timeB = b.updatedAt?.toDate?.()?.getTime() || 0;
       return timeB - timeA;
     });
-  }, [rooms, participantProfiles, user]);
+  }, [rooms, participantProfiles, user, hasMounted]);
 
   return (
     <div className={cn("h-full border-r border-white/5 flex flex-col bg-background/95 backdrop-blur-xl shrink-0 z-30", className)}>
