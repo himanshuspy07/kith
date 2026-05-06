@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -20,11 +19,16 @@ import {
   LogOut,
   ChevronUp,
   Check,
-  CheckCheck
+  CheckCheck,
+  Forward,
+  ExternalLink,
+  UserMinus,
+  Settings2
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { 
   Sheet, 
   SheetContent, 
@@ -61,6 +65,7 @@ import {
   updateDocumentNonBlocking
 } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
+import ForwardDialog from './ForwardDialog';
 
 interface ChatWindowProps {
   conversationId?: string;
@@ -77,6 +82,22 @@ const WALLPAPERS = [
 ];
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "💯", "🙌", "✨", "🚀"];
+
+const LinkPreview = ({ url }: { url: string }) => {
+  return (
+    <div className="mt-2 p-3 rounded-xl bg-black/10 dark:bg-white/5 border border-white/10 flex items-center gap-3 max-w-full">
+      <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+        <ExternalLink className="h-5 w-5 text-primary" />
+      </div>
+      <div className="flex flex-col overflow-hidden">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Web Link</span>
+        <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs truncate hover:underline text-accent font-medium">
+          {url}
+        </a>
+      </div>
+    </div>
+  );
+};
 
 const TypingAnimation = () => (
   <div className="flex items-center gap-1 h-2">
@@ -99,9 +120,10 @@ const MessageItem = memo(({
 }: any) => {
   const reactions = msg.reactions || {};
   const hasReactions = Object.values(reactions).some((uids: any) => Array.isArray(uids) && uids.length > 0);
-  
-  // Logic for Read Receipts
   const isReadByOthers = msg.readBy && msg.readBy.some((uid: string) => uid !== msg.senderId);
+
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const urls = msg.content?.match(urlRegex);
 
   const renderMarkdown = (content: string) => {
     if (!content) return null;
@@ -179,23 +201,28 @@ const MessageItem = memo(({
                 </PopoverContent>
               </Popover>
 
-              {isMe && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
-                      <MoreHorizontal className="h-3.5 w-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align={isMe ? "end" : "start"} className="bg-card/95 backdrop-blur-xl border-white/5">
-                    <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2 p-3">
-                      <Edit2 className="h-4 w-4" /> Edit Message
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 p-3 text-destructive focus:text-destructive">
-                      <Trash2 className="h-4 w-4" /> Delete Message
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align={isMe ? "end" : "start"} className="bg-card/95 backdrop-blur-xl border-white/5 rounded-2xl p-1">
+                  <DropdownMenuItem onClick={() => onAction('forward', msg)} className="gap-2 p-3 rounded-xl">
+                    <Forward className="h-4 w-4" /> Forward Message
+                  </DropdownMenuItem>
+                  {isMe && (
+                    <>
+                      <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2 p-3 rounded-xl">
+                        <Edit2 className="h-4 w-4" /> Edit Message
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 p-3 rounded-xl text-destructive focus:text-destructive">
+                        <Trash2 className="h-4 w-4" /> Delete Message
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>
@@ -211,10 +238,18 @@ const MessageItem = memo(({
         )}
         onClick={() => msg.type === 'image' && onImageClick(msg.content)}
         >
+          {msg.forwardedFrom && (
+            <div className="flex items-center gap-1 opacity-50 text-[9px] font-bold uppercase tracking-widest mb-1">
+              <Forward className="h-2.5 w-2.5" /> Forwarded
+            </div>
+          )}
           {msg.type === 'image' ? (
             <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64" />
           ) : (
-            renderMarkdown(msg.content)
+            <>
+              {renderMarkdown(msg.content)}
+              {urls?.map((url: string, i: number) => <LinkPreview key={i} url={url} />)}
+            </>
           )}
           {msg.isEdited && !msg.isDeleted && (
             <span className="block text-[8px] opacity-40 mt-1 text-right uppercase tracking-widest font-bold">edited</span>
@@ -273,11 +308,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [isGroupImageUploading, setIsGroupImageUploading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [editingMessage, setEditingMessage] = useState<any>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<any>(null);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
   const [messageLimit, setMessageLimit] = useState(30);
+
+  // Admin Controls State
+  const [isEditingGroupName, setIsEditingGroupName] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -298,7 +338,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, conversationId]);
   const { data: room } = useDoc(roomRef);
 
-  // Sync Room Read Status
   useEffect(() => {
     if (room && user && roomRef) {
       const isUnread = room.lastMessageText && 
@@ -330,7 +369,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, conversationId, room, user?.uid, messageLimit]);
   const { data: messages } = useCollection(messagesQuery);
 
-  // Sync Individual Message Read Status
   useEffect(() => {
     if (!messages || !user || !conversationId || !db) return;
 
@@ -433,7 +471,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (type === 'text') setInputValue('');
   };
 
-  const handleAction = (action: 'delete' | 'edit' | 'reply', message: any) => {
+  const handleAction = (action: 'delete' | 'edit' | 'reply' | 'forward', message: any) => {
     if (action === 'delete') {
       const msgRef = doc(db, 'chatRooms', conversationId!, 'messages', message.id);
       updateDocumentNonBlocking(msgRef, {
@@ -451,6 +489,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     } else if (action === 'reply') {
       setReplyingTo(message);
       setEditingMessage(null);
+    } else if (action === 'forward') {
+      setForwardingMessage(message);
     }
   };
 
@@ -472,6 +512,25 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       reactions[emoji].push(user.uid);
     }
     updateDocumentNonBlocking(msgRef, { reactions });
+  };
+
+  const handleUpdateGroupName = () => {
+    if (!roomRef || !newGroupName.trim()) return;
+    updateDocumentNonBlocking(roomRef, { 
+      name: newGroupName.trim(),
+      nameLowercase: newGroupName.trim().toLowerCase()
+    });
+    setIsEditingGroupName(false);
+    toast({ title: "Group renamed" });
+  };
+
+  const handleRemoveMember = (memberId: string) => {
+    if (!roomRef || !room || !user || room.createdBy !== user.uid) return;
+    const nextMembers = { ...room.members };
+    delete nextMembers[memberId];
+    const nextMemberIds = (room.memberIds || []).filter((id: string) => id !== memberId);
+    updateDocumentNonBlocking(roomRef, { members: nextMembers, memberIds: nextMemberIds });
+    toast({ title: "Member removed" });
   };
 
   const handleTogglePin = () => {
@@ -562,12 +621,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const presenceText = useMemo(() => {
     if (room?.isGroupChat) return "Group Conversation";
     if (!otherUser || !hasMounted) return "Offline";
-    
     const lastActive = otherUser.lastActiveAt?.toDate?.() || new Date(0);
     const isRecentlyActive = differenceInMinutes(new Date(), lastActive) < 3;
-    
     if (otherUser.onlineStatus === true && isRecentlyActive) return "Active Now";
-    
     try {
       return `Last active ${formatDistanceToNow(lastActive)} ago`;
     } catch (e) {
@@ -648,8 +704,26 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     )}
                     <input type="file" ref={groupImageInputRef} className="hidden" accept="image/*" onChange={handleGroupImageUpload} />
                   </div>
-                  <div className="space-y-1">
-                    <h3 className="text-2xl font-black tracking-tighter uppercase italic">{chatDisplayName}</h3>
+                  <div className="space-y-1 w-full flex flex-col items-center">
+                    {isEditingGroupName ? (
+                      <div className="flex items-center gap-2 w-full max-w-[200px]">
+                        <Input 
+                          value={newGroupName} 
+                          onChange={(e) => setNewGroupName(e.target.value)} 
+                          className="h-8 rounded-lg bg-black/10"
+                        />
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-accent" onClick={handleUpdateGroupName}><Check className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setIsEditingGroupName(false)}><X className="h-4 w-4" /></Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-2xl font-black tracking-tighter uppercase italic">{chatDisplayName}</h3>
+                        {room?.isGroupChat && room?.createdBy === user?.uid && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setIsEditingGroupName(true); setNewGroupName(room.name); }}><Settings2 className="h-4 w-4" /></Button>
+                        )}
+                      </div>
+                    )}
+                    
                     {!room?.isGroupChat && otherUser && (
                       <div className="flex flex-col gap-1 items-center">
                         <span className="text-xs text-muted-foreground italic max-w-xs">{otherUser.bio || "No bio set."}</span>
@@ -661,6 +735,27 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     )}
                   </div>
                 </div>
+
+                {room?.isGroupChat && participants && (
+                  <div className="space-y-4">
+                    <Label className="text-xs font-bold uppercase tracking-widest text-primary/60">Members ({room.memberIds?.length})</Label>
+                    <div className="space-y-2">
+                      {participants.map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8"><AvatarImage src={p.profilePictureUrl} /><AvatarFallback>{p.username[0]}</AvatarFallback></Avatar>
+                            <span className="text-sm font-bold">{p.username} {p.id === room.createdBy && <span className="text-[8px] bg-primary/20 text-primary px-1 rounded ml-1">ADMIN</span>}</span>
+                          </div>
+                          {room.createdBy === user?.uid && p.id !== user?.uid && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveMember(p.id)}>
+                              <UserMinus className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4 pt-4">
                   <Label className="text-xs font-bold uppercase tracking-widest text-primary/60">Appearance</Label>
@@ -801,6 +896,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </Button>
         </div>
       </div>
+
+      <ForwardDialog 
+        open={!!forwardingMessage} 
+        onOpenChange={(open) => !open && setForwardingMessage(null)} 
+        messageToForward={forwardingMessage} 
+      />
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
         <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">

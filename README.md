@@ -15,3 +15,6 @@ A modern, professional real-time chat application built with Next.js 15, Firebas
 - **Database/Auth**: Firebase (Firestore & Authentication)
 - **Styling**: Tailwind CSS & ShadCN UI
 - **Icons**: Lucide React
+
+## About the Creator
+- **Name is Himanshu Yadav

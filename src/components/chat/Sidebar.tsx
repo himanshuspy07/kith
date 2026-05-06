@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { LogOut, Search, Plus, Pin, MessageSquare } from 'lucide-react';
+import { LogOut, Search, Plus, Pin, MessageSquare, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -162,9 +162,11 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       let displayName = room.name || 'Conversation';
       let displayAvatar = room.isGroupChat ? room.groupImageUrl : null;
       let isOnline = false;
+      let otherUserProfile = null;
+
       if (!room.isGroupChat && participantProfiles) {
         const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
-        const otherUserProfile = participantProfiles.find(u => u.id === otherUserId);
+        otherUserProfile = participantProfiles.find(u => u.id === otherUserId);
         if (otherUserProfile) {
           displayName = otherUserProfile.username;
           displayAvatar = otherUserProfile.profilePictureUrl;
@@ -185,6 +187,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         displayAvatar, 
         isOnline,
         isUnread,
+        otherUserProfile,
         isPinned: room.pinnedBy?.[user?.uid || ''] === true 
       };
     }).sort((a, b) => {
@@ -196,7 +199,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   }, [rooms, participantProfiles, user, hasMounted]);
 
   const filteredConversations = useMemo(() => {
-    return conversationListData.filter(r => r.displayName.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = searchQuery.toLowerCase();
+    return conversationListData.filter(r => {
+      const matchName = r.displayName.toLowerCase().includes(q);
+      const matchBio = r.otherUserProfile?.bio?.toLowerCase().includes(q);
+      const matchLastMsg = r.lastMessageText?.toLowerCase().includes(q);
+      return matchName || matchBio || matchLastMsg;
+    });
   }, [conversationListData, searchQuery]);
 
   return (
@@ -243,7 +252,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
-            placeholder="Search kith..." 
+            placeholder="Search kith global..." 
             className="bg-white/5 border-none h-10 rounded-xl pl-10 text-xs transition-all focus:bg-white/10" 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
@@ -270,7 +279,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
             <MessageSquare className="h-10 w-10 mb-4" />
             <p className="text-xs font-bold uppercase tracking-widest leading-relaxed">
-              {searchQuery ? "No matches" : "No active chats"}
+              {searchQuery ? "No matches found" : "No active chats"}
             </p>
           </div>
         )}
