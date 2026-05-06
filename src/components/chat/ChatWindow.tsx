@@ -38,7 +38,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { format, isSameDay, differenceInMinutes, formatDistanceToNow } from 'date-fns';
+import { format, isSameDay, differenceInMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { 
@@ -82,7 +82,6 @@ const MessageItem = memo(({
   isGroupChat, 
   onAction, 
   onReact, 
-  onImageClick,
   currentUserId 
 }: any) => {
   const [hasMounted, setHasMounted] = useState(false);
@@ -206,19 +205,12 @@ const MessageItem = memo(({
           isMe 
             ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
             : "bg-black/[0.05] dark:bg-white/[0.05] backdrop-blur-md border border-black/5 dark:border-white/5 text-foreground rounded-bl-none message-shadow",
-          msg.type === 'image' ? 'p-1 cursor-pointer hover:opacity-90' : 'p-3 md:p-4',
+          msg.type === 'image' ? 'p-1' : 'p-3 md:p-4',
           msg.isDeleted && "italic opacity-50",
           isGrouped && (isMe ? "rounded-tr-none" : "rounded-tl-none")
-        )}
-        onClick={() => msg.type === 'image' && onImageClick(msg.content)}
-        >
+        )}>
           {msg.type === 'image' ? (
-            <div className="relative group/img">
-              <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64 md:max-h-96" />
-              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
-                <Maximize2 className="h-6 w-6 text-white drop-shadow-lg" />
-              </div>
-            </div>
+            <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64" />
           ) : (
             renderMarkdown(msg.content)
           )}
@@ -266,19 +258,14 @@ MessageItem.displayName = 'MessageItem';
 
 export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
-  const [messageLimit, setMessageLimit] = useState(50);
   const [isUploading, setIsUploading] = useState(false);
   const [isGroupImageUploading, setIsGroupImageUploading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [editingMessage, setEditingMessage] = useState<any>(null);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const topSentinelRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const groupImageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -313,72 +300,18 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { data: participants } = useCollection(participantsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
-    // Only fetch messages if the room document exists and we are confirmed as a member
-    // This prevents "Missing or insufficient permissions" race conditions
-    if (!db || !conversationId || !user?.uid || !room || !room.members?.[user.uid]) return null;
-    
-    return query(
-      collection(db, 'chatRooms', conversationId, 'messages'),
-      orderBy('createdAt', 'asc'),
-      limitToLast(messageLimit)
-    );
-  }, [db, conversationId, messageLimit, room, user?.uid]);
-  const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
-
-  const sharedMediaQuery = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
-      where('type', '==', 'image'),
-      orderBy('createdAt', 'desc'),
-      limitToLast(12)
+      orderBy('createdAt', 'asc'),
+      limitToLast(50)
     );
   }, [db, conversationId]);
-  const { data: sharedMedia } = useCollection(sharedMediaQuery);
+  const { data: messages } = useCollection(messagesQuery);
 
   useEffect(() => {
-    setMessageLimit(50);
-    setIsInitialLoad(true);
-  }, [conversationId]);
-
-  useEffect(() => {
-    if (messages && messages.length > 0 && isInitialLoad) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-      setIsInitialLoad(false);
-    }
-  }, [messages?.length, isInitialLoad]);
-
-  useEffect(() => {
-    if (!messages || messages.length === 0 || isInitialLoad) return;
-    const lastMsg = messages[messages.length - 1];
-    if (lastMsg.senderId === user?.uid) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages?.length]);
-
-  useEffect(() => {
-    if (!topSentinelRef.current || isInitialLoad || isMessagesLoading) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && messages && messages.length >= messageLimit) {
-          const container = scrollContainerRef.current;
-          const currentHeight = container?.scrollHeight || 0;
-          setMessageLimit(prev => prev + 50);
-          setTimeout(() => {
-            if (container) {
-              const newHeight = container.scrollHeight;
-              container.scrollTop = newHeight - currentHeight;
-            }
-          }, 0);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(topSentinelRef.current);
-    return () => observer.disconnect();
-  }, [messages?.length, messageLimit, isInitialLoad, isMessagesLoading]);
 
   const updateTypingStatus = (isTyping: boolean) => {
     if (!roomRef || !user) return;
@@ -563,17 +496,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     reader.readAsDataURL(file);
   };
 
-  const otherUserProfile = useMemo(() => {
-    if (!room || room.isGroupChat || !participants || !user) return null;
-    return participants.find(p => p.id !== user.uid);
-  }, [room, participants, user]);
-
-  const isOtherUserOnline = useMemo(() => {
-    if (!otherUserProfile) return false;
-    const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
-    return otherUserProfile.onlineStatus === true && differenceInMinutes(new Date(), lastActive) < 3;
-  }, [otherUserProfile]);
-
   const chatDisplayName = useMemo(() => {
     if (!room) return 'Loading...';
     if (!room.isGroupChat && participants && user) {
@@ -620,22 +542,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         style={{ background: room?.wallpaper || 'transparent' }}
       />
       
-      {previewImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-3xl animate-in fade-in duration-300">
-          <button 
-            onClick={() => setPreviewImage(null)}
-            className="absolute top-8 right-8 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-[110]"
-          >
-            <X className="h-6 w-6 text-white" />
-          </button>
-          <img 
-            src={previewImage} 
-            alt="Preview" 
-            className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl animate-in zoom-in-95 duration-300" 
-          />
-        </div>
-      )}
-      
       <header className="h-16 md:h-20 px-4 md:px-6 flex items-center justify-between glass-morphism sticky top-0 z-10 mx-2 mt-2 md:mx-4 md:mt-4 rounded-xl md:rounded-2xl shadow-lg border-white/5">
         <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
           {onBack && (
@@ -643,21 +549,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               <ChevronLeft className="h-5 w-5" />
             </Button>
           )}
-          <div className="relative shrink-0">
-            <Avatar className="h-8 w-8 md:h-10 md:w-10 border border-white/10">
-              <AvatarImage src={chatAvatar || undefined} className="object-cover" />
-              <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs md:text-sm">{chatDisplayName?.[0]}</AvatarFallback>
-            </Avatar>
-            {!room?.isGroupChat && isOtherUserOnline && (
-              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-background" />
-            )}
-          </div>
+          <Avatar className="h-8 w-8 md:h-10 md:w-10 border border-white/10 shrink-0">
+            <AvatarImage src={chatAvatar || undefined} className="object-cover" />
+            <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs md:text-sm">{chatDisplayName?.[0]}</AvatarFallback>
+          </Avatar>
           <div className="flex flex-col overflow-hidden">
             <h3 className="text-xs md:text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
             <span className="text-[9px] md:text-[10px] text-muted-foreground truncate mt-0.5 md:mt-1 font-medium italic">
               {typingUsers.length > 0 
                 ? `${typingUsers.join(', ')} ${typingUsers.length > 1 ? 'are' : 'is'} typing...`
-                : (room?.isGroupChat ? "Group Conversation" : (isOtherUserOnline ? 'Active now' : (otherUserProfile?.bio || 'No bio available')))}
+                : (room?.isGroupChat ? "Group Conversation" : "Online")}
             </span>
           </div>
         </div>
@@ -686,65 +587,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     )}
                     <input type="file" ref={groupImageInputRef} className="hidden" accept="image/*" onChange={handleGroupImageUpload} />
                   </div>
-                  <div className="space-y-1">
-                    <h3 className="text-2xl font-black tracking-tighter uppercase italic">{chatDisplayName}</h3>
-                    {!room?.isGroupChat && otherUserProfile && (
-                      <div className="flex items-center justify-center gap-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/60">
-                        <span className={cn("h-1.5 w-1.5 rounded-full", isOtherUserOnline ? "bg-accent" : "bg-muted")} />
-                        {isOtherUserOnline ? "Active Now" : otherUserProfile.lastActiveAt ? `Last active ${formatDistanceToNow(otherUserProfile.lastActiveAt.toDate())} ago` : "Offline"}
-                      </div>
-                    )}
-                  </div>
+                  <h3 className="text-2xl font-black tracking-tighter uppercase italic">{chatDisplayName}</h3>
                 </div>
-
-                {!room?.isGroupChat && otherUserProfile?.bio && (
-                  <div className="space-y-4">
-                    <Label className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Professional Bio</Label>
-                    <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-white/5 text-sm leading-relaxed italic text-muted-foreground">
-                      "{otherUserProfile.bio}"
-                    </div>
-                  </div>
-                )}
-
-                {room?.isGroupChat && participants && (
-                  <div className="space-y-4">
-                    <Label className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Members ({participants.length})</Label>
-                    <div className="space-y-3">
-                      {participants.map(p => (
-                        <div key={p.id} className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={p.profilePictureUrl} className="object-cover" />
-                            <AvatarFallback>{p.username[0]}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold">{p.username}</span>
-                            <span className="text-[9px] text-muted-foreground">{p.id === room.createdBy ? 'Admin' : 'Member'}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {sharedMedia && sharedMedia.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Shared Media</Label>
-                      <Button variant="ghost" size="sm" className="h-6 text-[9px] uppercase tracking-widest font-bold">See All</Button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {sharedMedia.map(m => (
-                        <button 
-                          key={m.id} 
-                          onClick={() => setPreviewImage(m.content)}
-                          className="aspect-square rounded-xl overflow-hidden hover:opacity-80 transition-opacity border border-white/5"
-                        >
-                          <img src={m.content} className="h-full w-full object-cover" alt="Shared" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <div className="space-y-4 pt-4">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Appearance</Label>
@@ -779,16 +623,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       </header>
 
-      <div 
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-2 md:px-6 py-6 md:py-8 space-y-2 scrollbar-hide z-[1]"
-      >
-        <div ref={topSentinelRef} className="h-4 w-full flex items-center justify-center">
-          {isMessagesLoading && messages && messages.length >= messageLimit && (
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground opacity-50" />
-          )}
-        </div>
-        
+      <div className="flex-1 overflow-y-auto px-2 md:px-6 py-6 md:py-8 space-y-2 scrollbar-hide z-[1]">
         {messages?.map((msg, idx) => {
           const isMe = msg.senderId === user?.uid;
           const prevMsg = idx > 0 ? messages[idx - 1] : null;
@@ -810,7 +645,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               isGroupChat={room?.isGroupChat}
               onAction={handleAction}
               onReact={handleReact}
-              onImageClick={setPreviewImage}
               currentUserId={user?.uid}
             />
           );
