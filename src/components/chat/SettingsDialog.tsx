@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -64,10 +63,10 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   const [isUploading, setIsUploading] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
-  const [theme, setTheme] = useState<ThemeMode>('system');
+  const [theme, setTheme] = useState<ThemeMode>('dark');
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('kith-theme') as ThemeMode || 'system';
+    const savedTheme = localStorage.getItem('kith-theme') as ThemeMode || 'dark';
     setTheme(savedTheme);
   }, []);
 

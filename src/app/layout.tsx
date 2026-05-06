@@ -81,7 +81,7 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  const theme = localStorage.getItem('kith-theme') || 'system';
+                  const theme = localStorage.getItem('kith-theme') || 'dark';
                   const html = document.documentElement;
                   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
                   if (isDark) {
