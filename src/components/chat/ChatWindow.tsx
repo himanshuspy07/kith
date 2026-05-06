@@ -16,9 +16,7 @@ import {
   Camera,
   Pin,
   Info,
-  Maximize2,
-  LogOut,
-  Download
+  LogOut
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -298,13 +296,17 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { data: participants } = useCollection(participantsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
-    if (!db || !conversationId) return null;
+    // SECURITY: Wait for room document to be loaded and membership confirmed before querying messages.
+    // This prevents race conditions and "Permission Denied" errors upon chat creation.
+    if (!db || !conversationId || !room || !user) return null;
+    if (!room.members || !room.members[user.uid]) return null;
+
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limitToLast(100)
     );
-  }, [db, conversationId]);
+  }, [db, conversationId, room, user?.uid]);
   const { data: messages } = useCollection(messagesQuery);
 
   useEffect(() => {
@@ -607,7 +609,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     {!room?.isGroupChat && otherUser && (
                       <div className="flex flex-col gap-1 items-center">
                         <span className="text-xs text-muted-foreground italic max-w-xs">{otherUser.bio || "No bio set."}</span>
-                        <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/60 mt-2">
+                        <div className="flex items-center justify-center gap-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/60 mt-2">
                            <span className={cn("h-1.5 w-1.5 rounded-full", presenceText === "Active Now" ? "bg-accent" : "bg-muted")} />
                            {presenceText}
                         </div>

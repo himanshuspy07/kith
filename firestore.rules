@@ -18,6 +18,7 @@ service cloud.firestore {
 
     function isRoomMember(chatRoomId) {
       return isSignedIn() && 
+             exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) &&
              get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
     }
 
