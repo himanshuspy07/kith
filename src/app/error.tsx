@@ -21,6 +21,18 @@ export default function Error({
     console.error('App Crash Captured:', error);
   }, [error]);
 
+  const handleReset = () => {
+    if (typeof reset === 'function') {
+      try {
+        reset();
+      } catch (e) {
+        window.location.reload();
+      }
+    } else {
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 relative overflow-hidden transition-colors duration-500">
       {/* Dynamic Background Aura */}
@@ -52,13 +64,7 @@ export default function Error({
 
         <div className="flex flex-col gap-4 w-full max-w-[300px]">
           <Button 
-            onClick={() => {
-              if (typeof reset === 'function') {
-                reset();
-              } else {
-                window.location.reload();
-              }
-            }} 
+            onClick={handleReset} 
             className="h-16 rounded-[2rem] bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/20 transition-all active:scale-95 flex items-center justify-center gap-3 text-xs uppercase tracking-[0.2em]"
           >
             <RefreshCcw className="h-4 w-4" />

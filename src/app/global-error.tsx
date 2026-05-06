@@ -16,6 +16,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   const handleReset = () => {
+    // Safety check: Next.js may not always provide the reset function in global-error
     if (typeof reset === 'function') {
       try {
         reset();

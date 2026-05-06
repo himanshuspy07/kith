@@ -16,7 +16,8 @@ import {
   Camera,
   Pin,
   Info,
-  Maximize2
+  Maximize2,
+  LogOut
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -312,15 +313,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { data: participants } = useCollection(participantsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
-    if (!db || !conversationId || !user?.uid) return null;
-    if (!room || !room.members || !room.members[user.uid]) return null;
+    // Only fetch messages if the room document exists and we are confirmed as a member
+    // This prevents "Missing or insufficient permissions" race conditions
+    if (!db || !conversationId || !user?.uid || !room || !room.members?.[user.uid]) return null;
     
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limitToLast(messageLimit)
     );
-  }, [db, conversationId, messageLimit, room?.members?.[user?.uid || ''], user?.uid]);
+  }, [db, conversationId, messageLimit, room, user?.uid]);
   const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
   const sharedMediaQuery = useMemoFirebase(() => {
