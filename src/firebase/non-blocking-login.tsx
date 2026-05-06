@@ -10,6 +10,7 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   GoogleAuthProvider,
+  TwitterAuthProvider,
   signInWithPopup,
 } from 'firebase/auth';
 
@@ -21,6 +22,12 @@ export function initiateAnonymousSignIn(authInstance: Auth): Promise<UserCredent
 /** Initiate Google sign-in. */
 export function initiateGoogleSignIn(authInstance: Auth): Promise<UserCredential> {
   const provider = new GoogleAuthProvider();
+  return signInWithPopup(authInstance, provider);
+}
+
+/** Initiate Twitter/X sign-in. */
+export function initiateTwitterSignIn(authInstance: Auth): Promise<UserCredential> {
+  const provider = new TwitterAuthProvider();
   return signInWithPopup(authInstance, provider);
 }
 
