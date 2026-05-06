@@ -5,6 +5,7 @@ import { LogOut, Search, Plus, Pin, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { useCollection, useDoc, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
@@ -30,6 +31,14 @@ interface SidebarProps {
   className?: string;
 }
 
+const TypingAnimation = () => (
+  <div className="flex items-center gap-0.5 ml-1">
+    <div className="h-0.5 w-0.5 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+    <div className="h-0.5 w-0.5 bg-accent rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
+    <div className="h-0.5 w-0.5 bg-accent rounded-full animate-bounce" style={{ animationDelay: '400ms' }} />
+  </div>
+);
+
 const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any) => {
   const [hasMounted, setHasMounted] = useState(false);
   
@@ -46,6 +55,8 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     }
   }, [hasMounted, room.updatedAt]);
 
+  const isTyping = room.typing && Object.keys(room.typing).length > 0 && Object.keys(room.typing).some(id => id !== currentUserId);
+
   return (
     <div
       onClick={() => onClick(room.id)}
@@ -57,7 +68,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     >
       {isSelected && <div className="absolute left-0 w-1 h-8 bg-primary rounded-full -translate-x-1" />}
       <div className="relative shrink-0">
-        <Avatar className="h-12 w-12 border border-white/10">
+        <Avatar className={cn("h-12 w-12 border transition-all", isSelected ? "border-primary/50" : "border-white/10")}>
           <AvatarImage src={room.displayAvatar || undefined} className="object-cover" />
           <AvatarFallback className="bg-muted text-muted-foreground font-medium">{room.displayName?.[0]}</AvatarFallback>
         </Avatar>
@@ -67,7 +78,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       <div className="flex-1 overflow-hidden">
         <div className="flex justify-between items-center mb-0.5">
           <h3 className={cn(
-            "text-xs truncate", 
+            "text-xs truncate transition-colors", 
             isSelected ? "text-primary font-bold" : room.isUnread ? "text-foreground font-black" : "text-foreground font-bold"
           )}>
             {room.displayName}
@@ -81,17 +92,25 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
                 {timeAgo}
               </span>
             )}
-            {room.isUnread && <div className="h-2 w-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]" />}
           </div>
         </div>
-        <p className={cn(
-          "text-[11px] truncate leading-snug",
-          room.isUnread ? "text-foreground font-bold" : "text-muted-foreground/60"
-        )}>
-          {room.typing && Object.keys(room.typing).length > 0 && Object.keys(room.typing).some(id => id !== currentUserId)
-            ? <span className="text-accent italic animate-pulse">Typing...</span>
-            : (room.lastMessageText || 'Start a conversation')}
-        </p>
+        <div className="flex justify-between items-center">
+          <div className={cn(
+            "text-[11px] truncate leading-snug flex items-center",
+            room.isUnread ? "text-foreground font-bold" : "text-muted-foreground/60"
+          )}>
+            {isTyping ? (
+              <div className="flex items-center text-accent italic font-bold">
+                Typing <TypingAnimation />
+              </div>
+            ) : (room.lastMessageText || 'Start a conversation')}
+          </div>
+          {room.isUnread && (
+            <Badge className="ml-2 h-4 min-w-[1rem] px-1 bg-primary text-[8px] font-black rounded-full flex items-center justify-center animate-in zoom-in duration-300">
+              NEW
+            </Badge>
+          )}
+        </div>
       </div>
     </div>
   );

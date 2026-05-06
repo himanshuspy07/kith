@@ -16,7 +16,8 @@ import {
   Camera,
   Pin,
   Info,
-  LogOut
+  LogOut,
+  ChevronUp
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -72,7 +73,15 @@ const WALLPAPERS = [
   { id: 'nordic', name: 'Nordic Blue', value: 'linear-gradient(to right, #0f172a, #334155)', preview: 'bg-blue-900' },
 ];
 
-const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "💯", "🙌", "✨", "🚀"];
+
+const TypingAnimation = () => (
+  <div className="flex items-center gap-1 h-2">
+    <div className="typing-dot" />
+    <div className="typing-dot" />
+    <div className="typing-dot" />
+  </div>
+);
 
 const MessageItem = memo(({ 
   msg, 
@@ -147,7 +156,7 @@ const MessageItem = memo(({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-1 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-full shadow-2xl z-[60]">
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap max-w-[200px] p-2 justify-center">
                     {REACTION_EMOJIS.map(emoji => (
                       <button 
                         key={emoji} 
@@ -253,6 +262,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [mentionFilter, setMentionFilter] = useState('');
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  const [messageLimit, setMessageLimit] = useState(30);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -299,14 +309,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
-      limitToLast(100)
+      limitToLast(messageLimit)
     );
-  }, [db, conversationId, room, user?.uid]);
+  }, [db, conversationId, room, user?.uid, messageLimit]);
   const { data: messages } = useCollection(messagesQuery);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages?.length]);
+    if (messageLimit === 30) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages?.length, messageLimit]);
 
   const updateTypingStatus = (isTyping: boolean) => {
     if (!roomRef || !user) return;
@@ -563,15 +575,21 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs md:text-sm">{chatDisplayName?.[0]}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col overflow-hidden">
-            <h3 className="text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
-            <span className={cn(
-              "text-[10px] truncate mt-1 font-medium italic",
-              typingUsers.length > 0 ? "text-accent animate-pulse" : "text-muted-foreground"
+            <div className="flex items-center gap-2">
+               <h3 className="text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
+               {room?.pinnedBy?.[user?.uid || ''] && <Pin className="h-3 w-3 text-primary fill-primary" />}
+            </div>
+            <div className={cn(
+              "text-[10px] truncate mt-1 font-medium italic flex items-center gap-1.5",
+              typingUsers.length > 0 ? "text-accent" : "text-muted-foreground"
             )}>
-              {typingUsers.length > 0 
-                ? `${typingUsers.join(', ')} ${typingUsers.length > 1 ? 'are' : 'is'} typing...`
-                : presenceText}
-            </span>
+              {typingUsers.length > 0 ? (
+                <>
+                  <TypingAnimation />
+                  <span>{typingUsers.join(', ')} is typing</span>
+                </>
+              ) : presenceText}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1 md:gap-2">
@@ -633,7 +651,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               </div>
               <SheetFooter className="p-8 pt-4 flex flex-col gap-2 border-t border-white/5 bg-black/5">
                 <Button variant="outline" className="w-full rounded-xl h-12 border-white/10 font-bold text-xs uppercase tracking-widest" onClick={handleTogglePin}>
-                  <Pin className="mr-2 h-3.5 w-3.5" />
+                  <Pin className={cn("mr-2 h-3.5 w-3.5", room?.pinnedBy?.[user?.uid || ''] && "fill-primary text-primary")} />
                   {room?.pinnedBy?.[user?.uid || ''] ? 'Unpin' : 'Pin'} Conversation
                 </Button>
                 <Button variant="destructive" className="w-full rounded-xl h-12 font-bold text-xs uppercase tracking-widest" onClick={handleDeleteConversation}>
@@ -647,6 +665,19 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       </header>
 
       <div className="flex-1 overflow-y-auto px-2 md:px-6 py-4 md:py-8 space-y-2 scrollbar-hide z-[1]">
+        {messages && messages.length >= messageLimit && (
+          <div className="flex justify-center pb-6">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground hover:text-primary transition-colors"
+              onClick={() => setMessageLimit(prev => prev + 30)}
+            >
+              <ChevronUp className="h-3 w-3 mr-1" /> Load earlier messages
+            </Button>
+          </div>
+        )}
+        
         {messages?.map((msg, idx) => {
           const isMe = msg.senderId === user?.uid;
           const prevMsg = idx > 0 ? messages[idx - 1] : null;
@@ -742,10 +773,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
         <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">
-          <DialogTitle className="sr-only">Image Preview</DialogTitle>
+          <DialogTitle className="sr-only">Full-size Shared Image</DialogTitle>
           <div className="relative group w-full h-full flex items-center justify-center">
             {lightboxImage && (
-              <img src={lightboxImage} alt="Full view" className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" />
+              <img src={lightboxImage} alt="Shared content" className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" />
             )}
             <div className="absolute top-4 right-4 flex gap-2">
               <Button variant="secondary" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md" onClick={() => setLightboxImage(null)}>

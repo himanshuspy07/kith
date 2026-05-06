@@ -22,11 +22,12 @@ export default function Error({
   }, [error]);
 
   const handleReset = () => {
-    // Safety check: reset may not be a function in some Next.js error states
+    // Safety check: reset may not be a function in some Next.js error states or during hydration mismatches
     if (typeof reset === 'function') {
       try {
         reset();
       } catch (e) {
+        // Final fallback: refresh the window if programmatic reset fails
         window.location.reload();
       }
     } else {
