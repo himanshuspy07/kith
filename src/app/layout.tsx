@@ -19,63 +19,41 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://kith-chat.vercel.app'), // Replace with actual production URL
+  metadataBase: new URL('https://kith.chat'),
   title: {
     default: 'kith - Connecting You Simply',
     template: '%s | kith',
   },
-  description: 'A modern, real-time chat application for private and group conversations. Secure, aesthetic, and professional messaging.',
-  keywords: ['chat', 'messaging', 'real-time', 'kith', 'communication', 'group chat', 'professional messenger'],
-  authors: [{ name: 'kith Team' }],
+  description: 'A modern, real-time chat application for professional and private conversations. Secure, aesthetic, and reliable messaging.',
+  keywords: ['chat', 'messaging', 'real-time', 'kith', 'communication', 'professional messenger'],
+  authors: [{ name: 'kith' }],
   creator: 'kith',
-  publisher: 'kith',
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://kith-chat.vercel.app',
+    url: 'https://kith.chat',
     siteName: 'kith',
     title: 'kith - Connecting You Simply',
-    description: 'A modern, real-time chat application for private and group conversations.',
+    description: 'Modern messaging for a connected world.',
     images: [
       {
         url: '/icon.svg',
         width: 512,
         height: 512,
-        alt: 'kith - Professional Messenger',
+        alt: 'kith Logo',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'kith - Connecting You Simply',
-    description: 'A modern, real-time chat application for private and group conversations.',
+    description: 'Modern messaging for a connected world.',
     images: ['/icon.svg'],
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
   },
   manifest: '/manifest.json',
   icons: {
     icon: '/icon.svg',
     apple: '/icon.svg',
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'kith',
   },
 };
 
@@ -126,16 +104,12 @@ export default function RootLayout({
           {`
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js').then(function(reg) {
-                  // SW registered
-                }).catch(function(err) {
-                  // SW registration failed
+                navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                  console.error('SW registration failed:', err);
                 });
                 
-                navigator.serviceWorker.register('/firebase-messaging-sw.js').then(function(reg) {
-                  // FCM SW registered
-                }).catch(function(err) {
-                  // FCM SW registration failed
+                navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(function(err) {
+                  console.error('FCM SW registration failed:', err);
                 });
               });
             }

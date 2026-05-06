@@ -70,28 +70,42 @@ export default function Home() {
 
   if (isUserLoading || !hasMounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-background relative overflow-hidden transition-colors duration-500">
-        {/* Animated Background Accents */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] bg-accent/5 rounded-full blur-[100px] animate-bounce duration-[10s]" />
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-background relative overflow-hidden transition-colors duration-1000">
+        {/* Cinematic Background Atmosphere */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[160px] animate-pulse duration-[4000ms]" />
+        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px] animate-bounce duration-[15s]" />
+        <div className="absolute -bottom-40 -right-40 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] animate-pulse duration-[6000ms]" />
         
-        <div className="flex flex-col items-center gap-8 relative z-10 animate-in fade-in zoom-in-95 duration-700">
-          <div className="relative">
-            <BrandLogo size="lg" showText={false} className="animate-pulse scale-110" />
-            <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full -z-10 animate-ping opacity-20" />
+        <div className="flex flex-col items-center gap-10 relative z-10 animate-in fade-in zoom-in-95 duration-1000 slide-in-from-bottom-4">
+          <div className="relative group">
+            <BrandLogo size="lg" showText={false} className="scale-110" />
+            <div className="absolute inset-0 bg-primary/30 blur-3xl rounded-full -z-10 animate-ping opacity-30" />
+            <div className="absolute -inset-4 bg-accent/20 blur-2xl rounded-full -z-20 animate-pulse" />
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <h1 className="text-4xl font-black tracking-tighter uppercase italic text-foreground">kith</h1>
-            <div className="flex items-center gap-2 text-muted-foreground/40 text-[10px] uppercase tracking-[0.3em] font-bold">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Initializing Workspace
+          
+          <div className="flex flex-col items-center gap-4">
+            <h1 className="text-5xl font-black tracking-tighter uppercase italic text-foreground drop-shadow-2xl">kith</h1>
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-1 w-24 bg-muted/20 rounded-full overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary to-transparent w-full h-full animate-[shimmer_2s_infinite] -translate-x-full" />
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground/50 text-[11px] uppercase tracking-[0.4em] font-bold">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                Initializing Workspace
+              </div>
             </div>
           </div>
         </div>
         
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2">
-          <p className="text-[9px] text-muted-foreground/20 uppercase tracking-[0.5em] font-bold">Connecting You Simply</p>
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 opacity-30">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-[0.6em] font-bold animate-pulse">Connecting You Simply</p>
         </div>
+
+        <style jsx global>{`
+          @keyframes shimmer {
+            100% { transform: translateX(100%); }
+          }
+        `}</style>
       </div>
     );
   }
