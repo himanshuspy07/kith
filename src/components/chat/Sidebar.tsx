@@ -51,7 +51,8 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       onClick={() => onClick(room.id)}
       className={cn(
         "p-3 flex items-center gap-3 rounded-2xl cursor-pointer transition-all group relative",
-        isSelected ? "bg-primary/10" : "hover:bg-white/5"
+        isSelected ? "bg-primary/10" : "hover:bg-white/5",
+        room.isUnread && !isSelected && "bg-white/[0.03]"
       )}
     >
       {isSelected && <div className="absolute left-0 w-1 h-8 bg-primary rounded-full -translate-x-1" />}
@@ -65,14 +66,28 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       </div>
       <div className="flex-1 overflow-hidden">
         <div className="flex justify-between items-center mb-0.5">
-          <h3 className={cn("text-xs font-bold truncate", isSelected ? "text-primary" : "text-foreground")}>{room.displayName}</h3>
-          {timeAgo && (
-            <span className="text-[8px] text-muted-foreground/40 font-bold uppercase">
-              {timeAgo}
-            </span>
-          )}
+          <h3 className={cn(
+            "text-xs truncate", 
+            isSelected ? "text-primary font-bold" : room.isUnread ? "text-foreground font-black" : "text-foreground font-bold"
+          )}>
+            {room.displayName}
+          </h3>
+          <div className="flex items-center gap-1.5">
+            {timeAgo && (
+              <span className={cn(
+                "text-[8px] font-bold uppercase",
+                room.isUnread ? "text-primary" : "text-muted-foreground/40"
+              )}>
+                {timeAgo}
+              </span>
+            )}
+            {room.isUnread && <div className="h-2 w-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]" />}
+          </div>
         </div>
-        <p className="text-[11px] text-muted-foreground/60 truncate leading-snug">
+        <p className={cn(
+          "text-[11px] truncate leading-snug",
+          room.isUnread ? "text-foreground font-bold" : "text-muted-foreground/60"
+        )}>
           {room.typing && Object.keys(room.typing).length > 0 && Object.keys(room.typing).some(id => id !== currentUserId)
             ? 'Typing...'
             : (room.lastMessageText || 'Start a conversation')}
@@ -124,12 +139,12 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const { data: participantProfiles } = useCollection(usersQuery);
 
   const conversationListData = useMemo(() => {
-    if (!rooms || !hasMounted) return [];
+    if (!rooms || !hasMounted || !user) return [];
     return rooms.map(room => {
       let displayName = room.name || 'Conversation';
       let displayAvatar = room.isGroupChat ? room.groupImageUrl : null;
       let isOnline = false;
-      if (!room.isGroupChat && participantProfiles && user) {
+      if (!room.isGroupChat && participantProfiles) {
         const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
         const otherUserProfile = participantProfiles.find(u => u.id === otherUserId);
         if (otherUserProfile) {
@@ -141,11 +156,18 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           isOnline = otherUserProfile.onlineStatus === true && isRecentlyActive;
         }
       }
+
+      // Check for unread status
+      const isUnread = room.lastMessageText && 
+                       room.lastMessageSenderId !== user.uid && 
+                       (!room.readBy || !room.readBy.includes(user.uid));
+
       return { 
         ...room, 
         displayName, 
         displayAvatar, 
         isOnline,
+        isUnread,
         isPinned: room.pinnedBy?.[user?.uid || ''] === true 
       };
     }).sort((a, b) => {

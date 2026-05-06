@@ -279,6 +279,20 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, conversationId]);
   const { data: room } = useDoc(roomRef);
 
+  // Automatic Mark-as-Read Logic
+  useEffect(() => {
+    if (room && user && roomRef) {
+      const isUnread = room.lastMessageText && 
+                       room.lastMessageSenderId !== user.uid && 
+                       (!room.readBy || !room.readBy.includes(user.uid));
+
+      if (isUnread) {
+        const nextReadBy = Array.from(new Set([...(room.readBy || []), user.uid]));
+        updateDocumentNonBlocking(roomRef, { readBy: nextReadBy });
+      }
+    }
+  }, [room, user, roomRef]);
+
   const participantsQuery = useMemoFirebase(() => {
     if (!db || !room?.memberIds || room.memberIds.length === 0) return null;
     return query(collection(db, 'users'), where('id', 'in', room.memberIds.slice(0, 30)));
