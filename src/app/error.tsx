@@ -22,6 +22,7 @@ export default function Error({
   }, [error]);
 
   const handleReset = () => {
+    // Safety check: reset may not be a function in some Next.js error states
     if (typeof reset === 'function') {
       try {
         reset();
