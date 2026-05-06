@@ -18,7 +18,9 @@ import {
   Pin,
   Info,
   LogOut,
-  ChevronUp
+  ChevronUp,
+  Check,
+  CheckCheck
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -97,6 +99,9 @@ const MessageItem = memo(({
 }: any) => {
   const reactions = msg.reactions || {};
   const hasReactions = Object.values(reactions).some((uids: any) => Array.isArray(uids) && uids.length > 0);
+  
+  // Logic for Read Receipts
+  const isReadByOthers = msg.readBy && msg.readBy.some((uid: string) => uid !== msg.senderId);
 
   const renderMarkdown = (content: string) => {
     if (!content) return null;
@@ -240,14 +245,23 @@ const MessageItem = memo(({
         </div>
       </div>
 
-      {!isGrouped && msg.createdAt?.toDate && (
-        <div className="mt-1 px-1 flex items-center gap-1.5">
+      <div className="mt-1 px-1 flex items-center gap-1.5">
+        {isMe && !msg.isDeleted && (
+          <div className="flex items-center gap-0.5 mr-1">
+            {isReadByOthers ? (
+              <CheckCheck className="h-3 w-3 text-accent animate-in zoom-in duration-300" />
+            ) : (
+              <Check className="h-3 w-3 text-white/40" />
+            )}
+          </div>
+        )}
+        {!isGrouped && msg.createdAt?.toDate && (
           <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">
             {format(msg.createdAt.toDate(), 'HH:mm')}
           </span>
-          {isMe && <div className="h-1 w-1 rounded-full bg-accent" />}
-        </div>
-      )}
+        )}
+        {isMe && !isGrouped && <div className="h-1 w-1 rounded-full bg-accent" />}
+      </div>
     </div>
   );
 });
@@ -284,6 +298,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, conversationId]);
   const { data: room } = useDoc(roomRef);
 
+  // Sync Room Read Status
   useEffect(() => {
     if (room && user && roomRef) {
       const isUnread = room.lastMessageText && 
@@ -305,7 +320,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !conversationId || !room || !user) return null;
-    // Defensive check: only start listener if user is a current member and room document exists
     if (!room.members || !room.members[user.uid]) return null;
 
     return query(
@@ -315,6 +329,19 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     );
   }, [db, conversationId, room, user?.uid, messageLimit]);
   const { data: messages } = useCollection(messagesQuery);
+
+  // Sync Individual Message Read Status
+  useEffect(() => {
+    if (!messages || !user || !conversationId || !db) return;
+
+    messages.forEach((msg) => {
+      if (msg.senderId !== user.uid && (!msg.readBy || !msg.readBy.includes(user.uid))) {
+        const msgRef = doc(db, 'chatRooms', conversationId, 'messages', msg.id);
+        const nextReadBy = Array.from(new Set([...(msg.readBy || []), user.uid]));
+        updateDocumentNonBlocking(msgRef, { readBy: nextReadBy });
+      }
+    });
+  }, [messages, user?.uid, conversationId, db]);
 
   useEffect(() => {
     if (messageLimit === 30) {
