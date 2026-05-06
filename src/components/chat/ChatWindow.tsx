@@ -85,9 +85,6 @@ const MessageItem = memo(({
   onImageClick,
   currentUserId 
 }: any) => {
-  const [hasMounted, setHasMounted] = useState(false);
-  useEffect(() => { setHasMounted(true); }, []);
-
   const reactions = msg.reactions || {};
   const hasReactions = Object.values(reactions).some((uids: any) => Array.isArray(uids) && uids.length > 0);
 
@@ -118,7 +115,7 @@ const MessageItem = memo(({
           "px-3 py-1 mb-[-4px] rounded-t-xl bg-black/5 dark:bg-white/5 border-l-2 border-primary text-[10px] text-muted-foreground/80 max-w-[80%] md:max-w-[60%] truncate",
           isMe ? "mr-2" : "ml-2"
         )}>
-          <Reply className="h-3 w-3 inline mr-1 opacity-50" />
+          <Reply className="h-3.5 w-3.5 inline mr-1 opacity-50" />
           {msg.replyToContent}
         </div>
       )}
@@ -233,7 +230,7 @@ const MessageItem = memo(({
         </div>
       </div>
 
-      {hasMounted && !isGrouped && msg.createdAt && msg.createdAt.toDate && (
+      {!isGrouped && msg.createdAt?.toDate && (
         <div className="mt-1 px-1 flex items-center gap-1.5">
           <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">
             {format(msg.createdAt.toDate(), 'HH:mm')}
@@ -296,8 +293,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { data: participants } = useCollection(participantsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
-    // SECURITY: Wait for room document to be loaded and membership confirmed before querying messages.
-    // This prevents race conditions and "Permission Denied" errors upon chat creation.
     if (!db || !conversationId || !room || !user) return null;
     if (!room.members || !room.members[user.uid]) return null;
 
@@ -619,7 +614,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 </div>
 
                 <div className="space-y-4 pt-4">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Appearance</Label>
+                  <Label className="text-xs font-bold uppercase tracking-widest text-primary/60">Appearance</Label>
                   <div className="grid grid-cols-2 gap-3">
                     {WALLPAPERS.map(wp => (
                       <button 

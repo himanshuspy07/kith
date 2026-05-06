@@ -35,12 +35,10 @@ service cloud.firestore {
 
     match /chatRooms/{chatRoomId} {
       allow list: if isSignedIn();
-      allow get: if isSignedIn() && (
-        !exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) || 
-        isRoomMemberData(resource.data)
-      );
+      allow get: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] == true;
-      allow update, delete: if isRoomMemberData(resource.data);
+      allow update: if isSignedIn() && resource.data.members[request.auth.uid] == true;
+      allow delete: if isSignedIn() && resource.data.members[request.auth.uid] == true;
 
       match /messages/{messageId} {
         allow list, get: if isRoomMember(chatRoomId);
