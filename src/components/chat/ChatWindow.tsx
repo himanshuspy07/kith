@@ -357,16 +357,15 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
+  // CRITICAL: Stable query dependencies to prevent Firestore Internal Assertion Failed errors
   const messagesQuery = useMemoFirebase(() => {
-    if (!db || !conversationId || !room || !user) return null;
-    if (!room.members || !room.members[user.uid]) return null;
-
+    if (!db || !conversationId || !user) return null;
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limitToLast(messageLimit)
     );
-  }, [db, conversationId, room, user?.uid, messageLimit]);
+  }, [db, conversationId, user?.uid, messageLimit]);
   const { data: messages } = useCollection(messagesQuery);
 
   useEffect(() => {

@@ -279,7 +279,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
             <MessageSquare className="h-10 w-10 mb-4" />
             <p className="text-xs font-bold uppercase tracking-widest leading-relaxed">
-              {searchQuery ? "No matches found" : "No active chats"}
+              {searchQuery ? "No matches" : "No active chats"}
             </p>
           </div>
         )}
