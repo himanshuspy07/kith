@@ -7,6 +7,5 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
-  // Pass-through strategy for real-time app
-  event.respondWith(fetch(event.request));
+  // Pass through fetch events
 });
