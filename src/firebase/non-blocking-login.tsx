@@ -9,11 +9,19 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 
 /** Initiate anonymous sign-in. */
 export function initiateAnonymousSignIn(authInstance: Auth): Promise<UserCredential> {
   return signInAnonymously(authInstance);
+}
+
+/** Initiate Google sign-in. */
+export function initiateGoogleSignIn(authInstance: Auth): Promise<UserCredential> {
+  const provider = new GoogleAuthProvider();
+  return signInWithPopup(authInstance, provider);
 }
 
 /** Initiate email/password sign-up. */

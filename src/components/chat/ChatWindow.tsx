@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -336,7 +337,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (!db || !conversationId) return null;
     return doc(db, 'chatRooms', conversationId);
   }, [db, conversationId]);
-  const { data: room } = useDoc(roomRef);
+  const { data: room, isLoading: isRoomLoading } = useDoc(roomRef);
 
   useEffect(() => {
     if (room && user && roomRef) {
@@ -357,15 +358,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
-  // CRITICAL: Stable query dependencies to prevent Firestore Internal Assertion Failed errors
+  // CRITICAL: Use stable dependencies (conversationId and user.uid) to avoid SDK assertion errors.
+  // We only run this if the room is loaded and not loading, ensuring consistent membership check.
   const messagesQuery = useMemoFirebase(() => {
-    if (!db || !conversationId || !user) return null;
+    if (!db || !conversationId || !user || isRoomLoading || !room) return null;
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limitToLast(messageLimit)
     );
-  }, [db, conversationId, user?.uid, messageLimit]);
+  }, [db, conversationId, user?.uid, messageLimit, isRoomLoading, !!room]);
   const { data: messages } = useCollection(messagesQuery);
 
   useEffect(() => {
