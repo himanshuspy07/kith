@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -97,7 +98,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     };
 
     fetchProfile();
-  }, [user, db, open]);
+  }, [user?.uid, db, open]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,7 +120,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
       setIsUploading(false);
       toast({
         title: "Photo Ready",
-        description: "Click 'Save Changes' to update your profile.",
+        description: "Click 'Apply Changes' to update your profile.",
       });
     };
     reader.onerror = () => {
@@ -139,13 +140,14 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 
     const userRef = doc(db, 'users', user.uid);
     updateDocumentNonBlocking(userRef, {
-      username,
-      usernameLowercase: username.toLowerCase(),
-      bio,
+      username: username.trim(),
+      usernameLowercase: username.trim().toLowerCase(),
+      bio: bio.trim(),
       profilePictureUrl: avatarUrl || '',
       updatedAt: serverTimestamp(),
     });
 
+    // Synthetic delay for feedback
     setTimeout(() => {
       setIsSaving(false);
       toast({
@@ -248,7 +250,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
               <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="flex flex-col md:flex-row items-center gap-6 pb-6 border-b border-black/5 dark:border-white/5 text-center md:text-left">
                   <div className="relative group">
-                    <Avatar className="h-20 w-20 md:h-24 md:24 border-2 border-black/5 dark:border-white/5 shadow-xl overflow-hidden">
+                    <Avatar className="h-20 w-20 md:h-24 md:w-24 border-2 border-black/5 dark:border-white/5 shadow-xl overflow-hidden">
                       <AvatarImage src={avatarUrl || undefined} className="object-cover" />
                       <AvatarFallback className="text-2xl bg-secondary text-muted-foreground font-bold">
                         {username?.[0]?.toUpperCase() || 'U'}
