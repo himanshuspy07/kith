@@ -40,7 +40,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { format, isSameDay, differenceInMinutes } from 'date-fns';
+import { format, isSameDay, differenceInMinutes, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { 
@@ -658,7 +658,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         style={{ background: room?.wallpaper || 'transparent' }}
       />
       
-      {/* Lightbox Overlay */}
       {previewImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-3xl animate-in fade-in duration-300">
           <button 
