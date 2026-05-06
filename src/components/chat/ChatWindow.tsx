@@ -110,7 +110,7 @@ const MessageItem = memo(({
       });
       formattedText = formattedText.flatMap((item, idx) => {
         if (typeof item !== 'string') return item;
-        return item.split(/\*([^\*]+)\*/g).map((sub, si) => si % 2 === 1 ? <em key={`italic-${idx}-${si}`}>{sub}</em> : sub);
+        return item.split(/\*([^\*]+)\*\*/g).map((sub, si) => si % 2 === 1 ? <em key={`italic-${idx}-${si}`}>{sub}</em> : sub);
       });
       return <React.Fragment key={`part-${i}`}>{formattedText}</React.Fragment>;
     });
@@ -316,15 +316,17 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { data: participants } = useCollection(participantsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
+    if (!db || !conversationId || !user?.uid) return null;
     // CRITICAL: We only list messages if we have the room and confirmed user is a member
-    // This prevents permission errors during chat creation.
-    if (!db || !conversationId || !room || !room.members?.[user?.uid || '']) return null;
+    // This prevents permission errors during chat creation race conditions.
+    if (!room || !room.members || !room.members[user.uid]) return null;
+    
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limitToLast(messageLimit)
     );
-  }, [db, conversationId, messageLimit, !!room, user?.uid]);
+  }, [db, conversationId, messageLimit, room?.members?.[user?.uid || ''], user?.uid]);
   const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
   const sharedMediaQuery = useMemoFirebase(() => {

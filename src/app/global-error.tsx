@@ -15,6 +15,18 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const handleReset = () => {
+    if (typeof reset === 'function') {
+      try {
+        reset();
+      } catch (e) {
+        window.location.reload();
+      }
+    } else {
+      window.location.reload();
+    }
+  };
+
   return (
     <html lang="en">
       <body className="antialiased bg-background text-foreground font-body overflow-hidden">
@@ -35,13 +47,7 @@ export default function GlobalError({
              </div>
 
              <button 
-               onClick={() => {
-                 if (typeof reset === 'function') {
-                   reset();
-                 } else {
-                   window.location.reload();
-                 }
-               }}
+               onClick={handleReset}
                className="h-14 px-10 rounded-2xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 uppercase text-[10px] tracking-widest"
              >
                <RefreshCcw className="h-4 w-4" />

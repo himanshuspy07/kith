@@ -17,22 +17,12 @@ service cloud.firestore {
     }
 
     function isRoomMember(chatRoomId) {
-      // Improved: Use get() but only if the document exists to prevent evaluation errors
-      let room = get(/databases/$(database)/documents/chatRooms/$(chatRoomId));
       return isSignedIn() && 
-             room != null && 
-             room.data.members[request.auth.uid] == true;
+             get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
     }
 
     function isRoomMemberData(data) {
       return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] == true;
-    }
-
-    function isRoomAdmin(chatRoomId) {
-      let room = get(/databases/$(database)/documents/chatRooms/$(chatRoomId));
-      return isSignedIn() && 
-             room != null && 
-             room.data.createdBy == request.auth.uid;
     }
 
     // --- Collection Rules ---
@@ -56,10 +46,13 @@ service cloud.firestore {
         allow create: if isRoomMember(chatRoomId) && request.resource.data.senderId == request.auth.uid;
         allow update: if isRoomMember(chatRoomId) && (
           resource.data.senderId == request.auth.uid ||
-          isRoomAdmin(chatRoomId) ||
+          get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'reactions'])
         );
-        allow delete: if isRoomMember(chatRoomId) && (resource.data.senderId == request.auth.uid || isRoomAdmin(chatRoomId));
+        allow delete: if isRoomMember(chatRoomId) && (
+          resource.data.senderId == request.auth.uid || 
+          get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid
+        );
       }
     }
   }
