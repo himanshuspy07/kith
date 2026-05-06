@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /__/auth/
+
+Sitemap: https://kith-chat.vercel.app/sitemap.xml
