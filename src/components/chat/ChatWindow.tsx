@@ -14,11 +14,8 @@ import {
   Trash2, 
   X, 
   Camera,
-  LogOut,
   Pin,
   Info,
-  Calendar,
-  User,
   Maximize2
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -59,7 +56,6 @@ import {
   updateDocumentNonBlocking
 } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
-import BrandLogo from '@/components/ui/brand-logo';
 
 interface ChatWindowProps {
   conversationId?: string;
@@ -317,8 +313,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !conversationId || !user?.uid) return null;
-    // CRITICAL: We only list messages if we have the room and confirmed user is a member
-    // This prevents permission errors during chat creation race conditions.
     if (!room || !room.members || !room.members[user.uid]) return null;
     
     return query(
@@ -607,50 +601,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   if (!conversationId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-background relative overflow-hidden transition-colors duration-1000">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute top-1/3 left-1/3 w-[300px] h-[300px] bg-accent/5 rounded-full blur-[100px] pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col items-center gap-10 animate-in fade-in zoom-in-95 duration-1000">
-          <div className="relative group">
-            <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-150 opacity-50 group-hover:opacity-100 transition-opacity" />
-            <BrandLogo size="lg" showText={false} className="opacity-40 grayscale contrast-125" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <MessageSquare className="h-16 w-16 text-primary drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
-            </div>
-          </div>
-
-          <div className="space-y-4 max-w-sm">
-            <h2 className="text-3xl font-black tracking-tighter uppercase italic text-foreground leading-none">
-              Your Workspace
-            </h2>
-            <div className="space-y-2">
-              <p className="text-sm font-bold text-muted-foreground/80 uppercase tracking-[0.2em]">
-                Select a conversation to begin
-              </p>
-              <p className="text-sm text-muted-foreground leading-relaxed px-4">
-                Connect with colleagues, friends, and teams in a professional, aesthetic environment.
-              </p>
-            </div>
-          </div>
-          
-          <div className="h-1 w-32 bg-white/5 rounded-full overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/50 to-transparent w-full h-full animate-[shimmer_3s_infinite]" />
-          </div>
-        </div>
-        
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2">
-          <p className="text-[9px] text-muted-foreground/30 uppercase tracking-[0.6em] font-bold">
-            kith • Connecting You Simply
-          </p>
-        </div>
-
-        <style jsx global>{`
-          @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-          }
-        `}</style>
+      <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-background">
+        <MessageSquare className="h-12 w-12 text-muted-foreground/20 mb-4" />
+        <h2 className="text-xl font-bold">Select a conversation</h2>
+        <p className="text-sm text-muted-foreground mt-2">
+          Pick a chat from the sidebar to start messaging.
+        </p>
       </div>
     );
   }

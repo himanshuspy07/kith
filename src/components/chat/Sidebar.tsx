@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { Settings, LogOut, Search, Plus, Pin, User, Bell, ChevronRight, MessageSquareOff, UserSearch } from 'lucide-react';
+import { LogOut, Search, Plus, Pin, ChevronRight } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -204,7 +204,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-xl font-bold">Sign Out?</AlertDialogTitle>
                 <AlertDialogDescription className="text-muted-foreground">
-                  Are you sure you want to end your session? You'll need to log back in to access your kith conversations.
+                  Are you sure you want to exit kith?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter className="mt-6 gap-3">
@@ -249,28 +249,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             />
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4 space-y-6 animate-in fade-in duration-700">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/10 blur-2xl rounded-full scale-150" />
-              {searchQuery ? (
-                <UserSearch className="h-12 w-12 text-muted-foreground/30 relative z-10" />
-              ) : (
-                <MessageSquareOff className="h-12 w-12 text-muted-foreground/30 relative z-10" />
-              )}
-            </div>
-            <div className="space-y-1">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">
-                {searchQuery ? "No matches found" : "No conversations"}
-              </h4>
-              <p className="text-[10px] text-muted-foreground/40 leading-relaxed font-medium">
-                {searchQuery 
-                  ? `We couldn't find any chats matching "${searchQuery}"` 
-                  : "Start a new chat to begin connecting with your colleagues simply."}
-              </p>
-            </div>
-            {!searchQuery && (
-              <NewChatDialog onChatCreated={onSelectConversation} />
-            )}
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <p className="text-xs text-muted-foreground">
+              {searchQuery ? "No chats match your search." : "No conversations yet."}
+            </p>
           </div>
         )}
       </div>
