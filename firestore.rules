@@ -17,7 +17,9 @@ service cloud.firestore {
     }
 
     function isRoomMember(chatRoomId) {
-      return isSignedIn() && get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) && 
+             get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
     }
 
     function isRoomMemberData(data) {
@@ -25,7 +27,9 @@ service cloud.firestore {
     }
 
     function isRoomAdmin(chatRoomId) {
-      return isSignedIn() && get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid;
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) && 
+             get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid;
     }
 
     // --- Collection Rules ---
@@ -37,7 +41,10 @@ service cloud.firestore {
 
     match /chatRooms/{chatRoomId} {
       allow list: if isSignedIn();
-      allow get: if isRoomMemberData(resource.data);
+      allow get: if isSignedIn() && (
+        !exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) || 
+        isRoomMemberData(resource.data)
+      );
       allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] == true;
       allow update, delete: if isRoomMemberData(resource.data);
 
