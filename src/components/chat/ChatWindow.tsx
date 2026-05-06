@@ -256,15 +256,18 @@ MessageItem.displayName = 'MessageItem';
 
 export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
-  const [messageLimit] = useState(50);
+  const [messageLimit, setMessageLimit] = useState(50);
   const [isUploading, setIsUploading] = useState(false);
   const [isGroupImageUploading, setIsGroupImageUploading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [editingMessage, setEditingMessage] = useState<any>(null);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const groupImageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -307,13 +310,61 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       limitToLast(messageLimit)
     );
   }, [db, conversationId, messageLimit]);
-  const { data: messages } = useCollection(messagesQuery);
+  const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
+  // Reset pagination when switching rooms
   useEffect(() => {
-    if (messages && messages.length > 0) {
+    setMessageLimit(50);
+    setIsInitialLoad(true);
+  }, [conversationId]);
+
+  // Initial scroll to bottom
+  useEffect(() => {
+    if (messages && messages.length > 0 && isInitialLoad) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      setIsInitialLoad(false);
+    }
+  }, [messages?.length, isInitialLoad]);
+
+  // Handle new message arrival (auto-scroll to bottom if near bottom)
+  useEffect(() => {
+    if (!messages || messages.length === 0 || isInitialLoad) return;
+    
+    // If it's a new message (last item changed) and user is me or near bottom
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.senderId === user?.uid) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages?.length]);
+
+  // Infinite Scroll Logic (Sentinel)
+  useEffect(() => {
+    if (!topSentinelRef.current || isInitialLoad || isMessagesLoading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && messages && messages.length >= messageLimit) {
+          // Record current scroll height before updating limit
+          const container = scrollContainerRef.current;
+          const currentHeight = container?.scrollHeight || 0;
+          
+          setMessageLimit(prev => prev + 50);
+
+          // After render, adjust scroll position to keep it anchored
+          setTimeout(() => {
+            if (container) {
+              const newHeight = container.scrollHeight;
+              container.scrollTop = newHeight - currentHeight;
+            }
+          }, 0);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(topSentinelRef.current);
+    return () => observer.disconnect();
+  }, [messages?.length, messageLimit, isInitialLoad, isMessagesLoading]);
 
   const updateTypingStatus = (isTyping: boolean) => {
     if (!roomRef || !user) return;
@@ -649,7 +700,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-2 md:px-6 py-6 md:py-8 space-y-2 scrollbar-hide z-[1]">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-2 md:px-6 py-6 md:py-8 space-y-2 scrollbar-hide z-[1]"
+      >
+        <div ref={topSentinelRef} className="h-4 w-full flex items-center justify-center">
+          {isMessagesLoading && messages && messages.length >= messageLimit && (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground opacity-50" />
+          )}
+        </div>
+        
         {messages?.map((msg, idx) => {
           const isMe = msg.senderId === user?.uid;
           const prevMsg = idx > 0 ? messages[idx - 1] : null;
