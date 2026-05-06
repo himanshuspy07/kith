@@ -38,7 +38,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { format, isSameDay, differenceInMinutes, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -745,6 +745,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
         <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">
+          <DialogTitle className="sr-only">Image Preview</DialogTitle>
           <div className="relative group w-full h-full flex items-center justify-center">
             {lightboxImage && (
               <img src={lightboxImage} alt="Full view" className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" />
