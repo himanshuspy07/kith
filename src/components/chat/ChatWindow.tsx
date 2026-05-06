@@ -316,16 +316,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { data: participants } = useCollection(participantsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
-    // CRITICAL: We wait for the room data to be available before listening to messages.
-    // This avoids a race condition where Security Rules deny the 'list' operation 
-    // because the parent 'chatRoom' document hasn't been created/synced yet.
     if (!db || !conversationId || !room) return null;
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limitToLast(messageLimit)
     );
-  }, [db, conversationId, messageLimit, !!room]); // Re-memoize when room status changes
+  }, [db, conversationId, messageLimit, !!room]);
   const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
   const sharedMediaQuery = useMemoFirebase(() => {

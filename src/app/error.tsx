@@ -42,17 +42,23 @@ export default function Error({
           </h1>
           <div className="space-y-2">
             <p className="text-sm font-bold text-muted-foreground/80 uppercase tracking-[0.2em]">
-              Kith encountered a critical error
+              Kith encountered a workspace error
             </p>
             <p className="text-base text-foreground font-medium leading-relaxed px-4">
-              Please clear the cache and storage of this website. I am sorry for the inconvenience.
+              We've encountered an unexpected error. Please try restarting the session.
             </p>
           </div>
         </div>
 
         <div className="flex flex-col gap-4 w-full max-w-[300px]">
           <Button 
-            onClick={() => reset()} 
+            onClick={() => {
+              if (typeof reset === 'function') {
+                reset();
+              } else {
+                window.location.reload();
+              }
+            }} 
             className="h-16 rounded-[2rem] bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/20 transition-all active:scale-95 flex items-center justify-center gap-3 text-xs uppercase tracking-[0.2em]"
           >
             <RefreshCcw className="h-4 w-4" />
