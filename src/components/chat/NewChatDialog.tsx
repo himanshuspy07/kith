@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -179,7 +178,7 @@ export default function NewChatDialog({ onChatCreated }: NewChatDialogProps) {
               >
                 <div className="flex items-center gap-3 overflow-hidden">
                   <Avatar className="h-10 w-10 shrink-0">
-                    <AvatarImage src={user.profilePictureUrl} />
+                    <AvatarImage src={user.profilePictureUrl || undefined} />
                     <AvatarFallback>{user.username?.[0]}</AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col overflow-hidden">

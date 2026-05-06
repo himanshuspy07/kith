@@ -57,7 +57,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       {isSelected && <div className="absolute left-0 w-1 h-8 bg-primary rounded-full -translate-x-1" />}
       <div className="relative shrink-0">
         <Avatar className="h-12 w-12 border border-white/10">
-          <AvatarImage src={room.displayAvatar} />
+          <AvatarImage src={room.displayAvatar || undefined} />
           <AvatarFallback className="bg-muted text-muted-foreground font-medium">{room.displayName?.[0]}</AvatarFallback>
         </Avatar>
         {room.isOnline && <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-background" />}

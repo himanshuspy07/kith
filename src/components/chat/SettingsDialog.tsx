@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -59,7 +58,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
@@ -93,7 +92,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         const data = snap.data();
         setUsername(data.username || '');
         setBio(data.bio || '');
-        setAvatarUrl(data.profilePictureUrl || '');
+        setAvatarUrl(data.profilePictureUrl || undefined);
       }
     };
 
@@ -104,7 +103,6 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Firestore documents have a 1MB limit. 600KB is a safe threshold for Base64 strings (which add ~33% overhead).
     if (file.size > 600 * 1024) {
       toast({
         variant: "destructive",
@@ -144,7 +142,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
       username,
       usernameLowercase: username.toLowerCase(),
       bio,
-      profilePictureUrl: avatarUrl,
+      profilePictureUrl: avatarUrl || '',
       updatedAt: serverTimestamp(),
     });
 
@@ -251,7 +249,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 <div className="flex flex-col md:flex-row items-center gap-6 pb-6 border-b border-black/5 dark:border-white/5 text-center md:text-left">
                   <div className="relative group">
                     <Avatar className="h-20 w-20 md:h-24 md:24 border-2 border-black/5 dark:border-white/5 shadow-xl overflow-hidden">
-                      <AvatarImage src={avatarUrl} className="object-cover" />
+                      <AvatarImage src={avatarUrl || undefined} className="object-cover" />
                       <AvatarFallback className="text-2xl bg-secondary text-muted-foreground font-bold">
                         {username?.[0]?.toUpperCase() || 'U'}
                       </AvatarFallback>
