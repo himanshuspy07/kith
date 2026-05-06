@@ -316,13 +316,15 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { data: participants } = useCollection(participantsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
-    if (!db || !conversationId || !room) return null;
+    // CRITICAL: We only list messages if we have the room and confirmed user is a member
+    // This prevents permission errors during chat creation.
+    if (!db || !conversationId || !room || !room.members?.[user?.uid || '']) return null;
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limitToLast(messageLimit)
     );
-  }, [db, conversationId, messageLimit, !!room]);
+  }, [db, conversationId, messageLimit, !!room, user?.uid]);
   const { data: messages, isLoading: isMessagesLoading } = useCollection(messagesQuery);
 
   const sharedMediaQuery = useMemoFirebase(() => {

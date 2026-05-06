@@ -17,9 +17,11 @@ service cloud.firestore {
     }
 
     function isRoomMember(chatRoomId) {
+      // Improved: Use get() but only if the document exists to prevent evaluation errors
+      let room = get(/databases/$(database)/documents/chatRooms/$(chatRoomId));
       return isSignedIn() && 
-             exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) && 
-             get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
+             room != null && 
+             room.data.members[request.auth.uid] == true;
     }
 
     function isRoomMemberData(data) {
@@ -27,9 +29,10 @@ service cloud.firestore {
     }
 
     function isRoomAdmin(chatRoomId) {
+      let room = get(/databases/$(database)/documents/chatRooms/$(chatRoomId));
       return isSignedIn() && 
-             exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) && 
-             get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid;
+             room != null && 
+             room.data.createdBy == request.auth.uid;
     }
 
     // --- Collection Rules ---
