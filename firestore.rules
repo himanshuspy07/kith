@@ -1,9 +1,11 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
      * Kith Chat Application Security Rules
+     * Optimized for performance and real-time synchronization.
      */
 
     // --- Helper Functions ---
@@ -18,12 +20,7 @@ service cloud.firestore {
 
     function isRoomMember(chatRoomId) {
       return isSignedIn() && 
-             exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) &&
              get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
-    }
-
-    function isRoomMemberData(data) {
-      return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] == true;
     }
 
     // --- Collection Rules ---
