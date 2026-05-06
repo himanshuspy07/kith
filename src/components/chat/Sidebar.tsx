@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { Settings, LogOut, Search, Plus, Pin, User, Bell, ChevronRight } from 'lucide-react';
+import { Settings, LogOut, Search, Plus, Pin, User, Bell, ChevronRight, MessageSquareOff, UserSearch } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -157,7 +157,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         }
       }
 
-      // Check for unread status
       const isUnread = room.lastMessageText && 
                        room.lastMessageSenderId !== user.uid && 
                        (!room.readBy || !room.readBy.includes(user.uid));
@@ -178,11 +177,15 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     });
   }, [rooms, participantProfiles, user, hasMounted]);
 
+  const filteredConversations = useMemo(() => {
+    return conversationListData.filter(r => r.displayName.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [conversationListData, searchQuery]);
+
   return (
     <div className={cn("h-full border-r border-white/5 flex flex-col bg-background/95 backdrop-blur-xl shrink-0 z-30", className)}>
       <div className="p-6 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setIsSettingsOpen(true)}>
-          <Avatar className="h-10 w-10 border-2 border-primary/20">
+          <Avatar className="h-10 w-10 border-2 border-primary/20 transition-transform group-hover:scale-105">
             <AvatarImage src={currentUserProfile?.profilePictureUrl || undefined} />
             <AvatarFallback className="bg-primary/10 text-primary font-bold">{currentUserProfile?.username?.[0]?.toUpperCase() || 'K'}</AvatarFallback>
           </Avatar>
@@ -220,10 +223,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
       <div className="px-6 py-4">
         <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
             placeholder="Search kith..." 
-            className="bg-white/5 border-none h-10 rounded-xl pl-10 text-xs" 
+            className="bg-white/5 border-none h-10 rounded-xl pl-10 text-xs transition-all focus:bg-white/10" 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
           />
@@ -235,15 +238,41 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           <div className="p-2 space-y-2">
             {[1, 2, 3].map(i => <div key={i} className="h-16 w-full bg-white/5 animate-pulse rounded-2xl" />)}
           </div>
-        ) : conversationListData.filter(r => r.displayName.toLowerCase().includes(searchQuery.toLowerCase())).map((room) => (
-          <ConversationItem 
-            key={room.id}
-            room={room}
-            isSelected={selectedConversationId === room.id}
-            onClick={onSelectConversation}
-            currentUserId={user?.uid}
-          />
-        ))}
+        ) : filteredConversations.length > 0 ? (
+          filteredConversations.map((room) => (
+            <ConversationItem 
+              key={room.id}
+              room={room}
+              isSelected={selectedConversationId === room.id}
+              onClick={onSelectConversation}
+              currentUserId={user?.uid}
+            />
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-center px-4 space-y-6 animate-in fade-in duration-700">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/10 blur-2xl rounded-full scale-150" />
+              {searchQuery ? (
+                <UserSearch className="h-12 w-12 text-muted-foreground/30 relative z-10" />
+              ) : (
+                <MessageSquareOff className="h-12 w-12 text-muted-foreground/30 relative z-10" />
+              )}
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">
+                {searchQuery ? "No matches found" : "No conversations"}
+              </h4>
+              <p className="text-[10px] text-muted-foreground/40 leading-relaxed font-medium">
+                {searchQuery 
+                  ? `We couldn't find any chats matching "${searchQuery}"` 
+                  : "Start a new chat to begin connecting with your colleagues simply."}
+              </p>
+            </div>
+            {!searchQuery && (
+              <NewChatDialog onChatCreated={onSelectConversation} />
+            )}
+          </div>
+        )}
       </div>
       <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
