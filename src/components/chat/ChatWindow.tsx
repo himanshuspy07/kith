@@ -358,8 +358,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
-  // CRITICAL: Use stable dependencies (conversationId and user.uid) to avoid SDK assertion errors.
-  // We only run this if the room is loaded and not loading, ensuring consistent membership check.
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !conversationId || !user || isRoomLoading || !room) return null;
     return query(

@@ -88,10 +88,16 @@ export default function AuthScreen() {
         description: "Successfully signed in with Google.",
       });
     } catch (error: any) {
+      let errorMessage = error.message || "Could not complete Google authentication.";
+      
+      if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = "Google Sign-In is not enabled in the Firebase Console. Please go to Authentication > Sign-in method and enable Google.";
+      }
+
       toast({
         variant: "destructive",
         title: "Google Sign In Failed",
-        description: error.message || "Could not complete Google authentication.",
+        description: errorMessage,
       });
     } finally {
       setIsGoogleLoading(false);
