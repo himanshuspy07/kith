@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { LogOut, Search, Plus, Pin, ChevronRight } from 'lucide-react';
+import { LogOut, Search, Plus, Pin, ChevronRight, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
