@@ -40,7 +40,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
   const timeAgo = useMemo(() => {
     if (!hasMounted || !room.updatedAt || !room.updatedAt.toDate) return null;
     try {
-      return formatDistanceToNow(room.updatedAt.toDate());
+      return formatDistanceToNow(room.updatedAt.toDate(), { addSuffix: false });
     } catch (e) {
       return null;
     }
@@ -58,11 +58,11 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       {isSelected && <div className="absolute left-0 w-1 h-8 bg-primary rounded-full -translate-x-1" />}
       <div className="relative shrink-0">
         <Avatar className="h-12 w-12 border border-white/10">
-          <AvatarImage src={room.displayAvatar || undefined} />
+          <AvatarImage src={room.displayAvatar || undefined} className="object-cover" />
           <AvatarFallback className="bg-muted text-muted-foreground font-medium">{room.displayName?.[0]}</AvatarFallback>
         </Avatar>
-        {room.isOnline && <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-background" />}
-        {room.isPinned && <Pin className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-background rounded-full p-0.5 text-primary fill-primary" />}
+        {room.isOnline && <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-accent border-[3px] border-background shadow-sm" />}
+        {room.isPinned && <Pin className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-background rounded-full p-0.5 text-primary fill-primary shadow-sm" />}
       </div>
       <div className="flex-1 overflow-hidden">
         <div className="flex justify-between items-center mb-0.5">
@@ -72,7 +72,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
           )}>
             {room.displayName}
           </h3>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             {timeAgo && (
               <span className={cn(
                 "text-[8px] font-bold uppercase",
@@ -89,11 +89,10 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
           room.isUnread ? "text-foreground font-bold" : "text-muted-foreground/60"
         )}>
           {room.typing && Object.keys(room.typing).length > 0 && Object.keys(room.typing).some(id => id !== currentUserId)
-            ? 'Typing...'
+            ? <span className="text-accent italic animate-pulse">Typing...</span>
             : (room.lastMessageText || 'Start a conversation')}
         </p>
       </div>
-      <ChevronRight className={cn("h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-40", isSelected && "opacity-100 text-primary")} />
     </div>
   );
 });
@@ -182,11 +181,11 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   }, [conversationListData, searchQuery]);
 
   return (
-    <div className={cn("h-full border-r border-white/5 flex flex-col bg-background/95 backdrop-blur-xl shrink-0 z-30", className)}>
-      <div className="p-6 flex items-center justify-between border-b border-white/5">
+    <div className={cn("h-full border-r border-white/5 flex flex-col bg-background shrink-0 z-30", className)}>
+      <div className="p-4 md:p-6 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setIsSettingsOpen(true)}>
-          <Avatar className="h-10 w-10 border-2 border-primary/20 transition-transform group-hover:scale-105">
-            <AvatarImage src={currentUserProfile?.profilePictureUrl || undefined} />
+          <Avatar className="h-9 w-9 md:h-10 md:w-10 border-2 border-primary/20 transition-transform group-hover:scale-105">
+            <AvatarImage src={currentUserProfile?.profilePictureUrl || undefined} className="object-cover" />
             <AvatarFallback className="bg-primary/10 text-primary font-bold">{currentUserProfile?.username?.[0]?.toUpperCase() || 'K'}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col max-w-[100px]"><span className="font-bold text-xs truncate leading-none">{currentUserProfile?.username || 'Kith User'}</span></div>
@@ -221,7 +220,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         </div>
       </div>
 
-      <div className="px-6 py-4">
+      <div className="px-4 md:px-6 py-4">
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
@@ -233,10 +232,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 space-y-1 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto px-2 md:px-4 space-y-1 scrollbar-hide">
         {isLoading ? (
           <div className="p-2 space-y-2">
-            {[1, 2, 3].map(i => <div key={i} className="h-16 w-full bg-white/5 animate-pulse rounded-2xl" />)}
+            {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 w-full bg-white/5 animate-pulse rounded-2xl" />)}
           </div>
         ) : filteredConversations.length > 0 ? (
           filteredConversations.map((room) => (
@@ -249,9 +248,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             />
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <p className="text-xs text-muted-foreground">
-              {searchQuery ? "No chats match your search." : "No conversations yet."}
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
+            <MessageSquare className="h-10 w-10 mb-4" />
+            <p className="text-xs font-bold uppercase tracking-widest leading-relaxed">
+              {searchQuery ? "No matches" : "No active chats"}
             </p>
           </div>
         )}

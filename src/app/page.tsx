@@ -71,41 +71,18 @@ export default function Home() {
   if (isUserLoading || !hasMounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background relative overflow-hidden transition-colors duration-1000">
-        {/* Cinematic Background Atmosphere */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[160px] animate-pulse duration-[4000ms]" />
-        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px] animate-bounce duration-[15s]" />
-        <div className="absolute -bottom-40 -right-40 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] animate-pulse duration-[6000ms]" />
         
-        <div className="flex flex-col items-center gap-10 relative z-10 animate-in fade-in zoom-in-95 duration-1000 slide-in-from-bottom-4">
-          <div className="relative group">
-            <BrandLogo size="lg" showText={false} className="scale-110" />
-            <div className="absolute inset-0 bg-primary/30 blur-3xl rounded-full -z-10 animate-ping opacity-30" />
-            <div className="absolute -inset-4 bg-accent/20 blur-2xl rounded-full -z-20 animate-pulse" />
-          </div>
-          
+        <div className="flex flex-col items-center gap-10 relative z-10 animate-in fade-in zoom-in-95 duration-1000">
+          <BrandLogo size="lg" showText={false} className="scale-110" />
           <div className="flex flex-col items-center gap-4">
-            <h1 className="text-5xl font-black tracking-tighter uppercase italic text-foreground drop-shadow-2xl">kith</h1>
-            <div className="flex flex-col items-center gap-3">
-              <div className="h-1 w-24 bg-muted/20 rounded-full overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary to-transparent w-full h-full animate-[shimmer_2s_infinite] -translate-x-full" />
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground/50 text-[11px] uppercase tracking-[0.4em] font-bold">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                Initializing Workspace
-              </div>
+            <h1 className="text-5xl font-black tracking-tighter uppercase italic text-foreground">kith</h1>
+            <div className="flex items-center gap-2 text-muted-foreground/50 text-[11px] uppercase tracking-[0.4em] font-bold">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              Initializing
             </div>
           </div>
         </div>
-        
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 opacity-30">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-[0.6em] font-bold animate-pulse">Connecting You Simply</p>
-        </div>
-
-        <style jsx global>{`
-          @keyframes shimmer {
-            100% { transform: translateX(100%); }
-          }
-        `}</style>
       </div>
     );
   }
@@ -145,7 +122,7 @@ export default function Home() {
                 <AlertDialogHeader>
                   <AlertDialogTitle className="text-xl font-bold">Sign Out?</AlertDialogTitle>
                   <AlertDialogDescription className="text-muted-foreground">
-                    Are you sure you want to exit? You can finish your verification later.
+                    Are you sure you want to exit?
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-6 gap-3">
@@ -165,6 +142,7 @@ export default function Home() {
     );
   }
 
+  // Responsive logic: On mobile, only show sidebar OR chat, never both.
   const showSidebar = !isMobile || !selectedConversationId;
   const showChat = !isMobile || !!selectedConversationId;
 
@@ -178,12 +156,12 @@ export default function Home() {
         <Sidebar 
           onSelectConversation={setSelectedConversationId} 
           selectedConversationId={selectedConversationId} 
-          className={cn(isMobile ? "w-full" : "w-80")}
+          className={cn(isMobile ? "w-full" : "w-80 md:w-96")}
         />
       )}
       
       {showChat && (
-        <main className="flex-1 h-full flex flex-col">
+        <main className="flex-1 h-full flex flex-col min-w-0">
           <ChatWindow 
             conversationId={selectedConversationId} 
             onBack={isMobile ? () => setSelectedConversationId(undefined) : undefined}

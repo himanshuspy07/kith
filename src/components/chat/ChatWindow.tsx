@@ -17,7 +17,8 @@ import {
   Pin,
   Info,
   Maximize2,
-  LogOut
+  LogOut,
+  Download
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -37,8 +38,9 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { format, isSameDay, differenceInMinutes } from 'date-fns';
+import { format, isSameDay, differenceInMinutes, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { 
@@ -82,6 +84,7 @@ const MessageItem = memo(({
   isGroupChat, 
   onAction, 
   onReact, 
+  onImageClick,
   currentUserId 
 }: any) => {
   const [hasMounted, setHasMounted] = useState(false);
@@ -95,20 +98,7 @@ const MessageItem = memo(({
     const parts = content.split(/(@\w+)/g);
     return parts.map((part, i) => {
       if (part.startsWith('@')) return <span key={`mention-${i}`} className="mention">{part}</span>;
-      let formattedText: React.ReactNode[] = [part];
-      formattedText = formattedText.flatMap((item, idx) => {
-        if (typeof item !== 'string') return item;
-        return item.split(/`([^`]+)`/g).map((sub, si) => si % 2 === 1 ? <code key={`code-${idx}-${si}`}>{sub}</code> : sub);
-      });
-      formattedText = formattedText.flatMap((item, idx) => {
-        if (typeof item !== 'string') return item;
-        return item.split(/\*\*([^\*\*]+)\*\*/g).map((sub, si) => si % 2 === 1 ? <strong key={`bold-${idx}-${si}`}>{sub}</strong> : sub);
-      });
-      formattedText = formattedText.flatMap((item, idx) => {
-        if (typeof item !== 'string') return item;
-        return item.split(/\*([^\*]+)\*\*/g).map((sub, si) => si % 2 === 1 ? <em key={`italic-${idx}-${si}`}>{sub}</em> : sub);
-      });
-      return <React.Fragment key={`part-${i}`}>{formattedText}</React.Fragment>;
+      return <React.Fragment key={`part-${i}`}>{part}</React.Fragment>;
     });
   };
 
@@ -149,16 +139,16 @@ const MessageItem = memo(({
                <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-10 w-10 md:h-8 md:w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5" 
+                className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5" 
                 onClick={() => onAction('reply', msg)}
               >
-                <Reply className="h-4 w-4 md:h-3.5 md:w-3.5" />
+                <Reply className="h-3.5 w-3.5" />
               </Button>
 
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-10 w-10 md:h-8 md:w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
-                    <Smile className="h-4 w-4 md:h-3.5 md:w-3.5" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                    <Smile className="h-3.5 w-3.5" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-1 bg-card/90 backdrop-blur-xl border-black/5 dark:border-white/10 rounded-full shadow-2xl z-[60]">
@@ -182,8 +172,8 @@ const MessageItem = memo(({
               {isMe && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-10 w-10 md:h-8 md:w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
-                      <MoreHorizontal className="h-4 w-4 md:h-3.5 md:w-3.5" />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                      <MoreHorizontal className="h-3.5 w-3.5" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align={isMe ? "end" : "start"} className="bg-card/95 backdrop-blur-xl border-white/5">
@@ -205,10 +195,12 @@ const MessageItem = memo(({
           isMe 
             ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
             : "bg-black/[0.05] dark:bg-white/[0.05] backdrop-blur-md border border-black/5 dark:border-white/5 text-foreground rounded-bl-none message-shadow",
-          msg.type === 'image' ? 'p-1' : 'p-3 md:p-4',
+          msg.type === 'image' ? 'p-1 cursor-zoom-in' : 'p-3 md:p-4',
           msg.isDeleted && "italic opacity-50",
           isGrouped && (isMe ? "rounded-tr-none" : "rounded-tl-none")
-        )}>
+        )}
+        onClick={() => msg.type === 'image' && onImageClick(msg.content)}
+        >
           {msg.type === 'image' ? (
             <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64" />
           ) : (
@@ -264,6 +256,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [editingMessage, setEditingMessage] = useState<any>(null);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -273,6 +267,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const roomRef = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
@@ -304,7 +302,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
-      limitToLast(50)
+      limitToLast(100)
     );
   }, [db, conversationId]);
   const { data: messages } = useCollection(messagesQuery);
@@ -467,8 +465,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleGroupImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !roomRef) return;
-    if (file.size > 600 * 1024) {
-      toast({ variant: "destructive", title: "File too large", description: "Limit is 600KB for stability." });
+    if (file.size > 800 * 1024) {
+      toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB." });
       return;
     }
     setIsGroupImageUploading(true);
@@ -483,8 +481,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 600 * 1024) {
-      toast({ variant: "destructive", title: "File too large", description: "Limit is 600KB for stability." });
+    if (file.size > 800 * 1024) {
+      toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB." });
       return;
     }
     setIsUploading(true);
@@ -496,24 +494,22 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     reader.readAsDataURL(file);
   };
 
+  const otherUser = useMemo(() => {
+    if (!room || room.isGroupChat || !participants || !user) return null;
+    return participants.find(p => p.id !== user.uid);
+  }, [room, participants, user]);
+
   const chatDisplayName = useMemo(() => {
     if (!room) return 'Loading...';
-    if (!room.isGroupChat && participants && user) {
-      const otherUser = participants.find(p => p.id !== user.uid);
-      if (otherUser) return otherUser.username;
-    }
+    if (otherUser) return otherUser.username;
     return room.name || 'Conversation';
-  }, [room, participants, user]);
+  }, [room, otherUser]);
 
   const chatAvatar = useMemo(() => {
     if (!room) return null;
     if (room.isGroupChat) return room.groupImageUrl;
-    if (participants && user) {
-      const otherUser = participants.find(p => p.id !== user.uid);
-      return otherUser?.profilePictureUrl;
-    }
-    return null;
-  }, [room, participants, user]);
+    return otherUser?.profilePictureUrl;
+  }, [room, otherUser]);
 
   const typingUsers = useMemo(() => {
     if (!room?.typing || !participants || !user) return [];
@@ -523,13 +519,29 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       .filter(Boolean);
   }, [room?.typing, participants, user]);
 
+  const presenceText = useMemo(() => {
+    if (room?.isGroupChat) return "Group Conversation";
+    if (!otherUser || !hasMounted) return "Offline";
+    
+    const lastActive = otherUser.lastActiveAt?.toDate?.() || new Date(0);
+    const isRecentlyActive = differenceInMinutes(new Date(), lastActive) < 3;
+    
+    if (otherUser.onlineStatus === true && isRecentlyActive) return "Active Now";
+    
+    try {
+      return `Last active ${formatDistanceToNow(lastActive)} ago`;
+    } catch (e) {
+      return "Offline";
+    }
+  }, [room?.isGroupChat, otherUser, hasMounted]);
+
   if (!conversationId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-background">
-        <MessageSquare className="h-12 w-12 text-muted-foreground/20 mb-4" />
-        <h2 className="text-xl font-bold">Select a conversation</h2>
-        <p className="text-sm text-muted-foreground mt-2">
-          Pick a chat from the sidebar to start messaging.
+        <MessageSquare className="h-16 w-16 text-muted-foreground/10 mb-6" />
+        <h2 className="text-xl font-bold tracking-tight">Select a conversation</h2>
+        <p className="text-sm text-muted-foreground mt-2 max-w-[200px]">
+          Choose a chat from the sidebar to start messaging securely.
         </p>
       </div>
     );
@@ -542,23 +554,26 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         style={{ background: room?.wallpaper || 'transparent' }}
       />
       
-      <header className="h-16 md:h-20 px-4 md:px-6 flex items-center justify-between glass-morphism sticky top-0 z-10 mx-2 mt-2 md:mx-4 md:mt-4 rounded-xl md:rounded-2xl shadow-lg border-white/5">
+      <header className="h-16 md:h-20 px-4 md:px-6 flex items-center justify-between glass-morphism sticky top-0 z-10 mx-0 mt-0 md:mx-4 md:mt-4 md:rounded-2xl shadow-lg border-white/5">
         <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
           {onBack && (
             <Button variant="ghost" size="icon" className="md:hidden shrink-0" onClick={onBack}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
           )}
-          <Avatar className="h-8 w-8 md:h-10 md:w-10 border border-white/10 shrink-0">
+          <Avatar className="h-9 w-9 md:h-10 md:w-10 border border-white/10 shrink-0">
             <AvatarImage src={chatAvatar || undefined} className="object-cover" />
             <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs md:text-sm">{chatDisplayName?.[0]}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col overflow-hidden">
-            <h3 className="text-xs md:text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
-            <span className="text-[9px] md:text-[10px] text-muted-foreground truncate mt-0.5 md:mt-1 font-medium italic">
+            <h3 className="text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
+            <span className={cn(
+              "text-[10px] truncate mt-1 font-medium italic",
+              typingUsers.length > 0 ? "text-accent animate-pulse" : "text-muted-foreground"
+            )}>
               {typingUsers.length > 0 
                 ? `${typingUsers.join(', ')} ${typingUsers.length > 1 ? 'are' : 'is'} typing...`
-                : (room?.isGroupChat ? "Group Conversation" : "Online")}
+                : presenceText}
             </span>
           </div>
         </div>
@@ -587,7 +602,18 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     )}
                     <input type="file" ref={groupImageInputRef} className="hidden" accept="image/*" onChange={handleGroupImageUpload} />
                   </div>
-                  <h3 className="text-2xl font-black tracking-tighter uppercase italic">{chatDisplayName}</h3>
+                  <div className="space-y-1">
+                    <h3 className="text-2xl font-black tracking-tighter uppercase italic">{chatDisplayName}</h3>
+                    {!room?.isGroupChat && otherUser && (
+                      <div className="flex flex-col gap-1 items-center">
+                        <span className="text-xs text-muted-foreground italic max-w-xs">{otherUser.bio || "No bio set."}</span>
+                        <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/60 mt-2">
+                           <span className={cn("h-1.5 w-1.5 rounded-full", presenceText === "Active Now" ? "bg-accent" : "bg-muted")} />
+                           {presenceText}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-4 pt-4">
@@ -623,7 +649,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-2 md:px-6 py-6 md:py-8 space-y-2 scrollbar-hide z-[1]">
+      <div className="flex-1 overflow-y-auto px-2 md:px-6 py-4 md:py-8 space-y-2 scrollbar-hide z-[1]">
         {messages?.map((msg, idx) => {
           const isMe = msg.senderId === user?.uid;
           const prevMsg = idx > 0 ? messages[idx - 1] : null;
@@ -645,6 +671,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               isGroupChat={room?.isGroupChat}
               onAction={handleAction}
               onReact={handleReact}
+              onImageClick={setLightboxImage}
               currentUserId={user?.uid}
             />
           );
@@ -695,7 +722,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           (replyingTo || editingMessage) ? "rounded-b-[1.5rem] rounded-t-none border-t-white/10" : "rounded-[1.5rem]"
         )}>
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-          <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full" onClick={() => fileInputRef.current?.click()}>
+          <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12 rounded-full" onClick={() => fileInputRef.current?.click()}>
             {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon className="h-5 w-5" />}
           </Button>
           <Textarea 
@@ -708,13 +735,28 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               }
             }} 
             placeholder={editingMessage ? "Update your message..." : "Message kith..."} 
-            className="bg-transparent border-none min-h-[48px] h-auto max-h-32 py-3 px-2 focus-visible:ring-0 text-sm md:text-base resize-none" 
+            className="bg-transparent border-none min-h-[40px] md:min-h-[48px] h-auto max-h-32 py-3 px-2 focus-visible:ring-0 text-sm md:text-base resize-none" 
           />
-          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className={cn("h-12 w-12 rounded-full shadow-lg shrink-0", inputValue.trim() ? "bg-primary" : "bg-muted/20")}>
+          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className={cn("h-10 w-10 md:h-12 md:w-12 rounded-full shadow-lg shrink-0", inputValue.trim() ? "bg-primary" : "bg-muted/20")}>
             <Send className="h-5 w-5" />
           </Button>
         </div>
       </div>
+
+      <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">
+          <div className="relative group w-full h-full flex items-center justify-center">
+            {lightboxImage && (
+              <img src={lightboxImage} alt="Full view" className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" />
+            )}
+            <div className="absolute top-4 right-4 flex gap-2">
+              <Button variant="secondary" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md" onClick={() => setLightboxImage(null)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
