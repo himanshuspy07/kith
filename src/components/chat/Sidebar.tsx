@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { useCollection, useDoc, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -121,7 +121,11 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         if (otherUserProfile) {
           displayName = otherUserProfile.username;
           displayAvatar = otherUserProfile.profilePictureUrl;
-          isOnline = otherUserProfile.onlineStatus === true;
+          
+          // Check online status: must be true AND active in the last 3 minutes
+          const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
+          const isRecentlyActive = differenceInMinutes(new Date(), lastActive) < 3;
+          isOnline = otherUserProfile.onlineStatus === true && isRecentlyActive;
         }
       }
       return { 

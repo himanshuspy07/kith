@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useEffect, useRef } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, getDoc, updateDoc } from 'firebase/firestore';
 import { setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -38,34 +37,25 @@ export default function UserProfileSync() {
               profilePictureUrl: user.photoURL || '',
               bio: '',
               onlineStatus: true,
-              hasSeenTutorial: false, // Set to false so the tutorial triggers
+              hasSeenTutorial: false,
               lastActiveAt: serverTimestamp(),
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             };
             setDocumentNonBlocking(userRef, initialData, { merge: true });
           } else {
-            // Profile exists: update presence and ensure lowercase field exists for case-insensitive search
+            // Profile exists: update presence
             const existingData = docSnap.data();
             const updates: any = {
               onlineStatus: true,
               lastActiveAt: serverTimestamp(),
             };
             
-            // Backfill lowercase field if it doesn't exist
             if (!existingData.usernameLowercase && existingData.username) {
               updates.usernameLowercase = existingData.username.toLowerCase();
             }
-
-            // Ensure bio field exists
-            if (existingData.bio === undefined) {
-              updates.bio = '';
-            }
-
-            // Ensure tutorial field exists for older accounts
-            if (existingData.hasSeenTutorial === undefined) {
-              updates.hasSeenTutorial = false;
-            }
+            if (existingData.bio === undefined) updates.bio = '';
+            if (existingData.hasSeenTutorial === undefined) updates.hasSeenTutorial = false;
 
             updateDocumentNonBlocking(userRef, updates);
           }
@@ -80,6 +70,7 @@ export default function UserProfileSync() {
 
     syncProfile();
 
+    // Heartbeat every 60 seconds
     heartbeatIntervalRef.current = setInterval(() => {
       updateDocumentNonBlocking(userRef, {
         lastActiveAt: serverTimestamp(),
@@ -87,8 +78,16 @@ export default function UserProfileSync() {
       });
     }, 1000 * 60);
 
+    // Set offline on unmount (e.g. log out or navigating away from SPA)
     return () => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+      // We use a traditional updateDoc here for the final unmount attempt
+      updateDoc(userRef, {
+        onlineStatus: false,
+        lastActiveAt: serverTimestamp()
+      }).catch(() => {
+        // Silent catch for unmount failures
+      });
     };
   }, [user, db]);
 

@@ -502,6 +502,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return participants.find(p => p.id !== user.uid);
   }, [room, participants, user]);
 
+  const isOtherUserOnline = useMemo(() => {
+    if (!otherUserProfile) return false;
+    const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
+    return otherUserProfile.onlineStatus === true && differenceInMinutes(new Date(), lastActive) < 3;
+  }, [otherUserProfile]);
+
   const chatDisplayName = useMemo(() => {
     if (!room) return 'Loading...';
     if (!room.isGroupChat && participants && user) {
@@ -559,7 +565,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               <AvatarImage src={chatAvatar || undefined} className="object-cover" />
               <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs md:text-sm">{chatDisplayName?.[0]}</AvatarFallback>
             </Avatar>
-            {!room?.isGroupChat && otherUserProfile?.onlineStatus && (
+            {!room?.isGroupChat && isOtherUserOnline && (
               <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent border-2 border-background" />
             )}
           </div>
