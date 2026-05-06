@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -55,7 +56,10 @@ export default function UserProfileSync() {
               updates.usernameLowercase = existingData.username.toLowerCase();
             }
             if (existingData.bio === undefined) updates.bio = '';
-            if (existingData.hasSeenTutorial === undefined) updates.hasSeenTutorial = false;
+            // Ensure we don't overwrite the tutorial status if it's already true
+            if (existingData.hasSeenTutorial === undefined) {
+              updates.hasSeenTutorial = false;
+            }
 
             updateDocumentNonBlocking(userRef, updates);
           }
@@ -78,10 +82,9 @@ export default function UserProfileSync() {
       });
     }, 1000 * 60);
 
-    // Set offline on unmount (e.g. log out or navigating away from SPA)
+    // Set offline on unmount
     return () => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-      // We use a traditional updateDoc here for the final unmount attempt
       updateDoc(userRef, {
         onlineStatus: false,
         lastActiveAt: serverTimestamp()

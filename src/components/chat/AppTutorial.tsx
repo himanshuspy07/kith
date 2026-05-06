@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { 
@@ -17,13 +16,12 @@ import {
   Smile, 
   Pin, 
   Palette, 
-  ArrowRight, 
   Check, 
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { cn } from '@/lib/utils';
 
@@ -79,10 +77,13 @@ export default function AppTutorial() {
   const { data: userData } = useDoc(userRef);
 
   useEffect(() => {
-    if (userData && userData.hasSeenTutorial === false) {
+    // Only show if the user strictly hasn't seen it and we haven't already shown it in this session
+    const hasSeenInSession = sessionStorage.getItem(`kith_tutorial_seen_${user?.uid}`);
+    
+    if (userData && userData.hasSeenTutorial === false && !hasSeenInSession) {
       setOpen(true);
     }
-  }, [userData]);
+  }, [userData, user?.uid]);
 
   const handleNext = () => {
     if (currentStep < TUTORIAL_STEPS.length - 1) {
@@ -101,6 +102,8 @@ export default function AppTutorial() {
   const handleComplete = () => {
     if (userRef) {
       updateDocumentNonBlocking(userRef, { hasSeenTutorial: true });
+      // Guard against slow Firestore sync by setting session storage
+      sessionStorage.setItem(`kith_tutorial_seen_${user?.uid}`, 'true');
     }
     setOpen(false);
   };
@@ -108,8 +111,17 @@ export default function AppTutorial() {
   const StepIcon = TUTORIAL_STEPS[currentStep].icon;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none bg-card rounded-[2.5rem] shadow-2xl">
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      // Prevent closing by clicking outside or pressing escape
+      // This forces the user to complete the tutorial so it saves to the DB
+      if (!isOpen && userData?.hasSeenTutorial === false) return;
+      setOpen(isOpen);
+    }}>
+      <DialogContent 
+        className="sm:max-w-[450px] p-0 overflow-hidden border-none bg-card rounded-[2.5rem] shadow-2xl"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <div className="p-8 md:p-10 flex flex-col items-center text-center space-y-8">
           <div className={cn(
             "h-24 w-24 rounded-[2rem] flex items-center justify-center transition-all duration-500",
