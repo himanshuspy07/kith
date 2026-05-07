@@ -316,7 +316,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [hasMounted, setHasMounted] = useState(false);
   const [messageLimit, setMessageLimit] = useState(30);
 
-  // Admin Controls State
   const [isEditingGroupName, setIsEditingGroupName] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   

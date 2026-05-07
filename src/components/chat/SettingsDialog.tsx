@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -28,15 +29,29 @@ import {
   Sun,
   Moon,
   Monitor,
-  Palette
+  Palette,
+  AlertTriangle,
+  Trash2
 } from 'lucide-react';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useAuth } from '@/firebase';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { deleteUser } from 'firebase/auth';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -51,6 +66,7 @@ type ThemeMode = 'light' | 'dark' | 'system';
 export default function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { user } = useUser();
   const db = useFirestore();
+  const auth = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +77,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>('dark');
@@ -146,7 +163,6 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
       updatedAt: serverTimestamp(),
     });
 
-    // Synthetic delay for feedback
     setTimeout(() => {
       setIsSaving(false);
       toast({
@@ -154,6 +170,40 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         description: "Your settings have been saved.",
       });
     }, 800);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user || !db) return;
+    setIsDeleting(true);
+    try {
+      // 1. Delete Firestore Document
+      const userRef = doc(db, 'users', user.uid);
+      deleteDocumentNonBlocking(userRef);
+
+      // 2. Delete Auth User
+      await deleteUser(user);
+      
+      toast({
+        title: "Account Deleted",
+        description: "Your workspace and profile have been permanently removed.",
+      });
+    } catch (error: any) {
+      if (error.code === 'auth/requires-recent-login') {
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "For security, please sign out and sign back in before deleting your account.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Deletion Failed",
+          description: error.message || "An unexpected error occurred.",
+        });
+      }
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleRequestNotifications = async () => {
@@ -371,22 +421,63 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 
             {activeTab === 'security' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="h-4 w-4 text-primary" />
-                    <h4 className="font-bold text-sm">Secure Identity</h4>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="h-4 w-4 text-primary" />
+                      <h4 className="font-bold text-sm">Secure Identity</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground bg-black/5 dark:bg-black/10 p-4 rounded-xl leading-relaxed border border-black/5 dark:border-white/5">
+                      Your account is secured via Firebase Authentication.
+                    </p>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-between h-14 rounded-xl border border-dashed border-black/10 dark:border-white/10 px-4 hover:bg-black/5 dark:hover:bg-white/5 group"
+                      onClick={copyDebugToken}
+                    >
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Auth Token</span>
+                      {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity" />}
+                    </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground bg-black/5 dark:bg-black/10 p-4 rounded-xl leading-relaxed border border-black/5 dark:border-white/5">
-                    Your account is secured via Firebase Authentication.
-                  </p>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-between h-14 rounded-xl border border-dashed border-black/10 dark:border-white/10 px-4 hover:bg-black/5 dark:hover:bg-white/5 group"
-                    onClick={copyDebugToken}
-                  >
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Auth Token</span>
-                    {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity" />}
-                  </Button>
+
+                  <div className="pt-6 border-t border-destructive/10">
+                    <div className="flex items-center gap-2 mb-4 text-destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <h4 className="font-bold text-sm uppercase tracking-widest">Danger Zone</h4>
+                    </div>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" className="w-full h-14 rounded-xl border-destructive/20 text-destructive hover:bg-destructive/5 font-bold gap-2">
+                          <Trash2 className="h-4 w-4" />
+                          Delete My Account
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="rounded-[2.5rem] border-none bg-card/95 backdrop-blur-xl p-10 max-w-md">
+                        <AlertDialogHeader className="space-y-4">
+                          <div className="h-16 w-16 bg-destructive/10 rounded-3xl flex items-center justify-center mx-auto mb-2">
+                            <AlertTriangle className="h-8 w-8 text-destructive" />
+                          </div>
+                          <AlertDialogTitle className="text-2xl font-black text-center uppercase italic tracking-tighter">Permanent Deletion</AlertDialogTitle>
+                          <AlertDialogDescription className="text-center text-muted-foreground font-medium leading-relaxed">
+                            This will permanently delete your kith profile, all conversations, and shared media. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="mt-8 gap-3 sm:flex-col sm:space-x-0">
+                          <AlertDialogAction 
+                            className="w-full rounded-2xl h-14 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold uppercase tracking-widest text-xs"
+                            onClick={handleDeleteAccount}
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? <Loader2 className="animate-spin h-4 w-4" /> : 'Delete Everything'}
+                          </AlertDialogAction>
+                          <AlertDialogCancel className="w-full rounded-2xl h-14 border-white/10 font-bold uppercase tracking-widest text-xs">
+                            Cancel
+                          </AlertDialogCancel>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               </div>
             )}
