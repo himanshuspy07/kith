@@ -17,14 +17,13 @@ export default function Error({
     console.error('App Crash Captured:', error);
   }, [error]);
 
-  const handleReset = () => {
+  const handleReset = async () => {
     try {
       localStorage.clear();
       sessionStorage.clear();
       if (typeof window !== 'undefined' && 'caches' in window) {
-        caches.keys().then((names) => {
-          names.forEach(name => caches.delete(name));
-        });
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
       }
     } catch (e) {
       console.warn('Failed to clear storage:', e);

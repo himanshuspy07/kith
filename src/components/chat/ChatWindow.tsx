@@ -358,13 +358,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const { data: participants } = useCollection(participantsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
-    if (!db || !conversationId || !user || isRoomLoading || !room) return null;
+    if (!db || !conversationId || !user) return null;
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limitToLast(messageLimit)
     );
-  }, [db, conversationId, user?.uid, messageLimit, isRoomLoading, !!room]);
+  }, [db, conversationId, user?.uid, messageLimit]);
   const { data: messages } = useCollection(messagesQuery);
 
   useEffect(() => {

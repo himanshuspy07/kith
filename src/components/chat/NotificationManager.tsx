@@ -3,9 +3,9 @@
 
 import { useEffect, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { query, collection, where } from 'firebase/firestore';
+import { query, collection, where, doc, arrayUnion } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { useToast } from '@/hooks/use-toast';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 interface NotificationManagerProps {
   currentConversationId?: string;
@@ -16,7 +16,6 @@ const VAPID_KEY = "BCg1UIFx2xNkxfPrxSeATRRO2jyjVh2c2C_9AEfN3FsbTFjcS3EN5fyF3qIDs
 export default function NotificationManager({ currentConversationId }: NotificationManagerProps) {
   const { user } = useUser();
   const db = useFirestore();
-  const { toast } = useToast();
   const lastProcessedMessages = useRef<Record<string, string>>({});
 
   // Listen to all rooms the user is a member of to trigger local notifications when minimized
@@ -56,7 +55,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
   }, [rooms, user, currentConversationId]);
 
   useEffect(() => {
-    if (!user || typeof window === 'undefined' || !("Notification" in window) || !('serviceWorker' in navigator)) return;
+    if (!user || !db || typeof window === 'undefined' || !("Notification" in window) || !('serviceWorker' in navigator)) return;
 
     const setupFCM = async () => {
       try {
@@ -70,6 +69,13 @@ export default function NotificationManager({ currentConversationId }: Notificat
           serviceWorkerRegistration: registration
         });
         
+        if (token) {
+          const userRef = doc(db, 'users', user.uid);
+          updateDocumentNonBlocking(userRef, {
+            fcmTokens: arrayUnion(token)
+          });
+        }
+
         onMessage(messaging, (payload) => {
           if (payload.notification && payload.data?.roomId !== currentConversationId) {
             new Notification(payload.notification.title || "kith", {
@@ -86,7 +92,7 @@ export default function NotificationManager({ currentConversationId }: Notificat
     if (Notification.permission === 'granted') {
       setupFCM();
     }
-  }, [user, currentConversationId]);
+  }, [user, currentConversationId, db]);
 
   return null;
 }
