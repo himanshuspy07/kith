@@ -239,7 +239,7 @@ const MessageItem = memo(({
         )}
         onClick={() => msg.type === 'image' && onImageClick(msg.content)}
         >
-          <DialogTitle className="sr-only">Message Content</DialogTitle>
+          <span className="sr-only">Message Content</span>
           {msg.forwardedFrom && (
             <div className="flex items-center gap-1 opacity-50 text-[9px] font-bold uppercase tracking-widest mb-1">
               <Forward className="h-2.5 w-2.5" /> Forwarded
