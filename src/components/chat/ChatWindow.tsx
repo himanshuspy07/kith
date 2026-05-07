@@ -896,7 +896,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   }
                 }} 
                 placeholder={editingMessage ? "Refine your thought..." : "Message kith..."} 
-                className="bg-transparent border-none min-h-[48px] h-auto max-h-48 py-3 px-1 focus-visible:ring-0 text-base md:text-lg resize-none scrollbar-hide font-medium placeholder:text-muted-foreground/40" 
+                className="bg-transparent border-none min-h-[32px] h-auto max-h-48 py-1.5 px-1 focus-visible:ring-0 text-base md:text-lg resize-none scrollbar-hide font-medium placeholder:text-muted-foreground/40" 
               />
             </div>
 
