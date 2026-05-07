@@ -91,6 +91,10 @@ export default function NotificationManager({ currentConversationId }: Notificat
 
     if (Notification.permission === 'granted') {
       setupFCM();
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') setupFCM();
+      });
     }
   }, [user, currentConversationId, db]);
 

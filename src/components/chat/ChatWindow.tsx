@@ -239,6 +239,7 @@ const MessageItem = memo(({
         )}
         onClick={() => msg.type === 'image' && onImageClick(msg.content)}
         >
+          <DialogTitle className="sr-only">Message Content</DialogTitle>
           {msg.forwardedFrom && (
             <div className="flex items-center gap-1 opacity-50 text-[9px] font-bold uppercase tracking-widest mb-1">
               <Forward className="h-2.5 w-2.5" /> Forwarded
@@ -359,12 +360,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !conversationId || !user) return null;
+    // Stabilize by only depending on conversationId and limit
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
       limitToLast(messageLimit)
     );
-  }, [db, conversationId, user?.uid, messageLimit]);
+  }, [db, conversationId, messageLimit]);
   const { data: messages } = useCollection(messagesQuery);
 
   useEffect(() => {
