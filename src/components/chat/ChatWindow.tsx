@@ -360,7 +360,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !conversationId || !user) return null;
-    // Stabilize by only depending on conversationId and limit
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),

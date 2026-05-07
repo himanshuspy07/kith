@@ -1,19 +1,20 @@
 
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+// Scripts for firebase messaging
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
+// Initialize the Firebase app in the service worker by passing in the messagingSenderId.
+// These credentials can be public.
 firebase.initializeApp({
-  apiKey: "AIzaSyD9dn4wj2w7qjodCzQZeS1DaAN2arjW8_o",
-  authDomain: "studio-7823896099-d3f14.firebaseapp.com",
-  projectId: "studio-7823896099-d3f14",
-  messagingSenderId: "1092017196904",
-  appId: "1:1092017196904:web:9f0712e970a240f915d0dd"
+  messagingSenderId: "1092017196904"
 });
 
 const messaging = firebase.messaging();
 
+// Handle background messages
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
+  
   const notificationTitle = payload.notification.title || "kith";
   const notificationOptions = {
     body: payload.notification.body,
@@ -22,4 +23,24 @@ messaging.onBackgroundMessage((payload) => {
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// Handle notification click to open the app
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  const roomId = event.notification.data.roomId;
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((windowClients) => {
+      for (var i = 0; i < windowClients.length; i++) {
+        var client = windowClients[i];
+        if (client.url.includes('/') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(roomId ? '/?roomId=' + roomId : '/');
+      }
+    })
+  );
 });
