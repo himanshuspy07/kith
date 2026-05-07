@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -95,7 +96,9 @@ export default function AuthScreen() {
       let errorMessage = error.message || "Could not complete Google authentication.";
       
       if (error.code === 'auth/operation-not-allowed') {
-        errorMessage = "Google Sign-In is not enabled in the Firebase Console. Please go to Authentication > Sign-in method and enable Google.";
+        errorMessage = "Google Sign-In is not enabled. Please enable it in the Firebase Console (Authentication > Sign-in method).";
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = "This domain (kith.indevs.in) is not authorized. Please add it to the 'Authorized domains' list in the Firebase Console.";
       }
 
       toast({
