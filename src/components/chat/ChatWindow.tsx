@@ -832,67 +832,85 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 md:p-6 bg-transparent z-10 space-y-3">
-        {(replyingTo || editingMessage) && (
-          <div className="max-w-4xl mx-auto glass-morphism-heavy rounded-t-2xl p-3 border-b-0 flex items-center justify-between animate-in slide-in-from-bottom-2">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="h-8 w-1 rounded-full bg-primary" />
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
-                  {replyingTo ? "Replying to" : "Editing message"}
-                </span>
-                <span className="text-xs text-muted-foreground truncate">
-                  {replyingTo ? (replyingTo.type === 'image' ? "Image" : replyingTo.content) : editingMessage.content}
-                </span>
+      <div className="p-4 md:p-8 bg-transparent z-10">
+        <div className="max-w-5xl mx-auto space-y-4">
+          {(replyingTo || editingMessage) && (
+            <div className="glass-morphism-heavy rounded-t-[2rem] p-4 border-b-0 flex items-center justify-between animate-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-4 overflow-hidden">
+                <div className="h-10 w-1.5 rounded-full bg-primary shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                    {replyingTo ? "Replying to" : "Editing message"}
+                  </span>
+                  <span className="text-sm text-muted-foreground truncate font-medium">
+                    {replyingTo ? (replyingTo.type === 'image' ? "Image" : replyingTo.content) : editingMessage.content}
+                  </span>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-10 w-10 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors" 
+                onClick={() => { setReplyingTo(null); setEditingMessage(null); if(editingMessage) setInputValue(''); }}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+
+          {showMentions && participants && (
+            <div className="glass-morphism-heavy rounded-[2rem] p-3 mb-2 shadow-2xl animate-in zoom-in-95 duration-300">
+              <div className="max-h-48 overflow-y-auto scrollbar-hide space-y-1">
+                {participants.filter(p => p.username.toLowerCase().includes(mentionFilter) && p.id !== user?.uid).map(p => (
+                  <button key={p.id} onClick={() => insertMention(p.username)} className="w-full flex items-center gap-3 p-3 hover:bg-primary/10 rounded-2xl transition-all">
+                    <Avatar className="h-10 w-10"><AvatarImage src={p.profilePictureUrl} /><AvatarFallback>{p.username[0]}</AvatarFallback></Avatar>
+                    <span className="text-sm font-bold tracking-tight">{p.username}</span>
+                  </button>
+                ))}
               </div>
             </div>
+          )}
+
+          <div className={cn(
+            "flex items-end gap-3 glass-morphism p-3 md:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 group focus-within:ring-2 focus-within:ring-primary/20",
+            (replyingTo || editingMessage) ? "rounded-b-[2rem] rounded-t-none border-t-white/10" : "rounded-[2rem]"
+          )}>
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 rounded-full hover:bg-black/10 dark:hover:bg-white/10" 
-              onClick={() => { setReplyingTo(null); setEditingMessage(null); if(editingMessage) setInputValue(''); }}
+              className="h-12 w-12 rounded-2xl hover:bg-primary/10 hover:text-primary transition-all shrink-0" 
+              onClick={() => fileInputRef.current?.click()}
             >
-              <X className="h-4 w-4" />
+              {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon className="h-6 w-6" />}
+            </Button>
+            
+            <div className="flex-1 relative">
+               <Textarea 
+                value={inputValue} 
+                onChange={handleInputChange} 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !showMentions) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }} 
+                placeholder={editingMessage ? "Refine your thought..." : "Message kith..."} 
+                className="bg-transparent border-none min-h-[48px] h-auto max-h-48 py-3 px-1 focus-visible:ring-0 text-base md:text-lg resize-none scrollbar-hide font-medium placeholder:text-muted-foreground/40" 
+              />
+            </div>
+
+            <Button 
+              onClick={() => handleSend()} 
+              disabled={!inputValue.trim() || isUploading} 
+              className={cn(
+                "h-12 w-12 md:h-14 md:w-14 rounded-2xl shadow-xl shadow-primary/20 shrink-0 transition-all active:scale-90",
+                inputValue.trim() ? "bg-primary hover:bg-primary/90 scale-100" : "bg-muted/20 scale-95 opacity-50"
+              )}
+            >
+              <Send className={cn("h-6 w-6 transition-transform", inputValue.trim() && "group-hover:translate-x-1 group-hover:-translate-y-1")} />
             </Button>
           </div>
-        )}
-
-        {showMentions && participants && (
-          <div className="max-w-4xl mx-auto glass-morphism-heavy rounded-2xl p-2 mb-2 shadow-2xl">
-            <div className="max-h-40 overflow-y-auto scrollbar-hide">
-              {participants.filter(p => p.username.toLowerCase().includes(mentionFilter) && p.id !== user?.uid).map(p => (
-                <button key={p.id} onClick={() => insertMention(p.username)} className="w-full flex items-center gap-3 p-2 hover:bg-primary/10 rounded-xl">
-                  <Avatar className="h-8 w-8"><AvatarImage src={p.profilePictureUrl} /><AvatarFallback>{p.username[0]}</AvatarFallback></Avatar>
-                  <span className="text-sm font-bold">{p.username}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className={cn(
-          "max-w-4xl mx-auto flex items-end gap-2 glass-morphism p-2 shadow-2xl transition-all",
-          (replyingTo || editingMessage) ? "rounded-b-[1.5rem] rounded-t-none border-t-white/10" : "rounded-[1.5rem]"
-        )}>
-          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-          <Button variant="ghost" size="icon" className="h-10 w-10 md:h-12 md:w-12 rounded-full" onClick={() => fileInputRef.current?.click()}>
-            {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon className="h-5 w-5" />}
-          </Button>
-          <Textarea 
-            value={inputValue} 
-            onChange={handleInputChange} 
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !showMentions) {
-                e.preventDefault();
-                handleSend();
-              }
-            }} 
-            placeholder={editingMessage ? "Update your message..." : "Message kith..."} 
-            className="bg-transparent border-none min-h-[40px] md:min-h-[48px] h-auto max-h-32 py-3 px-2 focus-visible:ring-0 text-sm md:text-base resize-none" 
-          />
-          <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className={cn("h-10 w-10 md:h-12 md:w-12 rounded-full shadow-lg shrink-0", inputValue.trim() ? "bg-primary" : "bg-muted/20")}>
-            <Send className="h-5 w-5" />
-          </Button>
         </div>
       </div>
 
@@ -904,7 +922,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
         <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">
-          <DialogTitle className="sr-only">Shared Image Lightbox</DialogTitle>
+          <span className="sr-only">Shared Image Lightbox</span>
           <div className="relative group w-full h-full flex items-center justify-center">
             {lightboxImage && (
               <img src={lightboxImage} alt="Shared content" className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" />
