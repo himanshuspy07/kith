@@ -14,7 +14,6 @@ import { collection, query, where, doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import NewChatDialog from './NewChatDialog';
 import SettingsDialog from './SettingsDialog';
-import NotificationCenter from './NotificationCenter';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -221,7 +220,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           <div className="flex flex-col max-w-[100px]"><span className="font-bold text-xs truncate leading-none">{currentUserProfile?.username || 'Kith User'}</span></div>
         </div>
         <div className="flex gap-1">
-          <NotificationCenter />
           <NewChatDialog onChatCreated={onSelectConversation} />
           
           <AlertDialog>

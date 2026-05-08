@@ -32,18 +32,16 @@ import {
   Monitor,
   Palette,
   AlertTriangle,
-  Trash2,
-  AtSign,
-  MessageSquare
+  Trash2
 } from 'lucide-react';
 import { useUser, useFirestore, useAuth } from '@/firebase';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { deleteUser } from 'firebase/auth';
+import { signOut, deleteUser } from 'firebase/auth';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,13 +82,6 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   const [copiedToken, setCopiedToken] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>('dark');
-  
-  // Notification Prefs
-  const [prefs, setPrefs] = useState({
-    allMessages: true,
-    mentionsOnly: false,
-    muteAll: false
-  });
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('kith-theme') as ThemeMode || 'dark';
@@ -120,9 +111,6 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         setUsername(data.username || '');
         setBio(data.bio || '');
         setAvatarUrl(data.profilePictureUrl || undefined);
-        if (data.notificationPreferences) {
-          setPrefs(data.notificationPreferences);
-        }
       }
     };
 
@@ -161,13 +149,12 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
       usernameLowercase: username.trim().toLowerCase(),
       bio: bio.trim(),
       profilePictureUrl: avatarUrl || '',
-      notificationPreferences: prefs,
       updatedAt: serverTimestamp(),
     });
 
     setTimeout(() => {
       setIsSaving(false);
-      toast({ title: "Settings Saved" });
+      toast({ title: "Profile Updated" });
     }, 800);
   };
 
@@ -190,6 +177,22 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
       }
     } catch (e) {
       toast({ variant: "destructive", title: "Error retrieving token" });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user || !db) return;
+    setIsDeleting(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      // We don't block here as per guidelines
+      await deleteUser(user);
+      toast({ title: "Account Deleted" });
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -274,52 +277,9 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
             {activeTab === 'notifications' && (
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
                 <div className="space-y-4">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-primary">Granular Controls</Label>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-xl bg-primary/20 flex items-center justify-center">
-                          <MessageSquare className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold">Message Alerts</p>
-                          <p className="text-[10px] text-muted-foreground">Notify for every new message</p>
-                        </div>
-                      </div>
-                      <Switch checked={prefs.allMessages} onCheckedChange={(v) => setPrefs(p => ({...p, allMessages: v}))} />
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-xl bg-accent/20 flex items-center justify-center">
-                          <AtSign className="h-5 w-5 text-accent" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold">Mentions Only</p>
-                          <p className="text-[10px] text-muted-foreground">Only notify when @username is typed</p>
-                        </div>
-                      </div>
-                      <Switch checked={prefs.mentionsOnly} onCheckedChange={(v) => setPrefs(p => ({...p, mentionsOnly: v}))} />
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-destructive/5 rounded-2xl border border-destructive/10">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-xl bg-destructive/20 flex items-center justify-center">
-                          <Bell className="h-5 w-5 text-destructive" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold">Do Not Disturb</p>
-                          <p className="text-[10px] text-muted-foreground text-destructive/70">Mute all notifications globally</p>
-                        </div>
-                      </div>
-                      <Switch checked={prefs.muteAll} onCheckedChange={(v) => setPrefs(p => ({...p, muteAll: v}))} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-white/5">
-                  <Button variant="outline" className="w-full h-12 rounded-xl border-dashed" onClick={handleRequestNotifications}>
-                    <Smartphone className="mr-2 h-4 w-4" /> Check Device Permissions
+                  <Label className="text-xs font-bold uppercase tracking-widest text-primary">Device Settings</Label>
+                  <Button variant="outline" className="w-full h-14 rounded-xl border-dashed" onClick={handleRequestNotifications}>
+                    <Smartphone className="mr-2 h-4 w-4" /> Enable Web Push Notifications
                   </Button>
                 </div>
               </div>
@@ -345,10 +305,43 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 
             {activeTab === 'security' && (
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-                <Button variant="ghost" className="w-full justify-between h-14 rounded-xl bg-white/5 border-white/10 px-4 group" onClick={copyDebugToken}>
-                  <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Notification ID</span>
-                  {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4 opacity-40 group-hover:opacity-100" />}
-                </Button>
+                <div className="space-y-4">
+                  <Label className="text-xs font-bold uppercase tracking-widest text-destructive">Danger Zone</Label>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="w-full h-14 rounded-xl font-bold flex gap-2">
+                        <Trash2 className="h-4 w-4" /> Delete Account Forever
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-[2.5rem] border-none bg-card p-10">
+                      <AlertDialogHeader className="items-center text-center space-y-4">
+                        <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                          <AlertTriangle className="h-8 w-8 text-destructive" />
+                        </div>
+                        <AlertDialogTitle className="text-2xl font-bold">Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete your account and remove your data from our servers.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="mt-8 flex gap-3">
+                        <AlertDialogCancel className="h-12 rounded-xl flex-1 border-white/5">Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          className="h-12 rounded-xl flex-1 bg-destructive hover:bg-destructive/90 font-bold"
+                          onClick={handleDeleteAccount}
+                        >
+                          {isDeleting ? <Loader2 className="animate-spin" /> : 'Delete Account'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+                
+                <div className="pt-4 border-t border-white/5">
+                  <Button variant="ghost" className="w-full justify-between h-14 rounded-xl bg-white/5 border-white/10 px-4 group" onClick={copyDebugToken}>
+                    <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">FCM Debug Token</span>
+                    {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4 opacity-40 group-hover:opacity-100" />}
+                  </Button>
+                </div>
               </div>
             )}
           </div>

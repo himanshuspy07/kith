@@ -15,35 +15,10 @@
         "profilePictureUrl": { "type": "string", "format": "uri" },
         "onlineStatus": { "type": "boolean" },
         "fcmTokens": { "type": "array", "items": { "type": "string" } },
-        "notificationPreferences": {
-          "type": "object",
-          "properties": {
-            "allMessages": { "type": "boolean", "default": true },
-            "mentionsOnly": { "type": "boolean", "default": false },
-            "muteAll": { "type": "boolean", "default": false }
-          }
-        },
         "lastActiveAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "username", "onlineStatus", "createdAt"]
-    },
-    "Notification": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Notification",
-      "type": "object",
-      "description": "A notification for a user.",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "title": { "type": "string" },
-        "body": { "type": "string" },
-        "type": { "type": "string", "enum": ["message", "mention", "system"] },
-        "link": { "type": "string", "description": "URL or path to navigate to." },
-        "isRead": { "type": "boolean", "default": false },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "userId", "title", "body", "type", "createdAt"]
     }
   },
   "auth": {
@@ -54,10 +29,6 @@
       {
         "path": "/users/{userId}",
         "definition": { "entityName": "User", "schema": { "$ref": "#/backend/entities/User" } }
-      },
-      {
-        "path": "/users/{userId}/notifications/{notificationId}",
-        "definition": { "entityName": "Notification", "schema": { "$ref": "#/backend/entities/Notification" } }
       },
       {
         "path": "/chatRooms/{chatRoomId}",
