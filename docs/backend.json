@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -6,207 +7,61 @@
       "type": "object",
       "description": "Represents a user account in the kith application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity."
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "usernameLowercase": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "bio": { "type": "string" },
+        "profilePictureUrl": { "type": "string", "format": "uri" },
+        "onlineStatus": { "type": "boolean" },
+        "fcmTokens": { "type": "array", "items": { "type": "string" } },
+        "notificationPreferences": {
+          "type": "object",
+          "properties": {
+            "allMessages": { "type": "boolean", "default": true },
+            "mentionsOnly": { "type": "boolean", "default": false },
+            "muteAll": { "type": "boolean", "default": false }
+          }
         },
-        "username": {
-          "type": "string",
-          "description": "Unique display name chosen by the user."
-        },
-        "usernameLowercase": {
-          "type": "string",
-          "description": "Lowercase version of the username for case-insensitive search."
-        },
-        "email": {
-          "type": "string",
-          "description": "User's email address.",
-          "format": "email"
-        },
-        "bio": {
-          "type": "string",
-          "description": "A short professional biography or status."
-        },
-        "phoneNumber": {
-          "type": "string",
-          "description": "User's phone number."
-        },
-        "profilePictureUrl": {
-          "type": "string",
-          "description": "URL to the user's profile picture.",
-          "format": "uri"
-        },
-        "onlineStatus": {
-          "type": "boolean",
-          "description": "Indicates if the user is online."
-        },
-        "hasSeenTutorial": {
-          "type": "boolean",
-          "description": "Indicates if the user has completed the onboarding tutorial."
-        },
-        "fcmTokens": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "List of device tokens for push notifications."
-        },
-        "lastActiveAt": {
-          "type": "string",
-          "description": "Timestamp of the user's last activity.",
-          "format": "date-time"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Account creation timestamp.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Profile update timestamp.",
-          "format": "date-time"
-        }
+        "lastActiveAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "username",
-        "usernameLowercase",
-        "onlineStatus",
-        "createdAt"
-      ]
+      "required": ["id", "username", "onlineStatus", "createdAt"]
     },
-    "ChatRoom": {
+    "Notification": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ChatRoom",
+      "title": "Notification",
       "type": "object",
-      "description": "Represents a conversation channel.",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "nameLowercase": {
-          "type": "string",
-          "description": "Lowercase version of the room name for case-insensitive search."
-        },
-        "isGroupChat": {
-          "type": "boolean"
-        },
-        "groupImageUrl": {
-          "type": "string",
-          "description": "Profile image for group chats.",
-          "format": "uri"
-        },
-        "memberIds": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "members": {
-          "type": "object",
-          "description": "Map of user IDs to booleans."
-        },
-        "pinnedBy": {
-          "type": "object",
-          "description": "Map of user IDs to booleans for pinning status."
-        },
-        "typing": {
-          "type": "object",
-          "description": "Map of user IDs to timestamps."
-        },
-        "wallpaper": {
-          "type": "string",
-          "description": "The selected theme or background color for this room."
-        },
-        "lastMessageText": {
-          "type": "string"
-        },
-        "lastMessageSenderId": {
-          "type": "string"
-        },
-        "readBy": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "createdBy": {
-          "type": "string",
-          "description": "The UID of the user who created the room."
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "isGroupChat",
-        "memberIds"
-      ]
-    },
-    "Message": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Message",
-      "type": "object",
-      "description": "Represents an individual message.",
+      "description": "A notification for a user.",
       "properties": {
         "id": { "type": "string" },
-        "chatRoomId": { "type": "string" },
-        "senderId": { "type": "string" },
-        "content": { "type": "string" },
-        "type": { "type": "string" },
-        "fileUrl": { "type": "string" },
-        "replyToId": { "type": "string" },
-        "replyToContent": { "type": "string" },
-        "isEdited": { "type": "boolean" },
-        "isDeleted": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" },
-        "readBy": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "reactions": {
-          "type": "object",
-          "description": "Map of emoji to array of user IDs."
-        }
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "type": { "type": "string", "enum": ["message", "mention", "system"] },
+        "link": { "type": "string", "description": "URL or path to navigate to." },
+        "isRead": { "type": "boolean", "default": false },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "chatRoomId",
-        "senderId",
-        "content",
-        "type",
-        "createdAt"
-      ]
+      "required": ["id", "userId", "title", "body", "type", "createdAt"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "google.com"
-    ]
+    "providers": ["password", "google.com"]
   },
   "firestore": {
     "structure": [
       {
         "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": { "$ref": "#/backend/entities/User" }
-        }
+        "definition": { "entityName": "User", "schema": { "$ref": "#/backend/entities/User" } }
+      },
+      {
+        "path": "/users/{userId}/notifications/{notificationId}",
+        "definition": { "entityName": "Notification", "schema": { "$ref": "#/backend/entities/Notification" } }
       },
       {
         "path": "/chatRooms/{chatRoomId}",
-        "definition": {
-          "entityName": "ChatRoom",
-          "schema": { "$ref": "#/backend/entities/ChatRoom" }
-        }
-      },
-      {
-        "path": "/chatRooms/{chatRoomId}/messages/{messageId}",
-        "definition": {
-          "entityName": "Message",
-          "schema": { "$ref": "#/backend/entities/Message" }
-        }
+        "definition": { "entityName": "ChatRoom", "schema": { "$ref": "#/backend/entities/ChatRoom" } }
       }
     ]
   }

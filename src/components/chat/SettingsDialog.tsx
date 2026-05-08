@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Switch } from '@/components/ui/switch';
 import {
   User,
   Bell,
@@ -31,7 +32,9 @@ import {
   Monitor,
   Palette,
   AlertTriangle,
-  Trash2
+  Trash2,
+  AtSign,
+  MessageSquare
 } from 'lucide-react';
 import { useUser, useFirestore, useAuth } from '@/firebase';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -81,6 +84,13 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   const [copiedToken, setCopiedToken] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>('dark');
+  
+  // Notification Prefs
+  const [prefs, setPrefs] = useState({
+    allMessages: true,
+    mentionsOnly: false,
+    muteAll: false
+  });
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('kith-theme') as ThemeMode || 'dark';
@@ -110,6 +120,9 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         setUsername(data.username || '');
         setBio(data.bio || '');
         setAvatarUrl(data.profilePictureUrl || undefined);
+        if (data.notificationPreferences) {
+          setPrefs(data.notificationPreferences);
+        }
       }
     };
 
@@ -124,7 +137,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
       toast({
         variant: "destructive",
         title: "File too large",
-        description: "Please select an image smaller than 600KB for document stability.",
+        description: "Please select an image smaller than 600KB.",
       });
       return;
     }
@@ -134,18 +147,6 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     reader.onloadend = () => {
       setAvatarUrl(reader.result as string);
       setIsUploading(false);
-      toast({
-        title: "Photo Ready",
-        description: "Click 'Apply Changes' to update your profile.",
-      });
-    };
-    reader.onerror = () => {
-      setIsUploading(false);
-      toast({
-        variant: "destructive",
-        title: "Upload Failed",
-        description: "Could not read the selected file.",
-      });
     };
     reader.readAsDataURL(file);
   };
@@ -160,60 +161,20 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
       usernameLowercase: username.trim().toLowerCase(),
       bio: bio.trim(),
       profilePictureUrl: avatarUrl || '',
+      notificationPreferences: prefs,
       updatedAt: serverTimestamp(),
     });
 
     setTimeout(() => {
       setIsSaving(false);
-      toast({
-        title: "Profile Updated",
-        description: "Your settings have been saved.",
-      });
+      toast({ title: "Settings Saved" });
     }, 800);
   };
 
-  const handleDeleteAccount = async () => {
-    if (!user || !db) return;
-    setIsDeleting(true);
-    try {
-      // 1. Delete Firestore Document
-      const userRef = doc(db, 'users', user.uid);
-      deleteDocumentNonBlocking(userRef);
-
-      // 2. Delete Auth User
-      await deleteUser(user);
-      
-      toast({
-        title: "Account Deleted",
-        description: "Your workspace and profile have been permanently removed.",
-      });
-    } catch (error: any) {
-      if (error.code === 'auth/requires-recent-login') {
-        toast({
-          variant: "destructive",
-          title: "Session Expired",
-          description: "For security, please sign out and sign back in before deleting your account.",
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Deletion Failed",
-          description: error.message || "An unexpected error occurred.",
-        });
-      }
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const handleRequestNotifications = async () => {
-    if (!("Notification" in window)) {
-      toast({ variant: "destructive", title: "Not Supported", description: "Browser notifications not supported." });
-      return;
-    }
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      toast({ title: "Notifications Enabled", description: "You will now receive desktop alerts." });
+      toast({ title: "Notifications Enabled" });
     }
   };
 
@@ -225,10 +186,10 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         await navigator.clipboard.writeText(token);
         setCopiedToken(true);
         setTimeout(() => setCopiedToken(false), 2000);
-        toast({ title: "Token Copied", description: "FCM Token copied to clipboard." });
+        toast({ title: "Token Copied" });
       }
     } catch (e) {
-      toast({ variant: "destructive", title: "Debug Error", description: "Could not retrieve token." });
+      toast({ variant: "destructive", title: "Error retrieving token" });
     }
   };
 
@@ -262,234 +223,139 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
           isMobile ? "w-full shrink-0 h-auto" : "w-1/3 h-full"
         )}>
           <div className="mb-6 md:mb-8 px-2 flex items-center justify-between">
-            <div>
-              <DialogTitle className="text-xl font-bold tracking-tight">Settings</DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground mt-1">
-                Configure your kith workspace
-              </DialogDescription>
-            </div>
+            <DialogTitle className="text-xl font-bold tracking-tight">Settings</DialogTitle>
             {isMobile && (
               <Button variant="ghost" size="icon" onClick={() => setShowMobileNav(!showMobileNav)}>
                 <Menu className="h-5 w-5" />
               </Button>
             )}
           </div>
-
-          <nav className={cn(
-            "flex-1 space-y-1 transition-all",
-            isMobile && !showMobileNav ? "hidden" : "block"
-          )}>
+          <nav className={cn("flex-1 space-y-1", isMobile && !showMobileNav ? "hidden" : "block")}>
             <NavItem id="profile" label="Public Profile" icon={User} />
             <NavItem id="appearance" label="Appearance" icon={Palette} />
             <NavItem id="notifications" label="Notifications" icon={Bell} />
             <NavItem id="security" label="Privacy & Security" icon={Shield} />
           </nav>
-
-          {!isMobile && (
-            <div className="pt-6 border-t border-black/5 dark:border-white/5 flex items-center gap-2.5 opacity-40 px-2">
-              <Settings className="h-3 w-3" />
-              <span className="text-[9px] uppercase font-bold tracking-widest">Version 2.3.0</span>
-            </div>
-          )}
         </aside>
 
         <main className="flex-1 flex flex-col h-full bg-card overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6 md:p-10 scrollbar-hide">
             {activeTab === 'profile' && (
-              <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="flex flex-col md:flex-row items-center gap-6 pb-6 border-b border-black/5 dark:border-white/5 text-center md:text-left">
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                <div className="flex items-center gap-6 pb-6 border-b border-white/5">
                   <div className="relative group">
-                    <Avatar className="h-20 w-20 md:h-24 md:w-24 border-2 border-black/5 dark:border-white/5 shadow-xl overflow-hidden">
-                      <AvatarImage src={avatarUrl || undefined} className="object-cover" />
-                      <AvatarFallback className="text-2xl bg-secondary text-muted-foreground font-bold">
-                        {username?.[0]?.toUpperCase() || 'U'}
-                      </AvatarFallback>
+                    <Avatar className="h-20 w-20 border-2 border-white/5 shadow-xl">
+                      <AvatarImage src={avatarUrl} className="object-cover" />
+                      <AvatarFallback className="text-2xl font-bold">{username?.[0]}</AvatarFallback>
                     </Avatar>
-                    <button 
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="absolute inset-0 bg-black/50 rounded-full opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
-                    >
-                      {isUploading ? <Loader2 className="h-6 w-6 text-white animate-spin" /> : <Camera className="h-6 w-6 text-white" />}
+                    <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Camera className="h-6 w-6 text-white" />
                     </button>
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
-                      accept="image/*" 
-                      onChange={handleFileChange}
-                    />
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="font-bold text-lg">{username || 'User'}</h3>
-                    <p className="text-xs text-muted-foreground">Click photo to update image.</p>
+                    <h3 className="font-bold">{username || 'Kith User'}</h3>
+                    <p className="text-xs text-muted-foreground">Change your display identity.</p>
                   </div>
                 </div>
-
-                <div className="grid gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Display Name</Label>
-                    <Input 
-                      value={username} 
-                      onChange={(e) => setUsername(e.target.value)} 
-                      placeholder="e.g. Alex Rivera" 
-                      className="bg-black/5 dark:bg-black/20 border-black/5 dark:border-white/5 h-12 rounded-xl focus-visible:ring-primary/40"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Personal Bio</Label>
-                    <Textarea 
-                      value={bio} 
-                      onChange={(e) => setBio(e.target.value)} 
-                      placeholder="Share a little bit about yourself..." 
-                      className="bg-black/5 dark:bg-black/20 border-black/5 dark:border-white/5 rounded-xl min-h-[100px] md:min-h-[120px] resize-none focus-visible:ring-primary/40 text-sm leading-relaxed"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'appearance' && (
-              <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="space-y-4">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-primary">Theme Selection</Label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => handleThemeChange('light')}
-                      className={cn(
-                        "h-24 flex flex-col gap-2 rounded-2xl border-2",
-                        theme === 'light' ? "border-primary bg-primary/5" : "border-black/5"
-                      )}
-                    >
-                      <Sun className={cn("h-6 w-6", theme === 'light' ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Light</span>
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => handleThemeChange('dark')}
-                      className={cn(
-                        "h-24 flex flex-col gap-2 rounded-2xl border-2",
-                        theme === 'dark' ? "border-primary bg-primary/5" : "border-black/5"
-                      )}
-                    >
-                      <Moon className={cn("h-6 w-6", theme === 'dark' ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Dark</span>
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => handleThemeChange('system')}
-                      className={cn(
-                        "h-24 flex flex-col gap-2 rounded-2xl border-2",
-                        theme === 'system' ? "border-primary bg-primary/5" : "border-black/5"
-                      )}
-                    >
-                      <Monitor className={cn("h-6 w-6", theme === 'system' ? "text-primary" : "text-muted-foreground")} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">System</span>
-                    </Button>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] uppercase tracking-widest font-bold">Username</Label>
+                    <Input value={username} onChange={(e) => setUsername(e.target.value)} className="bg-white/5 border-none h-12 rounded-xl" />
                   </div>
-                </div>
-                <div className="p-5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
-                  <h4 className="text-sm font-bold mb-1">Adaptive Interface</h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Choose between a vibrant light workspace, a focused dark environment, or let kith mirror your system settings automatically.
-                  </p>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] uppercase tracking-widest font-bold">Bio</Label>
+                    <Textarea value={bio} onChange={(e) => setBio(e.target.value)} className="bg-white/5 border-none rounded-xl min-h-[100px] resize-none" />
+                  </div>
                 </div>
               </div>
             )}
 
             {activeTab === 'notifications' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="p-5 md:p-6 rounded-2xl bg-black/10 border border-black/5 dark:border-white/5 space-y-4">
-                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                      <h4 className="font-bold text-sm">Desktop Notifications</h4>
-                      <p className="text-xs text-muted-foreground">Get alerted on new messages.</p>
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                <div className="space-y-4">
+                  <Label className="text-xs font-bold uppercase tracking-widest text-primary">Granular Controls</Label>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-xl bg-primary/20 flex items-center justify-center">
+                          <MessageSquare className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold">Message Alerts</p>
+                          <p className="text-[10px] text-muted-foreground">Notify for every new message</p>
+                        </div>
+                      </div>
+                      <Switch checked={prefs.allMessages} onCheckedChange={(v) => setPrefs(p => ({...p, allMessages: v}))} />
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full md:w-auto rounded-full border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
-                      onClick={handleRequestNotifications}
-                    >
-                      Configure
-                    </Button>
+
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-xl bg-accent/20 flex items-center justify-center">
+                          <AtSign className="h-5 w-5 text-accent" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold">Mentions Only</p>
+                          <p className="text-[10px] text-muted-foreground">Only notify when @username is typed</p>
+                        </div>
+                      </div>
+                      <Switch checked={prefs.mentionsOnly} onCheckedChange={(v) => setPrefs(p => ({...p, mentionsOnly: v}))} />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-destructive/5 rounded-2xl border border-destructive/10">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-xl bg-destructive/20 flex items-center justify-center">
+                          <Bell className="h-5 w-5 text-destructive" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold">Do Not Disturb</p>
+                          <p className="text-[10px] text-muted-foreground text-destructive/70">Mute all notifications globally</p>
+                        </div>
+                      </div>
+                      <Switch checked={prefs.muteAll} onCheckedChange={(v) => setPrefs(p => ({...p, muteAll: v}))} />
+                    </div>
                   </div>
+                </div>
+
+                <div className="pt-6 border-t border-white/5">
+                  <Button variant="outline" className="w-full h-12 rounded-xl border-dashed" onClick={handleRequestNotifications}>
+                    <Smartphone className="mr-2 h-4 w-4" /> Check Device Permissions
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'appearance' && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                <div className="grid grid-cols-3 gap-3">
+                  {(['light', 'dark', 'system'] as ThemeMode[]).map(m => (
+                    <Button 
+                      key={m}
+                      variant="outline" 
+                      onClick={() => handleThemeChange(m)}
+                      className={cn("h-24 flex flex-col gap-2 rounded-2xl border-2 capitalize", theme === m ? "border-primary bg-primary/5" : "border-white/5")}
+                    >
+                      {m === 'light' ? <Sun className="h-6 w-6" /> : m === 'dark' ? <Moon className="h-6 w-6" /> : <Monitor className="h-6 w-6" />}
+                      <span className="text-[10px] font-bold">{m}</span>
+                    </Button>
+                  ))}
                 </div>
               </div>
             )}
 
             {activeTab === 'security' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Shield className="h-4 w-4 text-primary" />
-                      <h4 className="font-bold text-sm">Secure Identity</h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground bg-black/5 dark:bg-black/10 p-4 rounded-xl leading-relaxed border border-black/5 dark:border-white/5">
-                      Your account is secured via Firebase Authentication.
-                    </p>
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-between h-14 rounded-xl border border-dashed border-black/10 dark:border-white/10 px-4 hover:bg-black/5 dark:hover:bg-white/5 group"
-                      onClick={copyDebugToken}
-                    >
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Auth Token</span>
-                      {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity" />}
-                    </Button>
-                  </div>
-
-                  <div className="pt-6 border-t border-destructive/10">
-                    <div className="flex items-center gap-2 mb-4 text-destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <h4 className="font-bold text-sm uppercase tracking-widest">Danger Zone</h4>
-                    </div>
-                    
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" className="w-full h-14 rounded-xl border-destructive/20 text-destructive hover:bg-destructive/5 font-bold gap-2">
-                          <Trash2 className="h-4 w-4" />
-                          Delete My Account
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-[2.5rem] border-none bg-card/95 backdrop-blur-xl p-10 max-w-md">
-                        <AlertDialogHeader className="space-y-4">
-                          <div className="h-16 w-16 bg-destructive/10 rounded-3xl flex items-center justify-center mx-auto mb-2">
-                            <AlertTriangle className="h-8 w-8 text-destructive" />
-                          </div>
-                          <AlertDialogTitle className="text-2xl font-black text-center uppercase italic tracking-tighter">Permanent Deletion</AlertDialogTitle>
-                          <AlertDialogDescription className="text-center text-muted-foreground font-medium leading-relaxed">
-                            This will permanently delete your kith profile, all conversations, and shared media. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="mt-8 gap-3 sm:flex-col sm:space-x-0">
-                          <AlertDialogAction 
-                            className="w-full rounded-2xl h-14 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold uppercase tracking-widest text-xs"
-                            onClick={handleDeleteAccount}
-                            disabled={isDeleting}
-                          >
-                            {isDeleting ? <Loader2 className="animate-spin h-4 w-4" /> : 'Delete Everything'}
-                          </AlertDialogAction>
-                          <AlertDialogCancel className="w-full rounded-2xl h-14 border-white/10 font-bold uppercase tracking-widest text-xs">
-                            Cancel
-                          </AlertDialogCancel>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                <Button variant="ghost" className="w-full justify-between h-14 rounded-xl bg-white/5 border-white/10 px-4 group" onClick={copyDebugToken}>
+                  <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Notification ID</span>
+                  {copiedToken ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4 opacity-40 group-hover:opacity-100" />}
+                </Button>
               </div>
             )}
           </div>
 
-          <div className="p-6 md:p-8 bg-black/[0.02] dark:bg-black/10 border-t border-black/5 dark:border-white/5 flex justify-end">
-            <Button 
-              onClick={handleSaveProfile} 
-              disabled={isSaving} 
-              className="w-full md:w-auto rounded-xl px-8 h-12 font-bold shadow-xl shadow-primary/20 transition-all active:scale-95"
-            >
-              {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'Apply Changes'}
+          <div className="p-8 bg-black/20 border-t border-white/5 flex justify-end">
+            <Button onClick={handleSaveProfile} disabled={isSaving} className="rounded-xl px-10 h-12 font-bold shadow-xl shadow-primary/20 transition-all active:scale-95">
+              {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'Save Changes'}
             </Button>
           </div>
         </main>
