@@ -5,7 +5,7 @@ service cloud.firestore {
 
     /**
      * Kith Chat Application Security Rules
-     * Optimized for performance and real-time synchronization.
+     * Optimized for performance, real-time synchronization, and security.
      */
 
     // --- Helper Functions ---
@@ -26,29 +26,52 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     match /users/{userId} {
+      // Allow any signed-in user to see profiles for search/chat
       allow get, list: if isSignedIn();
+      
+      // Allow users to manage their own profile document
       allow create, update, delete: if isOwner(userId);
     }
 
     match /chatRooms/{chatRoomId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
+      
+      // Only allow creation if the creator is part of the members map
       allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] == true;
-      allow update: if isSignedIn() && resource.data.members[request.auth.uid] == true;
-      allow delete: if isSignedIn() && resource.data.members[request.auth.uid] == true;
+      
+      // Only members can update or delete the room
+      allow update, delete: if isSignedIn() && resource.data.members[request.auth.uid] == true;
 
       match /messages/{messageId} {
         allow list, get: if isRoomMember(chatRoomId);
+        
+        // Messages must be sent by the authenticated user
         allow create: if isRoomMember(chatRoomId) && request.resource.data.senderId == request.auth.uid;
+        
+        // Update logic for editing, deleting (soft delete), or system updates like 'readBy'
         allow update: if isRoomMember(chatRoomId) && (
           resource.data.senderId == request.auth.uid ||
           get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'reactions'])
         );
+        
         allow delete: if isRoomMember(chatRoomId) && (
           resource.data.senderId == request.auth.uid || 
           get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid
         );
+      }
+    }
+
+    // Generic rule for system collections (like calls)
+    match /calls/{callId} {
+      allow create, get, update, delete: if isSignedIn();
+      
+      match /callerCandidates/{candidateId} {
+        allow create, list, get: if isSignedIn();
+      }
+      match /receiverCandidates/{candidateId} {
+        allow create, list, get: if isSignedIn();
       }
     }
   }

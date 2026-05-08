@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { query, collection, where, doc, arrayUnion } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 
 interface NotificationManagerProps {
@@ -77,9 +77,10 @@ export default function NotificationManager({ currentConversationId }: Notificat
         
         if (token) {
           const userRef = doc(db, 'users', user.uid);
-          updateDocumentNonBlocking(userRef, {
+          // Use setDocumentNonBlocking with merge: true to handle cases where the doc might not exist yet
+          setDocumentNonBlocking(userRef, {
             fcmTokens: arrayUnion(token)
-          });
+          }, { merge: true });
         }
 
         onMessage(messaging, (payload) => {
