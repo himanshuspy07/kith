@@ -63,7 +63,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     <div
       onClick={() => onClick(room.id)}
       className={cn(
-        "p-3 flex items-center gap-3 rounded-2xl cursor-pointer transition-all group relative animate-in fade-in slide-in-from-left-2 duration-300",
+        "p-3 flex items-center gap-3 rounded-2xl cursor-pointer transition-all group relative animate-in-fade px-2",
         isSelected ? "bg-primary/10" : "hover:bg-white/5",
         room.isUnread && !isSelected && "bg-white/[0.03]"
       )}
@@ -108,7 +108,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
             ) : (room.lastMessageText || 'Start a conversation')}
           </div>
           {room.isUnread && (
-            <Badge className="ml-2 h-4 min-w-[1rem] px-1 bg-primary text-[8px] font-black rounded-full flex items-center justify-center animate-in zoom-in duration-300">
+            <Badge className="ml-2 h-4 min-w-[1rem] px-1 bg-primary text-[8px] font-black rounded-full flex items-center justify-center animate-in-fade">
               NEW
             </Badge>
           )}
@@ -265,7 +265,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
-            placeholder="Search kith..." 
+            placeholder="Search Himanshu..." 
             className="bg-white/5 border-none h-10 rounded-xl pl-10 text-xs transition-all focus:bg-white/10" 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
@@ -303,7 +303,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             />
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40 animate-in fade-in zoom-in-95">
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40 animate-in-fade">
             {activeFilter === 'pinned' ? (
               <Star className="h-10 w-10 mb-4" />
             ) : activeFilter === 'unread' ? (
