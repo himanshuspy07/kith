@@ -53,6 +53,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { format, isSameDay, differenceInMinutes, formatDistanceToNow, addHours } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
@@ -369,19 +370,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     setHasMounted(true);
   }, []);
 
-  // Screenshot Detection Heuristic
-  useEffect(() => {
-    if (!room?.vanishMode || !conversationId || !user) return;
-
-    const handleBlur = () => {
-      // Notify only if it's the active window losing focus during vanish mode
-      handleSend('text', '⚠️ Potential screen capture or app switch detected.');
-    };
-
-    window.addEventListener('blur', handleBlur);
-    return () => window.removeEventListener('blur', handleBlur);
-  }, [room?.vanishMode, conversationId, user]);
-
   const roomRef = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
     return doc(db, 'chatRooms', conversationId);
@@ -527,6 +515,19 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     });
     if (type === 'text') setInputValue('');
   };
+
+  // Screenshot Detection Heuristic - Moved after handleSend and room initialization
+  useEffect(() => {
+    if (!room?.vanishMode || !conversationId || !user) return;
+
+    const handleBlur = () => {
+      // Notify only if it's the active window losing focus during vanish mode
+      handleSend('text', '⚠️ Potential screen capture or app switch detected.');
+    };
+
+    window.addEventListener('blur', handleBlur);
+    return () => window.removeEventListener('blur', handleBlur);
+  }, [room?.vanishMode, conversationId, user, handleSend]);
 
   const handleAction = (action: 'delete' | 'edit' | 'reply' | 'forward', message: any) => {
     if (action === 'delete') {
@@ -874,4 +875,3 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     </div>
   );
 }
-
