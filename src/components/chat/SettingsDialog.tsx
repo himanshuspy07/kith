@@ -32,7 +32,9 @@ import {
   Monitor,
   Palette,
   AlertTriangle,
-  Trash2
+  Trash2,
+  Lock,
+  Key
 } from 'lucide-react';
 import { useUser, useFirestore, useAuth } from '@/firebase';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -83,6 +85,10 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>('dark');
 
+  // App Lock State
+  const [appLockEnabled, setAppLockEnabled] = useState(false);
+  const [appLockPin, setAppLockPin] = useState('');
+
   useEffect(() => {
     const savedTheme = localStorage.getItem('kith-theme') as ThemeMode || 'dark';
     setTheme(savedTheme);
@@ -111,6 +117,8 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         setUsername(data.username || '');
         setBio(data.bio || '');
         setAvatarUrl(data.profilePictureUrl || undefined);
+        setAppLockEnabled(data.appLockEnabled || false);
+        setAppLockPin(data.appLockPin || '');
       }
     };
 
@@ -143,12 +151,24 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     if (!user || !db) return;
     setIsSaving(true);
 
+    if (appLockEnabled && appLockPin.length !== 4) {
+      toast({
+        variant: "destructive",
+        title: "Invalid PIN",
+        description: "App lock PIN must be exactly 4 digits.",
+      });
+      setIsSaving(false);
+      return;
+    }
+
     const userRef = doc(db, 'users', user.uid);
     updateDocumentNonBlocking(userRef, {
       username: username.trim(),
       usernameLowercase: username.trim().toLowerCase(),
       bio: bio.trim(),
       profilePictureUrl: avatarUrl || '',
+      appLockEnabled,
+      appLockPin,
       updatedAt: serverTimestamp(),
     });
 
@@ -184,8 +204,6 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     if (!user || !db) return;
     setIsDeleting(true);
     try {
-      const userRef = doc(db, 'users', user.uid);
-      // We don't block here as per guidelines
       await deleteUser(user);
       toast({ title: "Account Deleted" });
       onOpenChange(false);
@@ -305,6 +323,50 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 
             {activeTab === 'security' && (
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                <div className="space-y-6">
+                  <Label className="text-xs font-bold uppercase tracking-widest text-primary">App Protection</Label>
+                  
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Lock className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">App Lock</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Require PIN to open app</p>
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={appLockEnabled} 
+                      onCheckedChange={setAppLockEnabled} 
+                    />
+                  </div>
+
+                  {appLockEnabled && (
+                    <div className="space-y-4 p-4 rounded-2xl bg-primary/5 border border-primary/10 animate-in zoom-in-95">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-2">
+                          <Key className="h-3 w-3" /> Set 4-Digit PIN
+                        </Label>
+                        <Input 
+                          type="password"
+                          maxLength={4}
+                          placeholder="e.g. 1234"
+                          value={appLockPin}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            if (val.length <= 4) setAppLockPin(val);
+                          }}
+                          className="bg-background border-none h-12 rounded-xl text-center text-xl tracking-[1em] font-black"
+                        />
+                      </div>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest text-center leading-relaxed">
+                        This PIN will be required every time you reload the workspace.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-4">
                   <Label className="text-xs font-bold uppercase tracking-widest text-destructive">Danger Zone</Label>
                   <AlertDialog>

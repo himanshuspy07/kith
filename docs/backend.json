@@ -15,6 +15,9 @@
         "profilePictureUrl": { "type": "string", "format": "uri" },
         "onlineStatus": { "type": "boolean" },
         "fcmTokens": { "type": "array", "items": { "type": "string" } },
+        "appLockEnabled": { "type": "boolean" },
+        "appLockPin": { "type": "string" },
+        "hasSeenTutorial": { "type": "boolean" },
         "lastActiveAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       },

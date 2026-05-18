@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -7,6 +8,7 @@ import AuthScreen from '@/components/auth/AuthScreen';
 import UserProfileSync from '@/components/chat/UserProfileSync';
 import NotificationManager from '@/components/chat/NotificationManager';
 import AppTutorial from '@/components/chat/AppTutorial';
+import AppLockOverlay from '@/components/chat/AppLockOverlay';
 import BrandLogo from '@/components/ui/brand-logo';
 import { useUser, useAuth } from '@/firebase';
 import { initiateResendVerification } from '@/firebase/non-blocking-login';
@@ -147,27 +149,29 @@ export default function Home() {
   const showChat = !isMobile || !!selectedConversationId;
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      <UserProfileSync />
-      <NotificationManager currentConversationId={selectedConversationId} />
-      <AppTutorial />
-      
-      {showSidebar && (
-        <Sidebar 
-          onSelectConversation={setSelectedConversationId} 
-          selectedConversationId={selectedConversationId} 
-          className={cn(isMobile ? "w-full" : "w-80 md:w-96")}
-        />
-      )}
-      
-      {showChat && (
-        <main className="flex-1 h-full flex flex-col min-w-0">
-          <ChatWindow 
-            conversationId={selectedConversationId} 
-            onBack={isMobile ? () => setSelectedConversationId(undefined) : undefined}
+    <AppLockOverlay>
+      <div className="flex h-screen w-full bg-background overflow-hidden">
+        <UserProfileSync />
+        <NotificationManager currentConversationId={selectedConversationId} />
+        <AppTutorial />
+        
+        {showSidebar && (
+          <Sidebar 
+            onSelectConversation={setSelectedConversationId} 
+            selectedConversationId={selectedConversationId} 
+            className={cn(isMobile ? "w-full" : "w-80 md:w-96")}
           />
-        </main>
-      )}
-    </div>
+        )}
+        
+        {showChat && (
+          <main className="flex-1 h-full flex flex-col min-w-0">
+            <ChatWindow 
+              conversationId={selectedConversationId} 
+              onBack={isMobile ? () => setSelectedConversationId(undefined) : undefined}
+            />
+          </main>
+        )}
+      </div>
+    </AppLockOverlay>
   );
 }
