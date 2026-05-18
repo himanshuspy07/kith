@@ -26,7 +26,10 @@ import {
   UserMinus,
   Settings2,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Eye,
+  EyeOff,
+  AlertTriangle
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -127,6 +130,8 @@ const MessageItem = memo(({
   const reactions = msg.reactions || {};
   const hasReactions = Object.values(reactions).some((uids: any) => Array.isArray(uids) && uids.length > 0);
   const isReadByOthers = msg.readBy && msg.readBy.some((uid: string) => uid !== msg.senderId);
+  const isViewOnce = msg.type === 'view-once';
+  const isOpened = isViewOnce && msg.openedBy && msg.openedBy.includes(currentUserId);
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const urls = msg.content?.match(urlRegex);
@@ -138,6 +143,11 @@ const MessageItem = memo(({
       if (part.startsWith('@')) return <span key={`mention-${i}`} className="mention">{part}</span>;
       return <React.Fragment key={`part-${i}`}>{part}</React.Fragment>;
     });
+  };
+
+  const handleViewOnceClick = () => {
+    if (isOpened) return;
+    onImageClick(msg.content, msg.id, true);
   };
 
   return (
@@ -172,7 +182,7 @@ const MessageItem = memo(({
           "md:opacity-0 md:group-hover:opacity-100",
           "opacity-100" 
         )}>
-          {!msg.isDeleted && (
+          {!msg.isDeleted && !isViewOnce && (
             <div className="flex items-center gap-0.5">
                <Button 
                 variant="ghost" 
@@ -238,12 +248,15 @@ const MessageItem = memo(({
           isMe 
             ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
             : "bg-black/[0.05] dark:bg-white/[0.05] backdrop-blur-md border border-black/5 dark:border-white/5 text-foreground rounded-bl-none message-shadow",
-          msg.type === 'image' ? 'p-1 cursor-zoom-in' : 'p-3 md:p-4',
+          (msg.type === 'image' || isViewOnce) ? 'p-1 cursor-zoom-in' : 'p-3 md:p-4',
           msg.isDeleted && "italic opacity-50",
           isGrouped && (isMe ? "rounded-tr-none" : "rounded-tl-none"),
           msg.vanishMode && "border-dashed border-accent/40"
         )}
-        onClick={() => msg.type === 'image' && onImageClick(msg.content)}
+        onClick={() => {
+          if (msg.type === 'image') onImageClick(msg.content);
+          if (isViewOnce) handleViewOnceClick();
+        }}
         >
           {msg.vanishMode && (
             <div className="absolute -top-2 -right-2 h-5 w-5 bg-accent text-accent-foreground rounded-full flex items-center justify-center shadow-lg border-2 border-background">
@@ -257,7 +270,17 @@ const MessageItem = memo(({
               <Forward className="h-2.5 w-2.5" /> Forwarded
             </div>
           )}
-          {msg.type === 'image' ? (
+          {isViewOnce ? (
+            <div className="p-3 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center">
+                {isOpened ? <EyeOff className="h-5 w-5 opacity-40" /> : <Eye className="h-5 w-5 text-accent" />}
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold">{isOpened ? "Photo Opened" : "View Once Photo"}</span>
+                {!isOpened && <span className="text-[10px] opacity-60">Tap to view</span>}
+              </div>
+            </div>
+          ) : msg.type === 'image' ? (
             <img src={msg.content} alt="Shared" className="rounded-xl max-w-full h-auto object-cover max-h-64" />
           ) : (
             <>
@@ -320,12 +343,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [inputValue, setInputValue] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isGroupImageUploading, setIsGroupImageUploading] = useState(false);
+  const [isViewOnceEnabled, setIsViewOnceEnabled] = useState(false);
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [editingMessage, setEditingMessage] = useState<any>(null);
   const [forwardingMessage, setForwardingMessage] = useState<any>(null);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{url: string, id?: string, isViewOnce?: boolean} | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
   const [messageLimit, setMessageLimit] = useState(30);
 
@@ -344,6 +368,19 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  // Screenshot Detection Heuristic
+  useEffect(() => {
+    if (!room?.vanishMode || !conversationId || !user) return;
+
+    const handleBlur = () => {
+      // Notify only if it's the active window losing focus during vanish mode
+      handleSend('text', '⚠️ Potential screen capture or app switch detected.');
+    };
+
+    window.addEventListener('blur', handleBlur);
+    return () => window.removeEventListener('blur', handleBlur);
+  }, [room?.vanishMode, conversationId, user]);
 
   const roomRef = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
@@ -436,7 +473,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     setShowMentions(false);
   };
 
-  const handleSend = (type: 'text' | 'image' = 'text', content?: string) => {
+  const handleSend = (type: 'text' | 'image' | 'view-once' = 'text', content?: string) => {
     const finalContent = content || inputValue.trim();
     if (!finalContent || !conversationId || !user || !room) return;
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -467,8 +504,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       vanishMode: room.vanishMode || false
     };
 
+    if (type === 'view-once') {
+      messageData.openedBy = [];
+    }
+
     if (room.vanishMode) {
-      // Set expiry for 24 hours from now
       messageData.expiresAt = addHours(new Date(), 24);
     }
 
@@ -480,7 +520,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
     addDocumentNonBlocking(collection(db, 'chatRooms', conversationId, 'messages'), messageData);
     updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId), {
-      lastMessageText: room.vanishMode ? '🔒 Disappearing message' : (type === 'image' ? 'Sent a photo' : finalContent),
+      lastMessageText: room.vanishMode ? '🔒 Disappearing message' : (type === 'image' ? 'Sent a photo' : type === 'view-once' ? 'Sent a view-once photo' : finalContent),
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
       readBy: [user.uid],
@@ -531,94 +571,25 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     updateDocumentNonBlocking(msgRef, { reactions });
   };
 
-  const handleUpdateGroupName = () => {
-    if (!roomRef || !newGroupName.trim()) return;
-    updateDocumentNonBlocking(roomRef, { 
-      name: newGroupName.trim(),
-      nameLowercase: newGroupName.trim().toLowerCase()
-    });
-    setIsEditingGroupName(false);
-    toast({ title: "Group renamed" });
-  };
-
-  const handleRemoveMember = (memberId: string) => {
-    if (!roomRef || !room || !user || room.createdBy !== user.uid) return;
-    const nextMembers = { ...room.members };
-    delete nextMembers[memberId];
-    const nextMemberIds = (room.memberIds || []).filter((id: string) => id !== memberId);
-    updateDocumentNonBlocking(roomRef, { members: nextMembers, memberIds: nextMemberIds });
-    toast({ title: "Member removed" });
-  };
-
-  const handleTogglePin = () => {
-    if (!room || !user || !roomRef) return;
-    const uid = user.uid;
-    const isPinned = room.pinnedBy?.[uid] === true;
-    updateDocumentNonBlocking(roomRef, {
-      [`pinnedBy.${uid}`]: !isPinned
-    });
-    toast({ title: !isPinned ? "Conversation Pinned" : "Conversation Unpinned" });
-  };
-
-  const handleToggleVanish = () => {
-    if (!roomRef || !room) return;
-    const nextValue = !room.vanishMode;
-    updateDocumentNonBlocking(roomRef, { vanishMode: nextValue });
-    toast({ 
-      title: nextValue ? "Vanish Mode On" : "Vanish Mode Off",
-      description: nextValue ? "Messages will self-destruct after 24 hours." : "Messages are now permanent."
-    });
-  };
-
-  const handleDeleteConversation = async () => {
-    if (!conversationId || !room || !user) return;
-    try {
-      if (room.isGroupChat) {
-        const nextMembers = { ...room.members };
-        delete nextMembers[user.uid];
-        const nextMemberIds = (room.memberIds || []).filter((id: string) => id !== user.uid);
-        updateDocumentNonBlocking(roomRef!, { members: nextMembers, memberIds: nextMemberIds });
-      } else {
-        await deleteDoc(roomRef!);
-      }
-      onBack?.();
-      toast({ title: room.isGroupChat ? "Left Group" : "Conversation Deleted" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Error" });
+  const handleImageClick = (url: string, id?: string, isViewOnce?: boolean) => {
+    setLightboxImage({ url, id, isViewOnce });
+    if (isViewOnce && id && user && db && conversationId) {
+      const msgRef = doc(db, 'chatRooms', conversationId, 'messages', id);
+      updateDocumentNonBlocking(msgRef, {
+        openedBy: Array.from(new Set([...(messages?.find(m => m.id === id)?.openedBy || []), user.uid]))
+      });
     }
   };
 
-  const handleGroupImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !roomRef) return;
-    if (file.size > 800 * 1024) {
-      toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB." });
-      return;
-    }
-    setIsGroupImageUploading(true);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      updateDocumentNonBlocking(roomRef, { groupImageUrl: reader.result as string });
-      setIsGroupImageUploading(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 800 * 1024) {
-      toast({ variant: "destructive", title: "File too large", description: "Limit is 800KB." });
-      return;
-    }
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      handleSend('image', reader.result as string);
-      setIsUploading(false);
-    };
-    reader.readAsDataURL(file);
-  };
+  const activeMessages = useMemo(() => {
+    if (!messages) return [];
+    const now = new Date();
+    return messages.filter(msg => {
+      if (!msg.expiresAt) return true;
+      const expiry = msg.expiresAt.toDate ? msg.expiresAt.toDate() : new Date(msg.expiresAt);
+      return expiry > now;
+    });
+  }, [messages]);
 
   const otherUser = useMemo(() => {
     if (!room || room.isGroupChat || !participants || !user) return null;
@@ -657,16 +628,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       return "Offline";
     }
   }, [room?.isGroupChat, otherUser, hasMounted]);
-
-  const activeMessages = useMemo(() => {
-    if (!messages) return [];
-    const now = new Date();
-    return messages.filter(msg => {
-      if (!msg.expiresAt) return true;
-      const expiry = msg.expiresAt.toDate ? msg.expiresAt.toDate() : new Date(msg.expiresAt);
-      return expiry > now;
-    });
-  }, [messages]);
 
   if (!conversationId) {
     return (
@@ -740,7 +701,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         <Camera className="h-6 w-6 text-white" />
                       </button>
                     )}
-                    <input type="file" ref={groupImageInputRef} className="hidden" accept="image/*" onChange={handleGroupImageUpload} />
+                    <input type="file" ref={groupImageInputRef} className="hidden" accept="image/*" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !roomRef) return;
+                      const reader = new FileReader();
+                      reader.onloadend = () => updateDocumentNonBlocking(roomRef, { groupImageUrl: reader.result as string });
+                      reader.readAsDataURL(file);
+                    }} />
                   </div>
                   <div className="space-y-1 w-full flex flex-col items-center">
                     {isEditingGroupName ? (
@@ -750,7 +717,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                           onChange={(e) => setNewGroupName(e.target.value)} 
                           className="h-8 rounded-lg bg-black/10"
                         />
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-accent" onClick={handleUpdateGroupName}><Check className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-accent" onClick={() => {
+                           if (!roomRef || !newGroupName.trim()) return;
+                           updateDocumentNonBlocking(roomRef, { name: newGroupName.trim(), nameLowercase: newGroupName.trim().toLowerCase() });
+                           setIsEditingGroupName(false);
+                        }}><Check className="h-4 w-4" /></Button>
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setIsEditingGroupName(false)}><X className="h-4 w-4" /></Button>
                       </div>
                     ) : (
@@ -759,16 +730,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         {room?.isGroupChat && room?.createdBy === user?.uid && (
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setIsEditingGroupName(true); setNewGroupName(room.name); }}><Settings2 className="h-4 w-4" /></Button>
                         )}
-                      </div>
-                    )}
-                    
-                    {!room?.isGroupChat && otherUser && (
-                      <div className="flex flex-col gap-1 items-center">
-                        <span className="text-xs text-muted-foreground italic max-w-xs">{otherUser.bio || "No bio set."}</span>
-                        <div className="flex items-center justify-center gap-2 text-[10px] uppercase font-bold tracking-widest text-muted-foreground/60 mt-2">
-                           <span className={cn("h-1.5 w-1.5 rounded-full", presenceText === "Active Now" ? "bg-accent" : "bg-muted")} />
-                           {presenceText}
-                        </div>
                       </div>
                     )}
                   </div>
@@ -783,7 +744,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Self-destructing messages</p>
                       </div>
                     </div>
-                    <Switch checked={room?.vanishMode || false} onCheckedChange={handleToggleVanish} />
+                    <Switch checked={room?.vanishMode || false} onCheckedChange={(val) => roomRef && updateDocumentNonBlocking(roomRef, { vanishMode: val })} />
                   </div>
                 </div>
 
@@ -797,45 +758,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                             <Avatar className="h-8 w-8"><AvatarImage src={p.profilePictureUrl} /><AvatarFallback>{p.username[0]}</AvatarFallback></Avatar>
                             <span className="text-sm font-bold">{p.username} {p.id === room.createdBy && <span className="text-[8px] bg-primary/20 text-primary px-1 rounded ml-1">ADMIN</span>}</span>
                           </div>
-                          {room.createdBy === user?.uid && p.id !== user?.uid && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveMember(p.id)}>
-                              <UserMinus className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-
-                <div className="space-y-4 pt-4">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-primary/60">Appearance</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {WALLPAPERS.map(wp => (
-                      <button 
-                        key={wp.id} 
-                        onClick={() => roomRef && updateDocumentNonBlocking(roomRef, { wallpaper: wp.value })} 
-                        className={cn(
-                          "h-16 rounded-xl overflow-hidden border-2 transition-all", 
-                          room?.wallpaper === wp.value ? "border-primary scale-[1.05] shadow-lg shadow-primary/20" : "border-black/5 hover:border-white/10"
-                        )}
-                      >
-                        <div className={cn("h-full w-full bg-cover bg-center", wp.preview)} style={{ background: wp.value }} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
-              <SheetFooter className="p-8 pt-4 flex flex-col gap-2 border-t border-white/5 bg-black/5">
-                <Button variant="outline" className="w-full rounded-xl h-12 border-white/10 font-bold text-xs uppercase tracking-widest" onClick={handleTogglePin}>
-                  <Pin className={cn("mr-2 h-3.5 w-3.5 transition-all", room?.pinnedBy?.[user?.uid || ''] && "fill-primary text-primary")} />
-                  {room?.pinnedBy?.[user?.uid || ''] ? 'Unpin' : 'Pin'} Conversation
-                </Button>
-                <Button variant="destructive" className="w-full rounded-xl h-12 font-bold text-xs uppercase tracking-widest" onClick={handleDeleteConversation}>
-                  {room?.isGroupChat ? <LogOut className="mr-2 h-3.5 w-3.5" /> : <Trash2 className="mr-2 h-3.5 w-3.5" />}
-                  {room?.isGroupChat ? "Leave Group Chat" : "Delete Conversation"}
-                </Button>
-              </SheetFooter>
             </SheetContent>
           </Sheet>
         </div>
@@ -844,151 +772,106 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       <div className="flex-1 overflow-y-auto px-2 md:px-6 py-4 md:py-8 space-y-2 scrollbar-hide z-[1]">
         {messages && messages.length >= messageLimit && (
           <div className="flex justify-center pb-6">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground hover:text-primary transition-colors"
-              onClick={() => setMessageLimit(prev => prev + 30)}
-            >
-              <ChevronUp className="h-3 w-3 mr-1" /> Load earlier messages
+            <Button variant="ghost" size="sm" className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground" onClick={() => setMessageLimit(prev => prev + 30)}>
+              <ChevronUp className="h-3 w-3 mr-1" /> Load earlier
             </Button>
           </div>
         )}
         
-        {activeMessages.map((msg, idx) => {
-          const isMe = msg.senderId === user?.uid;
-          const prevMsg = idx > 0 ? activeMessages[idx - 1] : null;
-          const isGrouped = prevMsg && 
-            prevMsg.senderId === msg.senderId && 
-            msg.createdAt && prevMsg.createdAt &&
-            msg.createdAt.toDate && prevMsg.createdAt.toDate &&
-            isSameDay(msg.createdAt.toDate(), prevMsg.createdAt.toDate()) &&
-            differenceInMinutes(msg.createdAt.toDate(), prevMsg.createdAt.toDate()) < 5 &&
-            !msg.replyToId;
-
-          return (
-            <MessageItem 
-              key={msg.id}
-              msg={msg}
-              isMe={isMe}
-              isGrouped={isGrouped}
-              sender={participants?.find(p => p.id === msg.senderId)}
-              isGroupChat={room?.isGroupChat}
-              onAction={handleAction}
-              onReact={handleReact}
-              onImageClick={setLightboxImage}
-              currentUserId={user?.uid}
-            />
-          );
-        })}
+        {activeMessages.map((msg, idx) => (
+          <MessageItem 
+            key={msg.id}
+            msg={msg}
+            isMe={msg.senderId === user?.uid}
+            sender={participants?.find(p => p.id === msg.senderId)}
+            isGroupChat={room?.isGroupChat}
+            onAction={handleAction}
+            onReact={handleReact}
+            onImageClick={handleImageClick}
+            currentUserId={user?.uid}
+          />
+        ))}
         <div ref={messagesEndRef} />
       </div>
 
       <div className="p-4 md:p-8 bg-transparent z-10 transition-all duration-500">
         <div className="max-w-5xl mx-auto space-y-4">
-          {(replyingTo || editingMessage) && (
-            <div className="glass-morphism-heavy rounded-t-[2rem] p-4 border-b-0 flex items-center justify-between animate-in slide-in-from-bottom-4 duration-500 shadow-xl">
-              <div className="flex items-center gap-4 overflow-hidden">
-                <div className="h-10 w-1.5 rounded-full bg-primary shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
-                <div className="flex flex-col overflow-hidden">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                    {replyingTo ? "Replying to" : "Editing message"}
-                  </span>
-                  <span className="text-sm text-muted-foreground truncate font-medium">
-                    {replyingTo ? (replyingTo.type === 'image' ? "Image" : replyingTo.content) : editingMessage.content}
-                  </span>
-                </div>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-10 w-10 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors" 
-                onClick={() => { setReplyingTo(null); setEditingMessage(null); if(editingMessage) setInputValue(''); }}
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-          )}
-
-          {showMentions && participants && (
-            <div className="glass-morphism-heavy rounded-[2rem] p-3 mb-2 shadow-2xl animate-in zoom-in-95 duration-300">
-              <div className="max-h-48 overflow-y-auto scrollbar-hide space-y-1">
-                {participants.filter(p => p.username.toLowerCase().includes(mentionFilter) && p.id !== user?.uid).map(p => (
-                  <button key={p.id} onClick={() => insertMention(p.username)} className="w-full flex items-center gap-3 p-3 hover:bg-primary/10 rounded-2xl transition-all">
-                    <Avatar className="h-10 w-10"><AvatarImage src={p.profilePictureUrl} /><AvatarFallback>{p.username[0]}</AvatarFallback></Avatar>
-                    <span className="text-sm font-bold tracking-tight">{p.username}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className={cn(
-            "flex items-end gap-3 glass-morphism p-3 md:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 group focus-within:ring-2 focus-within:ring-primary/20",
-            (replyingTo || editingMessage) ? "rounded-b-[2rem] rounded-t-none border-t-white/10" : "rounded-[2rem]",
-            room?.vanishMode && "ring-2 ring-accent/30 border-accent/20"
+            "flex flex-col gap-2 glass-morphism p-3 md:p-4 shadow-2xl transition-all duration-500 group focus-within:ring-2 focus-within:ring-primary/20 rounded-[2rem]",
+            room?.vanishMode && "ring-2 ring-accent/30"
           )}>
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={cn("h-12 w-12 rounded-2xl hover:bg-primary/10 hover:text-primary transition-all shrink-0", room?.vanishMode && "hover:bg-accent/10 hover:text-accent")} 
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon className="h-6 w-6" />}
-            </Button>
-            
-            <div className="flex-1 relative">
-               <Textarea 
+            <div className="flex items-end gap-3">
+              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setIsUploading(true);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  handleSend(isViewOnceEnabled ? 'view-once' : 'image', reader.result as string);
+                  setIsUploading(false);
+                  setIsViewOnceEnabled(false);
+                };
+                reader.readAsDataURL(file);
+              }} />
+              <div className="flex flex-col gap-2 shrink-0">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={cn("h-10 w-10 rounded-xl", isViewOnceEnabled && "bg-accent/20 text-accent")}
+                  onClick={() => setIsViewOnceEnabled(!isViewOnceEnabled)}
+                >
+                  {isViewOnceEnabled ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                </Button>
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl" onClick={() => fileInputRef.current?.click()}>
+                  {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon className="h-5 w-5" />}
+                </Button>
+              </div>
+              
+              <Textarea 
                 value={inputValue} 
                 onChange={handleInputChange} 
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !showMentions) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }} 
-                placeholder={editingMessage ? "Refine your thought..." : (room?.vanishMode ? "🔒 Vanish mode message..." : "Message kith...")} 
-                className="bg-transparent border-none min-h-[32px] h-auto max-h-48 py-1.5 px-1 focus-visible:ring-0 text-base md:text-lg resize-none scrollbar-hide font-medium placeholder:text-muted-foreground/40" 
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
+                placeholder={isViewOnceEnabled ? "🔒 View-once message..." : "Message kith..."}
+                className="bg-transparent border-none min-h-[40px] h-[40px] focus-visible:ring-0 text-base resize-none py-2"
               />
-            </div>
 
-            <Button 
-              onClick={() => handleSend()} 
-              disabled={!inputValue.trim() || isUploading} 
-              className={cn(
-                "h-12 w-12 md:h-14 md:w-14 rounded-2xl shadow-xl transition-all active:scale-90 shrink-0",
-                inputValue.trim() 
-                  ? (room?.vanishMode ? "bg-accent hover:bg-accent/90 shadow-accent/20" : "bg-primary hover:bg-primary/90 shadow-primary/20") 
-                  : "bg-muted/20 scale-95 opacity-50"
-              )}
-            >
-              <Send className={cn("h-6 w-6 transition-transform", inputValue.trim() && "group-hover:translate-x-1 group-hover:-translate-y-1")} />
-            </Button>
+              <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isUploading} className="h-12 w-12 rounded-2xl shrink-0">
+                <Send className="h-5 w-5" />
+              </Button>
+            </div>
+            {isViewOnceEnabled && (
+              <div className="px-1 py-1 flex items-center gap-2 animate-in slide-in-from-left-2">
+                <Badge variant="secondary" className="bg-accent/10 text-accent border-accent/20 flex gap-1 items-center px-2 py-1">
+                  <ShieldAlert className="h-3 w-3" /> View Once Mode Active
+                </Badge>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <ForwardDialog 
-        open={!!forwardingMessage} 
-        onOpenChange={(open) => !open && setForwardingMessage(null)} 
-        messageToForward={forwardingMessage} 
-      />
+      <ForwardDialog open={!!forwardingMessage} onOpenChange={(open) => !open && setForwardingMessage(null)} messageToForward={forwardingMessage} />
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
-        <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden rounded-3xl">
-          <div className="relative group w-full h-full flex items-center justify-center">
+        <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/95 flex items-center justify-center overflow-hidden rounded-3xl">
+          <div className="relative group w-full h-full flex flex-col items-center justify-center p-4">
             {lightboxImage && (
-              <img src={lightboxImage} alt="Shared content" className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300 shadow-2xl" />
+              <img src={lightboxImage.url} alt="Content" className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl" />
             )}
-            <div className="absolute top-4 right-4 flex gap-2">
-              <Button variant="secondary" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all" onClick={() => setLightboxImage(null)}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
+            {lightboxImage?.isViewOnce && (
+              <div className="mt-6 flex flex-col items-center gap-2 text-white">
+                <AlertTriangle className="h-8 w-8 text-accent animate-pulse" />
+                <p className="font-bold">This is a view-once photo.</p>
+                <p className="text-xs opacity-60">It will disappear when you close this window.</p>
+              </div>
+            )}
+            <Button variant="secondary" size="icon" className="absolute top-4 right-4 rounded-full" onClick={() => setLightboxImage(null)}>
+              <X className="h-5 w-5" />
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
