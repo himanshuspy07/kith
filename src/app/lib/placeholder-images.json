@@ -24,6 +24,42 @@
       "description": "Sample shared image in chat",
       "imageUrl": "https://picsum.photos/seed/chatimg/600/400",
       "imageHint": "landscape nature"
+    },
+    {
+      "id": "wallpaper-stars",
+      "description": "Starry night sky wallpaper",
+      "imageUrl": "https://picsum.photos/seed/stars1/1200/800",
+      "imageHint": "stars night"
+    },
+    {
+      "id": "wallpaper-galaxy",
+      "description": "Deep space galaxy wallpaper",
+      "imageUrl": "https://picsum.photos/seed/galaxy1/1200/800",
+      "imageHint": "galaxy nebula"
+    },
+    {
+      "id": "wallpaper-animals",
+      "description": "Wildlife animal wallpaper",
+      "imageUrl": "https://picsum.photos/seed/animals1/1200/800",
+      "imageHint": "wildlife animals"
+    },
+    {
+      "id": "wallpaper-love",
+      "description": "Romantic heart themed wallpaper",
+      "imageUrl": "https://picsum.photos/seed/love1/1200/800",
+      "imageHint": "heart love"
+    },
+    {
+      "id": "wallpaper-nature",
+      "description": "Calming nature landscape wallpaper",
+      "imageUrl": "https://picsum.photos/seed/nature1/1200/800",
+      "imageHint": "nature forest"
+    },
+    {
+      "id": "wallpaper-abstract",
+      "description": "Modern abstract art wallpaper",
+      "imageUrl": "https://picsum.photos/seed/abstract1/1200/800",
+      "imageHint": "abstract art"
     }
   ]
 }

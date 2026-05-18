@@ -78,11 +78,13 @@ interface ChatWindowProps {
 
 const WALLPAPERS = [
   { id: 'none', name: 'Clean', value: 'transparent', preview: 'bg-background' },
+  { id: 'stars', name: 'Stars', value: 'url("https://picsum.photos/seed/stars1/1200/800")', preview: 'bg-slate-950' },
+  { id: 'galaxy', name: 'Galaxy', value: 'url("https://picsum.photos/seed/galaxy1/1200/800")', preview: 'bg-indigo-950' },
+  { id: 'animals', name: 'Animals', value: 'url("https://picsum.photos/seed/animals1/1200/800")', preview: 'bg-amber-950' },
+  { id: 'love', name: 'Love', value: 'url("https://picsum.photos/seed/love1/1200/800")', preview: 'bg-rose-950' },
+  { id: 'nature', name: 'Nature', value: 'url("https://picsum.photos/seed/nature1/1200/800")', preview: 'bg-emerald-950' },
+  { id: 'abstract', name: 'Abstract', value: 'url("https://picsum.photos/seed/abstract1/1200/800")', preview: 'bg-purple-950' },
   { id: 'midnight', name: 'Midnight', value: 'linear-gradient(180deg, #020617 0%, #0f172a 100%)', preview: 'bg-slate-900' },
-  { id: 'abyss', name: 'Abyss', value: 'radial-gradient(circle at center, #1e1b4b, #020617)', preview: 'bg-indigo-950' },
-  { id: 'forest', name: 'Deep Forest', value: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', preview: 'bg-emerald-950' },
-  { id: 'crimson', name: 'Crimson Night', value: 'linear-gradient(135deg, #450a0a 0%, #000000 100%)', preview: 'bg-red-950' },
-  { id: 'nordic', name: 'Nordic Blue', value: 'linear-gradient(to right, #0f172a, #334155)', preview: 'bg-blue-900' },
 ];
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "💯", "🙌", "✨", "🚀"];
@@ -681,7 +683,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
       <div 
-        className="absolute inset-0 z-0 transition-all duration-700 ease-in-out pointer-events-none opacity-40"
+        className="absolute inset-0 z-0 transition-all duration-700 ease-in-out pointer-events-none opacity-40 bg-cover bg-center bg-no-repeat"
         style={{ background: room?.wallpaper || 'transparent' }}
       />
       
@@ -818,7 +820,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                           room?.wallpaper === wp.value ? "border-primary scale-[1.05] shadow-lg shadow-primary/20" : "border-black/5 hover:border-white/10"
                         )}
                       >
-                        <div className={cn("h-full w-full", wp.preview)} style={{ background: wp.value }} />
+                        <div className={cn("h-full w-full bg-cover bg-center", wp.preview)} style={{ background: wp.value }} />
                       </button>
                     ))}
                   </div>
