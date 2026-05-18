@@ -2,11 +2,12 @@
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { LogOut, Search, Plus, Pin, MessageSquare, Loader2 } from 'lucide-react';
+import { LogOut, Search, Plus, Pin, MessageSquare, Loader2, Bell, Star, Inbox } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { useCollection, useDoc, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
@@ -62,14 +63,14 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     <div
       onClick={() => onClick(room.id)}
       className={cn(
-        "p-3 flex items-center gap-3 rounded-2xl cursor-pointer transition-all group relative",
+        "p-3 flex items-center gap-3 rounded-2xl cursor-pointer transition-all group relative animate-in fade-in slide-in-from-left-2 duration-300",
         isSelected ? "bg-primary/10" : "hover:bg-white/5",
         room.isUnread && !isSelected && "bg-white/[0.03]"
       )}
     >
       {isSelected && <div className="absolute left-0 w-1 h-8 bg-primary rounded-full -translate-x-1" />}
       <div className="relative shrink-0">
-        <Avatar className={cn("h-12 w-12 border transition-all", isSelected ? "border-primary/50" : "border-white/10")}>
+        <Avatar className={cn("h-12 w-12 border transition-all duration-500", isSelected ? "border-primary/50 scale-105" : "border-white/10 group-hover:scale-105")}>
           <AvatarImage src={room.displayAvatar || undefined} className="object-cover" />
           <AvatarFallback className="bg-muted text-muted-foreground font-medium">{room.displayName?.[0]}</AvatarFallback>
         </Avatar>
@@ -121,6 +122,7 @@ ConversationItem.displayName = 'ConversationItem';
 export default function Sidebar({ onSelectConversation, selectedConversationId, className }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'pinned' | 'unread'>('all');
   const { user } = useUser();
   const db = useFirestore();
   const auth = useAuth();
@@ -201,13 +203,23 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
   const filteredConversations = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return conversationListData.filter(r => {
+    let list = conversationListData;
+
+    if (activeFilter === 'pinned') {
+      list = list.filter(r => r.isPinned);
+    } else if (activeFilter === 'unread') {
+      list = list.filter(r => r.isUnread);
+    }
+
+    if (!q) return list;
+
+    return list.filter(r => {
       const matchName = r.displayName.toLowerCase().includes(q);
       const matchBio = r.otherUserProfile?.bio?.toLowerCase().includes(q);
       const matchLastMsg = r.lastMessageText?.toLowerCase().includes(q);
       return matchName || matchBio || matchLastMsg;
     });
-  }, [conversationListData, searchQuery]);
+  }, [conversationListData, searchQuery, activeFilter]);
 
   return (
     <div className={cn("h-full border-r border-white/5 flex flex-col bg-background shrink-0 z-30", className)}>
@@ -249,19 +261,33 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         </div>
       </div>
 
-      <div className="px-4 md:px-6 py-4">
+      <div className="px-4 md:px-6 py-4 space-y-4">
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
-            placeholder="Search kith global..." 
+            placeholder="Search kith..." 
             className="bg-white/5 border-none h-10 rounded-xl pl-10 text-xs transition-all focus:bg-white/10" 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
           />
         </div>
+
+        <Tabs value={activeFilter} onValueChange={(val: any) => setActiveFilter(val)} className="w-full">
+          <TabsList className="bg-white/5 border-none h-9 p-1 rounded-xl w-full grid grid-cols-3">
+            <TabsTrigger value="all" className="rounded-lg text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              All
+            </TabsTrigger>
+            <TabsTrigger value="pinned" className="rounded-lg text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Pinned
+            </TabsTrigger>
+            <TabsTrigger value="unread" className="rounded-lg text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Unread
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 md:px-4 space-y-1 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto px-2 md:px-4 space-y-1 scrollbar-hide pb-6">
         {isLoading ? (
           <div className="p-2 space-y-2">
             {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 w-full bg-white/5 animate-pulse rounded-2xl" />)}
@@ -277,10 +303,16 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             />
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
-            <MessageSquare className="h-10 w-10 mb-4" />
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40 animate-in fade-in zoom-in-95">
+            {activeFilter === 'pinned' ? (
+              <Star className="h-10 w-10 mb-4" />
+            ) : activeFilter === 'unread' ? (
+              <Inbox className="h-10 w-10 mb-4" />
+            ) : (
+              <MessageSquare className="h-10 w-10 mb-4" />
+            )}
             <p className="text-xs font-bold uppercase tracking-widest leading-relaxed">
-              {searchQuery ? "No matches" : "No active chats"}
+              {searchQuery ? "No matches found" : `No ${activeFilter !== 'all' ? activeFilter : 'active'} chats`}
             </p>
           </div>
         )}

@@ -24,12 +24,15 @@ import {
   Forward,
   ExternalLink,
   UserMinus,
-  Settings2
+  Settings2,
+  Clock,
+  ShieldAlert
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { 
   Sheet, 
   SheetContent, 
@@ -45,9 +48,9 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { format, isSameDay, differenceInMinutes, formatDistanceToNow } from 'date-fns';
+import { format, isSameDay, differenceInMinutes, formatDistanceToNow, addHours } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { 
@@ -229,16 +232,23 @@ const MessageItem = memo(({
         </div>
 
         <div className={cn(
-          "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-transform relative max-w-[85vw] md:max-w-[400px]",
+          "rounded-2xl text-[13px] leading-relaxed shadow-lg transition-all relative max-w-[85vw] md:max-w-[400px]",
           isMe 
             ? "bg-primary text-primary-foreground rounded-br-none message-shadow-me" 
             : "bg-black/[0.05] dark:bg-white/[0.05] backdrop-blur-md border border-black/5 dark:border-white/5 text-foreground rounded-bl-none message-shadow",
           msg.type === 'image' ? 'p-1 cursor-zoom-in' : 'p-3 md:p-4',
           msg.isDeleted && "italic opacity-50",
-          isGrouped && (isMe ? "rounded-tr-none" : "rounded-tl-none")
+          isGrouped && (isMe ? "rounded-tr-none" : "rounded-tl-none"),
+          msg.vanishMode && "border-dashed border-accent/40"
         )}
         onClick={() => msg.type === 'image' && onImageClick(msg.content)}
         >
+          {msg.vanishMode && (
+            <div className="absolute -top-2 -right-2 h-5 w-5 bg-accent text-accent-foreground rounded-full flex items-center justify-center shadow-lg border-2 border-background">
+              <Clock className="h-3 w-3" />
+            </div>
+          )}
+          
           <span className="sr-only">Message Content</span>
           {msg.forwardedFrom && (
             <div className="flex items-center gap-1 opacity-50 text-[9px] font-bold uppercase tracking-widest mb-1">
@@ -452,7 +462,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       readBy: [user.uid],
       isDeleted: false,
       isEdited: false,
+      vanishMode: room.vanishMode || false
     };
+
+    if (room.vanishMode) {
+      // Set expiry for 24 hours from now
+      messageData.expiresAt = addHours(new Date(), 24);
+    }
 
     if (replyingTo) {
       messageData.replyToId = replyingTo.id;
@@ -462,7 +478,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
     addDocumentNonBlocking(collection(db, 'chatRooms', conversationId, 'messages'), messageData);
     updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId), {
-      lastMessageText: type === 'image' ? 'Sent a photo' : finalContent,
+      lastMessageText: room.vanishMode ? '🔒 Disappearing message' : (type === 'image' ? 'Sent a photo' : finalContent),
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
       readBy: [user.uid],
@@ -540,6 +556,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       [`pinnedBy.${uid}`]: !isPinned
     });
     toast({ title: !isPinned ? "Conversation Pinned" : "Conversation Unpinned" });
+  };
+
+  const handleToggleVanish = () => {
+    if (!roomRef || !room) return;
+    const nextValue = !room.vanishMode;
+    updateDocumentNonBlocking(roomRef, { vanishMode: nextValue });
+    toast({ 
+      title: nextValue ? "Vanish Mode On" : "Vanish Mode Off",
+      description: nextValue ? "Messages will self-destruct after 24 hours." : "Messages are now permanent."
+    });
   };
 
   const handleDeleteConversation = async () => {
@@ -630,6 +656,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   }, [room?.isGroupChat, otherUser, hasMounted]);
 
+  const activeMessages = useMemo(() => {
+    if (!messages) return [];
+    const now = new Date();
+    return messages.filter(msg => {
+      if (!msg.expiresAt) return true;
+      const expiry = msg.expiresAt.toDate ? msg.expiresAt.toDate() : new Date(msg.expiresAt);
+      return expiry > now;
+    });
+  }, [messages]);
+
   if (!conversationId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-background">
@@ -649,14 +685,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         style={{ background: room?.wallpaper || 'transparent' }}
       />
       
-      <header className="h-16 md:h-20 px-4 md:px-6 flex items-center justify-between glass-morphism sticky top-0 z-10 mx-0 mt-0 md:mx-4 md:mt-4 md:rounded-2xl shadow-lg border-white/5">
+      <header className="h-16 md:h-20 px-4 md:px-6 flex items-center justify-between glass-morphism sticky top-0 z-10 mx-0 mt-0 md:mx-4 md:mt-4 md:rounded-2xl shadow-lg border-white/5 transition-all">
         <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
           {onBack && (
             <Button variant="ghost" size="icon" className="md:hidden shrink-0" onClick={onBack}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
           )}
-          <Avatar className="h-9 w-9 md:h-10 md:w-10 border border-white/10 shrink-0">
+          <Avatar className="h-9 w-9 md:h-10 md:w-10 border border-white/10 shrink-0 shadow-sm">
             <AvatarImage src={chatAvatar || undefined} className="object-cover" />
             <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs md:text-sm">{chatDisplayName?.[0]}</AvatarFallback>
           </Avatar>
@@ -664,6 +700,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             <div className="flex items-center gap-2">
                <h3 className="text-sm font-bold leading-none truncate">{chatDisplayName}</h3>
                {room?.pinnedBy?.[user?.uid || ''] && <Pin className="h-3 w-3 text-primary fill-primary" />}
+               {room?.vanishMode && <ShieldAlert className="h-3 w-3 text-accent" />}
             </div>
             <div className={cn(
               "text-[10px] truncate mt-1 font-medium italic flex items-center gap-1.5",
@@ -681,11 +718,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <div className="flex items-center gap-1 md:gap-2">
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full hover:bg-black/5 dark:hover:bg-white/5 shrink-0">
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-black/5 dark:hover:bg-white/5 shrink-0 transition-transform active:scale-90">
                 <Info className="h-5 w-5 text-muted-foreground" />
               </Button>
             </SheetTrigger>
-            <SheetContent className="bg-card/95 backdrop-blur-xl border-black/5 dark:border-white/10 w-full sm:max-w-md flex flex-col p-0">
+            <SheetContent className="bg-card/95 backdrop-blur-xl border-black/5 dark:border-white/10 w-full sm:max-w-md flex flex-col p-0 rounded-l-[2.5rem] shadow-2xl">
               <SheetHeader className="p-8 pb-4">
                 <SheetTitle className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Conversation Info</SheetTitle>
               </SheetHeader>
@@ -735,12 +772,25 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   </div>
                 </div>
 
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-white/5">
+                    <div className="flex items-center gap-3">
+                      <Clock className="h-5 w-5 text-accent" />
+                      <div>
+                        <p className="text-sm font-bold">Vanish Mode</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Self-destructing messages</p>
+                      </div>
+                    </div>
+                    <Switch checked={room?.vanishMode || false} onCheckedChange={handleToggleVanish} />
+                  </div>
+                </div>
+
                 {room?.isGroupChat && participants && (
                   <div className="space-y-4">
                     <Label className="text-xs font-bold uppercase tracking-widest text-primary/60">Members ({room.memberIds?.length})</Label>
                     <div className="space-y-2">
                       {participants.map(p => (
-                        <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5">
+                        <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                           <div className="flex items-center gap-3">
                             <Avatar className="h-8 w-8"><AvatarImage src={p.profilePictureUrl} /><AvatarFallback>{p.username[0]}</AvatarFallback></Avatar>
                             <span className="text-sm font-bold">{p.username} {p.id === room.createdBy && <span className="text-[8px] bg-primary/20 text-primary px-1 rounded ml-1">ADMIN</span>}</span>
@@ -765,7 +815,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         onClick={() => roomRef && updateDocumentNonBlocking(roomRef, { wallpaper: wp.value })} 
                         className={cn(
                           "h-16 rounded-xl overflow-hidden border-2 transition-all", 
-                          room?.wallpaper === wp.value ? "border-primary scale-[1.02]" : "border-black/5 hover:border-white/10"
+                          room?.wallpaper === wp.value ? "border-primary scale-[1.05] shadow-lg shadow-primary/20" : "border-black/5 hover:border-white/10"
                         )}
                       >
                         <div className={cn("h-full w-full", wp.preview)} style={{ background: wp.value }} />
@@ -776,7 +826,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               </div>
               <SheetFooter className="p-8 pt-4 flex flex-col gap-2 border-t border-white/5 bg-black/5">
                 <Button variant="outline" className="w-full rounded-xl h-12 border-white/10 font-bold text-xs uppercase tracking-widest" onClick={handleTogglePin}>
-                  <Pin className={cn("mr-2 h-3.5 w-3.5", room?.pinnedBy?.[user?.uid || ''] && "fill-primary text-primary")} />
+                  <Pin className={cn("mr-2 h-3.5 w-3.5 transition-all", room?.pinnedBy?.[user?.uid || ''] && "fill-primary text-primary")} />
                   {room?.pinnedBy?.[user?.uid || ''] ? 'Unpin' : 'Pin'} Conversation
                 </Button>
                 <Button variant="destructive" className="w-full rounded-xl h-12 font-bold text-xs uppercase tracking-widest" onClick={handleDeleteConversation}>
@@ -803,9 +853,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </div>
         )}
         
-        {messages?.map((msg, idx) => {
+        {activeMessages.map((msg, idx) => {
           const isMe = msg.senderId === user?.uid;
-          const prevMsg = idx > 0 ? messages[idx - 1] : null;
+          const prevMsg = idx > 0 ? activeMessages[idx - 1] : null;
           const isGrouped = prevMsg && 
             prevMsg.senderId === msg.senderId && 
             msg.createdAt && prevMsg.createdAt &&
@@ -832,10 +882,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 md:p-8 bg-transparent z-10">
+      <div className="p-4 md:p-8 bg-transparent z-10 transition-all duration-500">
         <div className="max-w-5xl mx-auto space-y-4">
           {(replyingTo || editingMessage) && (
-            <div className="glass-morphism-heavy rounded-t-[2rem] p-4 border-b-0 flex items-center justify-between animate-in slide-in-from-bottom-4 duration-500">
+            <div className="glass-morphism-heavy rounded-t-[2rem] p-4 border-b-0 flex items-center justify-between animate-in slide-in-from-bottom-4 duration-500 shadow-xl">
               <div className="flex items-center gap-4 overflow-hidden">
                 <div className="h-10 w-1.5 rounded-full bg-primary shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
                 <div className="flex flex-col overflow-hidden">
@@ -873,13 +923,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
           <div className={cn(
             "flex items-end gap-3 glass-morphism p-3 md:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-500 group focus-within:ring-2 focus-within:ring-primary/20",
-            (replyingTo || editingMessage) ? "rounded-b-[2rem] rounded-t-none border-t-white/10" : "rounded-[2rem]"
+            (replyingTo || editingMessage) ? "rounded-b-[2rem] rounded-t-none border-t-white/10" : "rounded-[2rem]",
+            room?.vanishMode && "ring-2 ring-accent/30 border-accent/20"
           )}>
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-12 w-12 rounded-2xl hover:bg-primary/10 hover:text-primary transition-all shrink-0" 
+              className={cn("h-12 w-12 rounded-2xl hover:bg-primary/10 hover:text-primary transition-all shrink-0", room?.vanishMode && "hover:bg-accent/10 hover:text-accent")} 
               onClick={() => fileInputRef.current?.click()}
             >
               {isUploading ? <Loader2 className="animate-spin" /> : <ImageIcon className="h-6 w-6" />}
@@ -895,7 +946,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     handleSend();
                   }
                 }} 
-                placeholder={editingMessage ? "Refine your thought..." : "Message kith..."} 
+                placeholder={editingMessage ? "Refine your thought..." : (room?.vanishMode ? "🔒 Vanish mode message..." : "Message kith...")} 
                 className="bg-transparent border-none min-h-[32px] h-auto max-h-48 py-1.5 px-1 focus-visible:ring-0 text-base md:text-lg resize-none scrollbar-hide font-medium placeholder:text-muted-foreground/40" 
               />
             </div>
@@ -904,8 +955,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               onClick={() => handleSend()} 
               disabled={!inputValue.trim() || isUploading} 
               className={cn(
-                "h-12 w-12 md:h-14 md:w-14 rounded-2xl shadow-xl shadow-primary/20 shrink-0 transition-all active:scale-90",
-                inputValue.trim() ? "bg-primary hover:bg-primary/90 scale-100" : "bg-muted/20 scale-95 opacity-50"
+                "h-12 w-12 md:h-14 md:w-14 rounded-2xl shadow-xl transition-all active:scale-90 shrink-0",
+                inputValue.trim() 
+                  ? (room?.vanishMode ? "bg-accent hover:bg-accent/90 shadow-accent/20" : "bg-primary hover:bg-primary/90 shadow-primary/20") 
+                  : "bg-muted/20 scale-95 opacity-50"
               )}
             >
               <Send className={cn("h-6 w-6 transition-transform", inputValue.trim() && "group-hover:translate-x-1 group-hover:-translate-y-1")} />
@@ -921,14 +974,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       />
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
-        <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">
-          <span className="sr-only">Shared Image Lightbox</span>
+        <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden rounded-3xl">
           <div className="relative group w-full h-full flex items-center justify-center">
             {lightboxImage && (
-              <img src={lightboxImage} alt="Shared content" className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" />
+              <img src={lightboxImage} alt="Shared content" className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300 shadow-2xl" />
             )}
             <div className="absolute top-4 right-4 flex gap-2">
-              <Button variant="secondary" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md" onClick={() => setLightboxImage(null)}>
+              <Button variant="secondary" size="icon" className="rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all" onClick={() => setLightboxImage(null)}>
                 <X className="h-5 w-5" />
               </Button>
             </div>
