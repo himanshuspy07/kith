@@ -1,8 +1,7 @@
-
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { LogOut, Search, Plus, Pin, MessageSquare, Loader2, Bell, Star, Inbox } from 'lucide-react';
+import { LogOut, Search, Plus, Pin, MessageSquare, Loader2, Bell, Star, Inbox, Settings } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { useCollection, useDoc, useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import NewChatDialog from './NewChatDialog';
 import SettingsDialog from './SettingsDialog';
 import {
@@ -43,6 +43,7 @@ const TypingAnimation = () => (
 
 const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any) => {
   const [hasMounted, setHasMounted] = useState(false);
+  const db = useFirestore();
   
   useEffect(() => {
     setHasMounted(true);
@@ -58,6 +59,15 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
   }, [hasMounted, room.updatedAt]);
 
   const isTyping = room.typing && Object.keys(room.typing).length > 0 && Object.keys(room.typing).some(id => id !== currentUserId);
+
+  const togglePin = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!db || !currentUserId) return;
+    const roomRef = doc(db, 'chatRooms', room.id);
+    updateDocumentNonBlocking(roomRef, {
+      [`pinnedBy.${currentUserId}`]: !room.isPinned
+    });
+  };
 
   return (
     <div
@@ -75,7 +85,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
           <AvatarFallback className="bg-muted text-muted-foreground font-medium">{room.displayName?.[0]}</AvatarFallback>
         </Avatar>
         {room.isOnline && <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-accent border-[3px] border-background shadow-sm" />}
-        {room.isPinned && <Pin className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-background rounded-full p-0.5 text-primary fill-primary shadow-sm" />}
+        {room.isPinned && <Pin className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-primary text-white rounded-full p-0.5 shadow-sm" />}
       </div>
       <div className="flex-1 overflow-hidden">
         <div className="flex justify-between items-center mb-0.5">
@@ -94,6 +104,17 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
                 {timeAgo}
               </span>
             )}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={cn(
+                "h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity",
+                room.isPinned ? "opacity-100 text-primary" : "text-muted-foreground"
+              )}
+              onClick={togglePin}
+            >
+              <Pin className={cn("h-3 w-3", room.isPinned && "fill-current")} />
+            </Button>
           </div>
         </div>
         <div className="flex justify-between items-center">
@@ -232,6 +253,9 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           <div className="flex flex-col max-w-[100px]"><span className="font-bold text-xs truncate leading-none">{currentUserProfile?.username || 'Kith User'}</span></div>
         </div>
         <div className="flex gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setIsSettingsOpen(true)}>
+            <Settings className="h-4 w-4" />
+          </Button>
           <NewChatDialog onChatCreated={onSelectConversation} />
           
           <AlertDialog>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -29,7 +28,8 @@ import {
   ShieldAlert,
   Eye,
   EyeOff,
-  AlertTriangle
+  AlertTriangle,
+  Palette
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -70,7 +70,8 @@ import {
 } from 'firebase/firestore';
 import { 
   addDocumentNonBlocking, 
-  updateDocumentNonBlocking
+  updateDocumentNonBlocking,
+  deleteDocumentNonBlocking
 } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import ForwardDialog from './ForwardDialog';
@@ -88,7 +89,6 @@ const WALLPAPERS = [
   { id: 'love', name: 'Love', value: 'url("https://picsum.photos/seed/love1/1200/800")', preview: 'bg-rose-950' },
   { id: 'nature', name: 'Nature', value: 'url("https://picsum.photos/seed/nature1/1200/800")', preview: 'bg-emerald-950' },
   { id: 'abstract', name: 'Abstract', value: 'url("https://picsum.photos/seed/abstract1/1200/800")', preview: 'bg-purple-950' },
-  { id: 'midnight', name: 'Midnight', value: 'linear-gradient(180deg, #020617 0%, #0f172a 100%)', preview: 'bg-slate-900' },
 ];
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "💯", "🙌", "✨", "🚀"];
@@ -343,7 +343,6 @@ MessageItem.displayName = 'MessageItem';
 export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  const [isGroupImageUploading, setIsGroupImageUploading] = useState(false);
   const [isViewOnceEnabled, setIsViewOnceEnabled] = useState(false);
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [editingMessage, setEditingMessage] = useState<any>(null);
@@ -454,13 +453,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   };
 
-  const insertMention = (username: string) => {
-    const lastAtPos = inputValue.lastIndexOf('@');
-    const newVal = inputValue.substring(0, lastAtPos) + '@' + username + ' ';
-    setInputValue(newVal);
-    setShowMentions(false);
-  };
-
   const handleSend = (type: 'text' | 'image' | 'view-once' = 'text', content?: string) => {
     const finalContent = content || inputValue.trim();
     if (!finalContent || !conversationId || !user || !room) return;
@@ -516,18 +508,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (type === 'text') setInputValue('');
   };
 
-  // Screenshot Detection Heuristic - Moved after handleSend and room initialization
   useEffect(() => {
     if (!room?.vanishMode || !conversationId || !user) return;
-
     const handleBlur = () => {
-      // Notify only if it's the active window losing focus during vanish mode
       handleSend('text', '⚠️ Potential screen capture or app switch detected.');
     };
-
     window.addEventListener('blur', handleBlur);
     return () => window.removeEventListener('blur', handleBlur);
-  }, [room?.vanishMode, conversationId, user, handleSend]);
+  }, [room?.vanishMode, conversationId, user]);
 
   const handleAction = (action: 'delete' | 'edit' | 'reply' | 'forward', message: any) => {
     if (action === 'delete') {
@@ -630,6 +618,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   }, [room?.isGroupChat, otherUser, hasMounted]);
 
+  const handleDeleteConversation = () => {
+    if (!roomRef || !onBack) return;
+    deleteDocumentNonBlocking(roomRef);
+    toast({ title: "Conversation Deleted" });
+    onBack();
+  };
+
   if (!conversationId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-background">
@@ -646,7 +641,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
       <div 
         className="absolute inset-0 z-0 transition-all duration-700 ease-in-out pointer-events-none opacity-40 bg-cover bg-center bg-no-repeat"
-        style={{ background: room?.wallpaper || 'transparent' }}
+        style={{ backgroundImage: room?.wallpaper || 'none' }}
       />
       
       <header className="h-16 md:h-20 px-4 md:px-6 flex items-center justify-between glass-morphism sticky top-0 z-10 mx-0 mt-0 md:mx-4 md:mt-4 md:rounded-2xl shadow-lg border-white/5 transition-all">
@@ -737,6 +732,30 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 </div>
 
                 <div className="space-y-6">
+                  <div className="space-y-3">
+                    <Label className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-2 text-primary">
+                      <Palette className="h-3 w-3" /> Chat Wallpaper
+                    </Label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {WALLPAPERS.map((wp) => (
+                        <button
+                          key={wp.id}
+                          onClick={() => roomRef && updateDocumentNonBlocking(roomRef, { wallpaper: wp.value })}
+                          className={cn(
+                            "aspect-square rounded-xl border-2 transition-all group relative overflow-hidden",
+                            room?.wallpaper === wp.value ? "border-primary scale-105 shadow-lg" : "border-transparent hover:border-white/10"
+                          )}
+                        >
+                          <div className={cn("absolute inset-0", wp.preview)} />
+                          {wp.id !== 'none' && <div className="absolute inset-0 opacity-20 bg-cover bg-center" style={{ backgroundImage: wp.value }} />}
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="text-[8px] font-bold text-white uppercase tracking-tighter">{wp.name}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-white/5">
                     <div className="flex items-center gap-3">
                       <Clock className="h-5 w-5 text-accent" />
@@ -749,21 +768,32 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   </div>
                 </div>
 
-                {room?.isGroupChat && participants && (
-                  <div className="space-y-4">
-                    <Label className="text-xs font-bold uppercase tracking-widest text-primary/60">Members ({room.memberIds?.length})</Label>
-                    <div className="space-y-2">
-                      {participants.map(p => (
-                        <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8"><AvatarImage src={p.profilePictureUrl} /><AvatarFallback>{p.username[0]}</AvatarFallback></Avatar>
-                            <span className="text-sm font-bold">{p.username} {p.id === room.createdBy && <span className="text-[8px] bg-primary/20 text-primary px-1 rounded ml-1">ADMIN</span>}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div className="pt-4 border-t border-white/5">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="w-full h-12 rounded-xl font-bold flex gap-2">
+                        <Trash2 className="h-4 w-4" /> Delete Conversation
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-[2.5rem] p-10 bg-card border-none shadow-2xl">
+                      <AlertDialogHeader className="space-y-4">
+                        <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter italic">Delete Entire Chat?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground leading-relaxed">
+                          This action is permanent. All messages and media in this conversation will be deleted for everyone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="mt-8 gap-4">
+                        <AlertDialogCancel className="h-12 rounded-xl border-white/5 font-bold">Keep Conversation</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleDeleteConversation}
+                          className="h-12 rounded-xl bg-destructive text-destructive-foreground font-bold"
+                        >
+                          Confirm Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
             </SheetContent>
           </Sheet>
@@ -840,13 +870,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 <Send className="h-5 w-5" />
               </Button>
             </div>
-            {isViewOnceEnabled && (
-              <div className="px-1 py-1 flex items-center gap-2 animate-in slide-in-from-left-2">
-                <Badge variant="secondary" className="bg-accent/10 text-accent border-accent/20 flex gap-1 items-center px-2 py-1">
-                  <ShieldAlert className="h-3 w-3" /> View Once Mode Active
-                </Badge>
-              </div>
-            )}
           </div>
         </div>
       </div>
