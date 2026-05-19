@@ -42,7 +42,6 @@ import {
   SheetHeader, 
   SheetTitle, 
   SheetTrigger, 
-  SheetFooter
 } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { 
@@ -53,8 +52,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { format, isSameDay, differenceInMinutes, formatDistanceToNow, addHours } from 'date-fns';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { format, differenceInMinutes, formatDistanceToNow, addHours } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { 
@@ -65,7 +74,6 @@ import {
   doc, 
   where, 
   limitToLast,
-  deleteDoc,
   deleteField
 } from 'firebase/firestore';
 import { 
