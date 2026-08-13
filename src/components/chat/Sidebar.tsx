@@ -33,14 +33,6 @@ interface SidebarProps {
   className?: string;
 }
 
-const TypingAnimation = () => (
-  <div className="flex items-center gap-0.5 ml-1">
-    <div className="h-0.5 w-0.5 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-    <div className="h-0.5 w-0.5 bg-accent rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
-    <div className="h-0.5 w-0.5 bg-accent rounded-full animate-bounce" style={{ animationDelay: '400ms' }} />
-  </div>
-);
-
 const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any) => {
   const [hasMounted, setHasMounted] = useState(false);
   const db = useFirestore();
@@ -49,10 +41,15 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     setHasMounted(true);
   }, []);
 
-  const timeAgo = useMemo(() => {
+  const timeDisplay = useMemo(() => {
     if (!hasMounted || !room.updatedAt || !room.updatedAt.toDate) return null;
     try {
-      return formatDistanceToNow(room.updatedAt.toDate(), { addSuffix: false });
+      const date = room.updatedAt.toDate();
+      const now = new Date();
+      if (differenceInMinutes(now, date) < 1440) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     } catch (e) {
       return null;
     }
@@ -73,65 +70,52 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     <div
       onClick={() => onClick(room.id)}
       className={cn(
-        "p-3 flex items-center gap-3 rounded-2xl cursor-pointer transition-all group relative animate-in-fade px-2",
-        isSelected ? "bg-primary/10" : "hover:bg-white/5",
-        room.isUnread && !isSelected && "bg-white/[0.03]"
+        "p-3 flex items-center gap-3 cursor-pointer transition-all relative animate-in-fade",
+        isSelected ? "sidebar-item-active" : "hover:bg-muted/50 dark:hover:bg-white/[0.02]"
       )}
     >
-      {isSelected && <div className="absolute left-0 w-1 h-8 bg-primary rounded-full -translate-x-1" />}
       <div className="relative shrink-0">
-        <Avatar className={cn("h-12 w-12 border transition-all duration-500", isSelected ? "border-primary/50 scale-105" : "border-white/10 group-hover:scale-105")}>
+        <Avatar className={cn("h-12 w-12 transition-all duration-300", isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "")}>
           <AvatarImage src={room.displayAvatar || undefined} className="object-cover" />
-          <AvatarFallback className="bg-muted text-muted-foreground font-medium">{room.displayName?.[0]}</AvatarFallback>
+          <AvatarFallback className="bg-muted text-muted-foreground font-semibold">{room.displayName?.[0]}</AvatarFallback>
         </Avatar>
-        {room.isOnline && <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-accent border-[3px] border-background shadow-sm" />}
-        {room.isPinned && <Pin className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-primary text-white rounded-full p-0.5 shadow-sm" />}
+        {room.isOnline && <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />}
       </div>
-      <div className="flex-1 overflow-hidden">
-        <div className="flex justify-between items-center mb-0.5">
+      
+      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <div className="flex justify-between items-center">
           <h3 className={cn(
-            "text-xs truncate transition-colors", 
-            isSelected ? "text-primary font-bold" : room.isUnread ? "text-foreground font-black" : "text-foreground font-bold"
+            "text-[14px] truncate leading-none", 
+            room.isUnread ? "font-bold text-foreground" : "font-medium text-foreground/90"
           )}>
             {room.displayName}
           </h3>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {timeAgo && (
+          <div className="flex items-center gap-2">
+            {timeDisplay && (
               <span className={cn(
-                "text-[8px] font-bold uppercase",
-                room.isUnread ? "text-primary" : "text-muted-foreground/40"
+                "text-[11px] font-medium whitespace-nowrap",
+                room.isUnread ? "text-primary" : "text-muted-foreground/60"
               )}>
-                {timeAgo}
+                {timeDisplay}
               </span>
             )}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={cn(
-                "h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity",
-                room.isPinned ? "opacity-100 text-primary" : "text-muted-foreground"
-              )}
-              onClick={togglePin}
-            >
-              <Pin className={cn("h-3 w-3", room.isPinned && "fill-current")} />
-            </Button>
+            {room.isPinned && <Pin className="h-3 w-3 text-muted-foreground fill-current rotate-45" />}
           </div>
         </div>
+        
         <div className="flex justify-between items-center">
-          <div className={cn(
-            "text-[11px] truncate leading-snug flex items-center",
-            room.isUnread ? "text-foreground font-bold" : "text-muted-foreground/60"
+          <p className={cn(
+            "text-[13px] truncate leading-tight flex-1",
+            room.isUnread ? "text-foreground font-semibold" : "text-muted-foreground"
           )}>
             {isTyping ? (
-              <div className="flex items-center text-accent italic font-bold">
-                Typing <TypingAnimation />
-              </div>
-            ) : (room.lastMessageText || 'Start a conversation')}
-          </div>
+              <span className="text-primary italic animate-pulse">is typing...</span>
+            ) : (room.lastMessageText || 'No messages yet')}
+          </p>
           {room.isUnread && (
-            <Badge className="ml-2 h-4 min-w-[1rem] px-1 bg-primary text-[8px] font-black rounded-full flex items-center justify-center animate-in-fade">
-              NEW
-            </Badge>
+            <div className="ml-2 h-4.5 min-w-[1.125rem] px-1 bg-primary text-[10px] text-white font-bold rounded-full flex items-center justify-center">
+              !
+            </div>
           )}
         </div>
       </div>
@@ -243,38 +227,37 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   }, [conversationListData, searchQuery, activeFilter]);
 
   return (
-    <div className={cn("h-full border-r border-white/5 flex flex-col bg-background shrink-0 z-30", className)}>
-      <div className="p-4 md:p-6 flex items-center justify-between border-b border-white/5">
+    <div className={cn("h-full border-r border-border flex flex-col bg-background shrink-0 z-30", className)}>
+      <header className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setIsSettingsOpen(true)}>
-          <Avatar className="h-9 w-9 md:h-10 md:w-10 border-2 border-primary/20 transition-transform group-hover:scale-105">
+          <Avatar className="h-10 w-10 border border-border shadow-sm transition-transform active:scale-95">
             <AvatarImage src={currentUserProfile?.profilePictureUrl || undefined} className="object-cover" />
-            <AvatarFallback className="bg-primary/10 text-primary font-bold">{currentUserProfile?.username?.[0]?.toUpperCase() || 'K'}</AvatarFallback>
+            <AvatarFallback className="bg-primary/5 text-primary font-bold">{currentUserProfile?.username?.[0]?.toUpperCase() || 'K'}</AvatarFallback>
           </Avatar>
-          <div className="flex flex-col max-w-[100px]"><span className="font-bold text-xs truncate leading-none">{currentUserProfile?.username || 'Kith User'}</span></div>
         </div>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setIsSettingsOpen(true)}>
-            <Settings className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={() => setIsSettingsOpen(true)}>
+            <Settings className="h-5 w-5 text-muted-foreground" />
           </Button>
           <NewChatDialog onChatCreated={onSelectConversation} />
           
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                <LogOut className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                <LogOut className="h-5 w-5 text-muted-foreground" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="rounded-[2rem] border-none bg-card/95 backdrop-blur-xl p-8 max-w-sm">
+            <AlertDialogContent className="rounded-[1.25rem] border-none bg-card shadow-2xl p-6 max-w-sm">
               <AlertDialogHeader>
-                <AlertDialogTitle className="text-xl font-bold">Sign Out?</AlertDialogTitle>
+                <AlertDialogTitle className="text-xl font-bold tracking-tight">Sign Out?</AlertDialogTitle>
                 <AlertDialogDescription className="text-muted-foreground">
-                  Are you sure you want to exit kith?
+                  Are you sure you want to end your session on kith?
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter className="mt-6 gap-3">
-                <AlertDialogCancel className="rounded-xl border-white/10 h-12">Cancel</AlertDialogCancel>
+              <AlertDialogFooter className="mt-6 gap-2">
+                <AlertDialogCancel className="rounded-lg h-11">Cancel</AlertDialogCancel>
                 <AlertDialogAction 
-                  className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 h-12 font-bold"
+                  className="rounded-lg bg-destructive text-white hover:bg-destructive/90 h-11 font-semibold"
                   onClick={() => signOut(auth)}
                 >
                   Sign Out
@@ -283,38 +266,46 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </div>
+      </header>
 
-      <div className="px-4 md:px-6 py-4 space-y-4">
+      <div className="px-4 py-2 space-y-4">
         <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
             placeholder="Search Himanshu..." 
-            className="bg-white/5 border-none h-10 rounded-xl pl-10 text-xs transition-all focus:bg-white/10" 
+            className="bg-muted/50 border-none h-10 rounded-lg pl-10 text-[14px] transition-all focus:bg-muted" 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
           />
         </div>
 
         <Tabs value={activeFilter} onValueChange={(val: any) => setActiveFilter(val)} className="w-full">
-          <TabsList className="bg-white/5 border-none h-9 p-1 rounded-xl w-full grid grid-cols-3">
-            <TabsTrigger value="all" className="rounded-lg text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsList className="bg-muted/50 border-none h-9 p-1 rounded-lg w-full">
+            <TabsTrigger value="all" className="flex-1 rounded-md text-[12px] font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm">
               All
             </TabsTrigger>
-            <TabsTrigger value="pinned" className="rounded-lg text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="pinned" className="flex-1 rounded-md text-[12px] font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm">
               Pinned
             </TabsTrigger>
-            <TabsTrigger value="unread" className="rounded-lg text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="unread" className="flex-1 rounded-md text-[12px] font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm">
               Unread
             </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 md:px-4 space-y-1 scrollbar-hide pb-6">
+      <div className="flex-1 overflow-y-auto mt-2 scrollbar-hide">
         {isLoading ? (
-          <div className="p-2 space-y-2">
-            {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 w-full bg-white/5 animate-pulse rounded-2xl" />)}
+          <div className="p-4 space-y-4">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="flex gap-3 items-center">
+                <div className="h-12 w-12 bg-muted animate-pulse rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-1/3 bg-muted animate-pulse rounded" />
+                  <div className="h-3 w-2/3 bg-muted animate-pulse rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredConversations.length > 0 ? (
           filteredConversations.map((room) => (
@@ -327,16 +318,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             />
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40 animate-in-fade">
-            {activeFilter === 'pinned' ? (
-              <Star className="h-10 w-10 mb-4" />
-            ) : activeFilter === 'unread' ? (
-              <Inbox className="h-10 w-10 mb-4" />
-            ) : (
-              <MessageSquare className="h-10 w-10 mb-4" />
-            )}
-            <p className="text-xs font-bold uppercase tracking-widest leading-relaxed">
-              {searchQuery ? "No matches found" : `No ${activeFilter !== 'all' ? activeFilter : 'active'} chats`}
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
+            <MessageSquare className="h-10 w-10 mb-4 text-muted-foreground" />
+            <p className="text-sm font-semibold tracking-tight">
+              {searchQuery ? "No matches found" : `No chats in ${activeFilter}`}
             </p>
           </div>
         )}
