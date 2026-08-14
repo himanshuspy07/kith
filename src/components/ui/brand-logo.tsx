@@ -33,36 +33,32 @@ export default function BrandLogo({ className, iconClassName, size = 'md', showT
         iconClassName
       )}>
         <svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-xl">
-          {/* Snapchat-style rounded square */}
-          <rect width="512" height="512" rx="128" fill="#FFFC00" />
-          {/* Character Body */}
+          {/* Snapchat-style rounded square - Now Black */}
+          <rect width="512" height="512" rx="140" fill="black" />
+          
+          {/* Character Body - Now White */}
           <path 
-            d="M256 120C200 120 160 170 160 230C160 290 200 340 256 340C312 340 352 290 352 230C352 170 312 120 256 120Z" 
+            d="M256 140C200 140 160 190 160 250C160 310 200 360 256 360C312 360 352 310 352 250C352 190 312 140 256 140Z" 
             fill="white" 
           />
-          {/* Antennae K */}
+          
+          {/* Single Antennae 'K' */}
           <path 
-            d="M230 60V120M230 90L260 60M230 90L260 120" 
+            d="M256 60V140M256 100L296 60M256 100L296 140" 
             stroke="white" 
-            strokeWidth="15" 
+            strokeWidth="24" 
             strokeLinecap="round" 
             strokeLinejoin="round" 
           />
-          <path 
-            d="M282 60V120M282 90L312 60M282 90L312 120" 
-            stroke="white" 
-            strokeWidth="15" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-          />
+          
           {/* Face */}
-          <circle cx="225" cy="225" r="8" fill="black" />
-          <circle cx="287" cy="225" r="8" fill="black" />
-          <path d="M245 260C245 260 256 270 267 260" stroke="black" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="225" cy="245" r="10" fill="black" />
+          <circle cx="287" cy="245" r="10" fill="black" />
+          <path d="M245 285C245 285 256 295 267 285" stroke="black" strokeWidth="5" strokeLinecap="round" />
         </svg>
       </div>
       {showText && (
-        <span className={cn("kith-text tracking-tighter italic font-black", textMap[size])}>
+        <span className={cn("kith-text tracking-tighter italic font-black text-foreground", textMap[size])}>
           KITH
         </span>
       )}

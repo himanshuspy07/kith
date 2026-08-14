@@ -5,50 +5,50 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 224 71.4% 2%;
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 2%;
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 2%;
-    /* Snap Yellow */
-    --primary: 59 100% 50%;
-    --primary-foreground: 0 0% 0%;
-    /* Snap Blue */
-    --secondary: 199 100% 50%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
-    /* Neon Mint Green */
-    --accent: 150 100% 66%;
+    --popover-foreground: 240 10% 3.9%;
+    /* Bright Peach */
+    --primary: 15 100% 65%;
+    --primary-foreground: 0 0% 100%;
+    /* Periwinkle */
+    --secondary: 245 100% 75%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    /* Neon Mint */
+    --accent: 155 100% 50%;
     --accent-foreground: 0 0% 0%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 199 100% 50%;
-    --radius: 1.5rem;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 15 100% 65%;
+    --radius: 2rem;
   }
 
   .dark {
     --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
+    --foreground: 0 0% 100%;
+    --card: 240 10% 5%;
+    --card-foreground: 0 0% 100%;
     --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 59 100% 50%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 199 100% 50%;
-    --secondary-foreground: 0 0% 100%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 15 100% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 245 100% 75%;
+    --secondary-foreground: 0 0% 0%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 150 100% 66%;
+    --accent: 155 100% 50%;
     --accent-foreground: 0 0% 0%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 0 0% 100%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 199 100% 50%;
+    --ring: 15 100% 65%;
   }
 }
 
@@ -57,16 +57,17 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body antialiased overflow-hidden;
+    @apply bg-background text-foreground font-body antialiased overflow-hidden select-none;
   }
 }
 
-.snap-shadow {
-  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.1);
+.kith-text {
+  @apply font-black tracking-tighter uppercase italic;
+  font-family: var(--font-jakarta);
 }
 
-.acrylic {
-  @apply bg-white/80 dark:bg-black/80 backdrop-blur-2xl border-none;
+.online-ring {
+  @apply ring-4 ring-accent ring-offset-2 ring-offset-background;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
@@ -86,11 +87,15 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.kith-text {
-  @apply font-black tracking-tighter uppercase italic;
-  font-family: var(--font-jakarta);
+/* Professional Contrast Enhancements */
+.acrylic {
+  @apply bg-background/80 backdrop-blur-2xl border-none;
 }
 
-.online-ring {
-  @apply ring-2 ring-accent ring-offset-2 ring-offset-background;
+input:focus, textarea:focus {
+  @apply ring-2 ring-primary/50 outline-none;
+}
+
+.snap-shadow {
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.1);
 }
