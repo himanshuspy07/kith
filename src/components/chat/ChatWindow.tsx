@@ -64,7 +64,8 @@ import {
   doc, 
   where, 
   limitToLast,
-  deleteField
+  deleteField,
+  arrayUnion
 } from 'firebase/firestore';
 import { 
   addDocumentNonBlocking, 
@@ -87,9 +88,12 @@ const MessageItem = memo(({
   onAction, 
   onReact, 
   onImageClick,
-  currentUserId 
+  currentUserId,
+  roomReadBy 
 }: any) => {
-  const isReadByOthers = msg.readBy && msg.readBy.some((uid: string) => uid !== msg.senderId);
+  // A message is "Opened" if anyone other than the sender is in the room's readBy list
+  // and the message was sent before or at the time the room was marked read.
+  const isReadByOthers = isMe && roomReadBy?.some((uid: string) => uid !== currentUserId);
   const isViewOnce = msg.type === 'view-once';
   const isOpened = isViewOnce && msg.openedBy && msg.openedBy.includes(currentUserId);
   const timeStr = msg.createdAt?.toDate ? format(msg.createdAt.toDate(), 'HH:mm') : '';
@@ -245,6 +249,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [lightboxImage, setLightboxImage] = useState<{url: string, id?: string, isViewOnce?: boolean} | null>(null);
   const [messageLimit, setMessageLimit] = useState(25);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -277,6 +282,15 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return query(collection(db, 'users'), where('id', 'in', room.memberIds));
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
+
+  // Mark room as read when active
+  useEffect(() => {
+    if (roomRef && user && room && !room.readBy?.includes(user.uid)) {
+      updateDocumentNonBlocking(roomRef, {
+        readBy: arrayUnion(user.uid)
+      });
+    }
+  }, [room, user, roomRef]);
 
   // Scroll logic fixed to prevent jumping during infinite scroll
   useEffect(() => {
@@ -334,6 +348,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     });
   };
 
+  const handleInputChange = (val: string) => {
+    setInputValue(val);
+    updateTypingStatus(val.length > 0);
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      updateTypingStatus(false);
+    }, 4000);
+  };
+
   const handleSend = (type: 'text' | 'image' | 'view-once' = 'text', content?: string) => {
     const finalContent = content || inputValue.trim();
     if (!finalContent || !conversationId || !user) return;
@@ -374,12 +398,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       lastMessageText: type === 'image' ? 'Sent a photo' : type === 'view-once' ? 'Sent a Snap' : finalContent,
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
-      readBy: [user.uid],
+      readBy: [user.uid], // Reset readBy to only sender
+      [`typing.${user.uid}`]: deleteField()
     });
     
     setInputValue('');
     setReplyingTo(null);
-    updateTypingStatus(false);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
   };
 
   const handleReact = (messageId: string, emoji: string) => {
@@ -503,6 +528,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             isMe={msg.senderId === user?.uid}
             sender={participants?.find(p => p.id === msg.senderId)}
             currentUserId={user?.uid}
+            roomReadBy={room?.readBy}
             onAction={(action: string, m: any) => {
                if (action === 'delete') {
                  updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id), { isDeleted: true });
@@ -519,7 +545,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               if (viewOnce && id && user) {
                 const msgRef = doc(db, 'chatRooms', conversationId, 'messages', id);
                 updateDocumentNonBlocking(msgRef, {
-                  openedBy: Array.from(new Set([...(msg.openedBy || []), user.uid]))
+                  openedBy: arrayUnion(user.uid)
                 });
               }
             }}
@@ -572,7 +598,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             
             <Textarea 
               value={inputValue}
-              onChange={(e) => { setInputValue(e.target.value); updateTypingStatus(e.target.value.length > 0); }}
+              onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
               placeholder="Start a Chat..."
               className="bg-transparent border-none min-h-[40px] h-[40px] focus-visible:ring-0 text-[15px] font-bold resize-none py-2 px-1 placeholder:opacity-50"

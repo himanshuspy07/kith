@@ -33,7 +33,15 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     }
   }, [room.updatedAt]);
 
-  const isTyping = room.typing && Object.keys(room.typing).length > 0 && Object.keys(room.typing).some(id => id !== currentUserId);
+  const isTyping = useMemo(() => {
+    if (!room.typing) return false;
+    const now = Date.now();
+    return Object.entries(room.typing).some(([id, timestamp]: any) => {
+      if (id === currentUserId) return false;
+      const ts = timestamp?.toMillis ? timestamp.toMillis() : 0;
+      return (now - ts) < 5000; // Typing status valid for 5 seconds
+    });
+  }, [room.typing, currentUserId]);
 
   return (
     <div
@@ -60,12 +68,18 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
           {room.displayName}
         </h3>
         <div className="flex items-center gap-2">
-          <p className={cn(
-            "text-[14px] truncate flex-1",
-            room.isUnread ? "text-secondary font-black" : "text-muted-foreground font-medium"
-          )}>
-            {isTyping ? "Typing..." : (room.lastMessageText || 'New Friend')}
-          </p>
+          {isTyping ? (
+            <div className="flex items-center gap-1">
+               <span className="text-[14px] text-accent font-black animate-pulse">Typing...</span>
+            </div>
+          ) : (
+            <p className={cn(
+              "text-[14px] truncate flex-1",
+              room.isUnread ? "text-secondary font-black" : "text-muted-foreground font-medium"
+            )}>
+              {room.lastMessageText || 'New Friend'}
+            </p>
+          )}
           <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-tighter">
             {timeDisplay}
           </span>
