@@ -3,12 +3,8 @@
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
 import { 
-  Send, 
   ChevronLeft, 
-  Image as ImageIcon, 
-  Smile, 
   MoreHorizontal, 
-  Loader2, 
   Reply, 
   Edit2, 
   Trash2, 
@@ -17,7 +13,6 @@ import {
   Info,
   Check,
   CheckCheck,
-  Forward,
   Eye,
   EyeOff,
   Clock,
@@ -52,7 +47,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { format, differenceInMinutes } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { 
@@ -63,10 +58,7 @@ import {
   doc, 
   where, 
   limitToLast,
-  deleteField,
-  addDoc,
-  updateDoc,
-  deleteDoc
+  deleteField
 } from 'firebase/firestore';
 import { 
   addDocumentNonBlocking, 
@@ -79,8 +71,6 @@ interface ChatWindowProps {
   conversationId?: string;
   onBack?: () => void;
 }
-
-const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 const MessageItem = memo(({ 
   msg, 
@@ -109,7 +99,7 @@ const MessageItem = memo(({
           </Avatar>
         </div>
 
-        <div className="flex flex-col">
+        <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2">
             <span className={cn("text-[14px] font-black uppercase tracking-tighter", isMe ? "text-secondary" : "text-primary")}>
               {isMe ? "ME" : sender?.username}
@@ -148,29 +138,11 @@ const MessageItem = memo(({
                 <p className={cn("text-[16px] font-medium leading-normal break-words py-1", msg.isDeleted && "italic opacity-50 line-through")}>
                   {msg.isDeleted ? "Message deleted" : msg.content}
                 </p>
-                
-                {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {Object.entries(msg.reactions).map(([emoji, uids]: [string, any]) => (
-                      <button 
-                        key={emoji} 
-                        onClick={() => onReact(msg.id, emoji)}
-                        className={cn(
-                          "px-2 py-0.5 rounded-full text-[12px] bg-muted/50 border border-border/50 flex items-center gap-1 hover:bg-muted transition-all",
-                          uids.includes(currentUserId) && "bg-primary/20 border-primary/30"
-                        )}
-                      >
-                        <span>{emoji}</span>
-                        <span className="text-[10px] font-bold">{uids.length}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 
             {isMe && !msg.isDeleted && (
-              <div className="flex items-center gap-1 mt-2 opacity-50">
+              <div className="flex items-center gap-1 mt-1.5 opacity-50">
                 {isReadByOthers ? <CheckCheck className="h-3 w-3 text-primary" /> : <Check className="h-3 w-3" />}
                 <span className="text-[9px] font-black uppercase tracking-[0.2em]">{isReadByOthers ? "Opened" : "Sent"}</span>
               </div>
@@ -180,12 +152,9 @@ const MessageItem = memo(({
 
         {/* Floating Quick Actions */}
         {!msg.isDeleted && (
-          <div className="absolute -right-2 top-1/2 -translate-y-1/2 translate-x-full opacity-0 group-hover:opacity-100 flex items-center gap-2 pl-4 transition-all pointer-events-none group-hover:pointer-events-auto">
+          <div className="absolute -right-2 top-1/2 -translate-y-1/2 translate-x-full opacity-0 group-hover:opacity-100 flex items-center gap-2 pl-4 transition-all pointer-events-none group-hover:pointer-events-auto z-10">
             <button onClick={() => onAction('reply', msg)} className="h-8 w-8 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-primary transition-colors border border-border/50">
               <Reply className="h-4 w-4" />
-            </button>
-            <button onClick={() => onAction('react', msg)} className="h-8 w-8 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-yellow-500 transition-colors border border-border/50">
-              <Smile className="h-4 w-4" />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -252,7 +221,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
       setIsInitialLoad(false);
     } else if (messages && messages.length > 0 && !isInitialLoad) {
-      // Only scroll to bottom if we were already near the bottom or it's a new message from ME
       const container = scrollContainerRef.current;
       if (container) {
         const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
@@ -266,14 +234,21 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   // Infinite Scroll Observer
   useEffect(() => {
-    if (!topSentinelRef.current) return;
+    if (!topSentinelRef.current || !scrollContainerRef.current) return;
 
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && messages && messages.length >= messageLimit) {
-        // User scrolled to top, load more
+        const currentScrollHeight = scrollContainerRef.current?.scrollHeight || 0;
         setMessageLimit(prev => prev + 25);
+        // Maintain scroll position after loading more
+        setTimeout(() => {
+          if (scrollContainerRef.current) {
+            const newScrollHeight = scrollContainerRef.current.scrollHeight;
+            scrollContainerRef.current.scrollTop = newScrollHeight - currentScrollHeight;
+          }
+        }, 50);
       }
-    }, { threshold: 0.1 });
+    }, { threshold: 0.1, root: scrollContainerRef.current });
 
     observer.observe(topSentinelRef.current);
     return () => observer.disconnect();
@@ -334,24 +309,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     updateTypingStatus(false);
   };
 
-  const handleReact = (msgId: string, emoji: string) => {
-    if (!user) return;
-    const msgRef = doc(db, 'chatRooms', conversationId!, 'messages', msgId);
-    const msg = messages?.find(m => m.id === msgId);
-    if (!msg) return;
-
-    const reactions = { ...(msg.reactions || {}) };
-    Object.keys(reactions).forEach(key => {
-      reactions[key] = reactions[key].filter((uid: string) => uid !== user.uid);
-      if (reactions[key].length === 0) delete reactions[key];
-    });
-
-    if (!msg.reactions?.[emoji]?.includes(user.uid)) {
-      reactions[emoji] = [...(reactions[emoji] || []), user.uid];
-    }
-    updateDocumentNonBlocking(msgRef, { reactions });
-  };
-
   const otherUser = useMemo(() => {
     if (!room || !participants || !user) return null;
     return participants.find(p => p.id !== user.uid);
@@ -371,7 +328,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-      <header className="h-20 px-6 flex items-center justify-between border-b border-border/80 sticky top-0 z-30 bg-background/95 backdrop-blur-xl">
+      <header className="h-20 px-6 flex items-center justify-between border-b border-border/40 shrink-0 bg-background/95 backdrop-blur-xl z-30">
         <div className="flex items-center gap-4">
           {onBack && (
             <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={onBack}>
@@ -394,13 +351,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </SheetTrigger>
           <SheetContent className="sm:max-w-md bg-card/98 backdrop-blur-2xl border-l border-border/50 shadow-2xl p-0">
             <SheetHeader className="p-10 border-b border-border/50 bg-muted/20">
+              <SheetTitle className="sr-only">Conversation Info</SheetTitle>
               <div className="flex flex-col items-center gap-6">
                 <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-4 ring-primary/20">
                   <AvatarImage src={room?.isGroupChat ? room.groupImageUrl : otherUser?.profilePictureUrl} />
                   <AvatarFallback className="text-4xl font-black bg-muted text-primary">{room?.name?.[0] || otherUser?.username?.[0]}</AvatarFallback>
                 </Avatar>
                 <div className="text-center space-y-1">
-                   <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">{room?.name || otherUser?.username}</SheetTitle>
+                   <h2 className="text-2xl font-black uppercase italic tracking-tighter">{room?.name || otherUser?.username}</h2>
                    <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Created {room?.createdAt?.toDate ? format(room.createdAt.toDate(), 'MMM yyyy') : ''}</p>
                 </div>
               </div>
@@ -449,9 +407,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto py-6 px-2 scrollbar-hide flex flex-col"
+        className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide flex flex-col bg-background"
       >
-        <div ref={topSentinelRef} className="h-1 w-full" />
+        <div ref={topSentinelRef} className="h-4 w-full shrink-0" />
         {messages?.map((msg) => (
           <MessageItem 
             key={msg.id}
@@ -469,7 +427,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                  setInputValue(m.content);
                }
             }}
-            onReact={handleReact}
             onImageClick={(url: string, id?: string, viewOnce?: boolean) => {
               setLightboxImage({ url, id, isViewOnce: viewOnce });
               if (viewOnce && id && user) {
@@ -481,41 +438,41 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             }}
           />
         ))}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-4 w-full shrink-0" />
       </div>
 
-      <footer className="p-4 md:p-6 bg-background/95 backdrop-blur-xl border-t border-border/80 sticky bottom-0 z-30">
-        <div className="max-w-4xl mx-auto space-y-4">
+      <footer className="p-4 md:p-6 bg-background border-t border-border/40 shrink-0 z-30">
+        <div className="max-w-4xl mx-auto space-y-3">
           {replyingTo && (
-            <div className="px-6 py-3 bg-primary/10 rounded-[1.5rem] flex items-center justify-between border border-primary/20 animate-in slide-in-from-bottom-2">
-              <div className="flex flex-col gap-1 overflow-hidden">
+            <div className="px-6 py-2.5 bg-primary/10 rounded-[1.5rem] flex items-center justify-between border border-primary/20 animate-in slide-in-from-bottom-2">
+              <div className="flex flex-col gap-0.5 overflow-hidden">
                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Replying</span>
                 <p className="text-xs font-bold truncate opacity-80">{replyingTo.content}</p>
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/20" onClick={() => setReplyingTo(null)}>
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-primary/20" onClick={() => setReplyingTo(null)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
           )}
 
           {editingMessage && (
-            <div className="px-6 py-3 bg-secondary/10 rounded-[1.5rem] flex items-center justify-between border border-secondary/20 animate-in slide-in-from-bottom-2">
-              <div className="flex flex-col gap-1 overflow-hidden">
+            <div className="px-6 py-2.5 bg-secondary/10 rounded-[1.5rem] flex items-center justify-between border border-secondary/20 animate-in slide-in-from-bottom-2">
+              <div className="flex flex-col gap-0.5 overflow-hidden">
                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-secondary">Editing Message</span>
                 <p className="text-xs font-bold truncate opacity-80">{editingMessage.content}</p>
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-secondary/20" onClick={() => { setEditingMessage(null); setInputValue(''); }}>
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-secondary/20" onClick={() => { setEditingMessage(null); setInputValue(''); }}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
           )}
 
-          <div className="flex items-center gap-4 bg-muted/60 rounded-[2.5rem] p-2 pl-3 border border-border shadow-inner focus-within:ring-4 ring-primary/10 transition-all">
+          <div className="flex items-center gap-3 bg-muted/60 rounded-[2.5rem] p-1.5 pl-2.5 border border-border/50 shadow-inner focus-within:ring-4 ring-primary/5 transition-all">
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="h-12 w-12 rounded-full flex items-center justify-center text-muted-foreground hover:bg-background hover:text-primary transition-all shadow-sm bg-background/80"
+              className="h-11 w-11 rounded-full flex items-center justify-center text-muted-foreground hover:bg-background hover:text-primary transition-all shadow-sm bg-background/80 shrink-0"
             >
-              <Camera className="h-6 w-6" />
+              <Camera className="h-5 w-5" />
             </button>
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
                const file = e.target.files?.[0];
@@ -531,23 +488,23 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               onChange={(e) => { setInputValue(e.target.value); updateTypingStatus(e.target.value.length > 0); }}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
               placeholder="Start a Chat..."
-              className="bg-transparent border-none min-h-[44px] h-[44px] focus-visible:ring-0 text-[16px] font-bold resize-none py-2.5 px-2 placeholder:opacity-50"
+              className="bg-transparent border-none min-h-[40px] h-[40px] focus-visible:ring-0 text-[15px] font-bold resize-none py-2 px-1 placeholder:opacity-50"
             />
 
-            <div className="flex items-center gap-2 pr-1">
+            <div className="flex items-center gap-2 pr-1 shrink-0">
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className={cn("h-12 w-12 rounded-full transition-all", isViewOnceEnabled && "text-primary bg-primary/10")}
+                className={cn("h-11 w-11 rounded-full transition-all", isViewOnceEnabled && "text-primary bg-primary/10")}
                 onClick={() => setIsViewOnceEnabled(!isViewOnceEnabled)}
                 title="View Once"
               >
-                <Eye className="h-6 w-6" />
+                <Eye className="h-5 w-5" />
               </Button>
               <Button 
                 onClick={() => handleSend()} 
                 disabled={!inputValue.trim()}
-                className="h-12 px-8 rounded-full bg-foreground text-background font-black uppercase tracking-widest text-[12px] shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+                className="h-11 px-6 rounded-full bg-foreground text-background font-black uppercase tracking-widest text-[11px] shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
               >
                 {editingMessage ? 'Update' : 'Send'}
               </Button>
@@ -557,12 +514,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       </footer>
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
-        <DialogContent className="max-w-full h-full p-0 border-none bg-black">
+        <DialogContent className="max-w-full h-svh p-0 border-none bg-black rounded-none">
           <DialogTitle className="sr-only">Image Preview</DialogTitle>
-          <div className="relative w-full h-full flex items-center justify-center p-6">
+          <div className="relative w-full h-full flex items-center justify-center p-4">
             {lightboxImage && <img src={lightboxImage.url} alt="Snap" className="max-w-full max-h-full object-contain rounded-[2rem] shadow-2xl" />}
-            <Button variant="ghost" size="icon" className="absolute top-8 right-8 text-white bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-xl h-14 w-14" onClick={() => setLightboxImage(null)}>
-              <X className="h-8 w-8" />
+            <Button variant="ghost" size="icon" className="absolute top-6 right-6 text-white bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-xl h-12 w-12" onClick={() => setLightboxImage(null)}>
+              <X className="h-6 w-6" />
             </Button>
           </div>
         </DialogContent>

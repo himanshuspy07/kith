@@ -12,11 +12,10 @@ import AppLockOverlay from '@/components/chat/AppLockOverlay';
 import ProfileView from '@/components/chat/ProfileView';
 import SettingsView from '@/components/chat/SettingsView';
 import BrandLogo from '@/components/ui/brand-logo';
-import { useUser, useAuth } from '@/firebase';
+import { useUser } from '@/firebase';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { MessageSquare, User, Settings as SettingsIcon, Camera } from 'lucide-react';
+import { MessageSquare, User, Settings as SettingsIcon } from 'lucide-react';
 
 type NavigationTab = 'chat' | 'profile' | 'settings';
 
@@ -45,14 +44,16 @@ export default function Home() {
     return <AuthScreen />;
   }
 
-  // Handle mobile full-screen chat
+  // Handle mobile full-screen chat with explicit height lock
   if (isMobile && selectedConversationId) {
     return (
       <AppLockOverlay>
-        <ChatWindow 
-          conversationId={selectedConversationId} 
-          onBack={() => setSelectedConversationId(undefined)}
-        />
+        <div className="h-svh w-full overflow-hidden flex flex-col bg-background">
+          <ChatWindow 
+            conversationId={selectedConversationId} 
+            onBack={() => setSelectedConversationId(undefined)}
+          />
+        </div>
       </AppLockOverlay>
     );
   }
@@ -69,7 +70,7 @@ export default function Home() {
             <Sidebar 
               onSelectConversation={setSelectedConversationId} 
               selectedConversationId={selectedConversationId} 
-              className={cn(isMobile ? "w-full" : "w-80 md:w-96 border-r")}
+              className={cn(isMobile ? "w-full" : "w-80 md:w-96 border-r border-border/40")}
             />
             {!isMobile && (
               <main className="flex-1 h-full flex flex-col min-w-0">
@@ -90,12 +91,12 @@ export default function Home() {
         <NotificationManager currentConversationId={selectedConversationId} />
         <AppTutorial />
         
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 relative overflow-hidden flex flex-col">
           {renderActiveView()}
         </div>
 
-        {/* Snapchat-style Bottom Navigation - Fixed height and high contrast */}
-        <nav className="h-20 bg-background border-t border-border/80 px-6 flex items-center justify-around z-50 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
+        {/* Snapchat-style Bottom Navigation */}
+        <nav className="h-20 bg-background border-t border-border/40 px-6 flex items-center justify-around z-50 shrink-0">
           <button 
             onClick={() => setActiveTab('profile')}
             className={cn("flex flex-col items-center gap-1 transition-all py-2", activeTab === 'profile' ? "text-primary" : "text-muted-foreground hover:text-foreground")}
