@@ -247,7 +247,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                 <LogOut className="h-5 w-5 text-muted-foreground" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="rounded-[1.25rem] border-none bg-card shadow-2xl p-6 max-w-sm">
+            <AlertDialogContent className="rounded-[1.25rem] border-none bg-card shadow-2xl p-6 max-sm">
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-xl font-bold tracking-tight">Sign Out?</AlertDialogTitle>
                 <AlertDialogDescription className="text-muted-foreground">

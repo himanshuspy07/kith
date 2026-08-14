@@ -47,15 +47,12 @@ export default function UserProfileSync() {
             setDocumentNonBlocking(userRef, initialData, { merge: true });
           } else {
             // Profile exists: update presence ONLY
-            // We do NOT update username or profilePictureUrl here because 
-            // Firestore is now the source of truth, not the initial Auth object.
             const existingData = docSnap.data();
             const updates: any = {
               onlineStatus: true,
               lastActiveAt: serverTimestamp(),
             };
             
-            // Backfill legacy fields if missing, but don't overwrite if they exist
             if (!existingData.usernameLowercase && existingData.username) {
               updates.usernameLowercase = existingData.username.toLowerCase();
             }
@@ -85,19 +82,14 @@ export default function UserProfileSync() {
       });
     }, 1000 * 60);
 
-    // Set offline on unmount (only on real unmount, not necessarily on refresh)
     return () => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-      // We use a small delay or check for visibility to avoid setting offline during refresh
-      // but for standard unmounts like logout, we want this.
       updateDoc(userRef, {
         onlineStatus: false,
         lastActiveAt: serverTimestamp()
-      }).catch(() => {
-        // Silent catch for unmount failures
-      });
+      }).catch(() => {});
     };
-  }, [user?.uid, db]); // Only depend on UID to prevent re-running if Auth user object updates fields
+  }, [user?.uid, db]);
 
   return null;
 }

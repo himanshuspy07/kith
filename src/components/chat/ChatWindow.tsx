@@ -183,6 +183,27 @@ const MessageItem = memo(({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          
+          {!msg.isDeleted && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground">
+                  <Smile className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="top" className="w-fit p-1 rounded-full bg-card/95 backdrop-blur-xl shadow-2xl border-white/5 flex gap-1">
+                {REACTION_EMOJIS.map(emoji => (
+                  <button 
+                    key={emoji} 
+                    onClick={() => onReact(msg, emoji)}
+                    className="h-8 w-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors text-lg"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         {/* The Bubble */}
@@ -223,6 +244,7 @@ const MessageItem = memo(({
               {renderMarkdown(msg.content)}
               {/* Integrated Time & Status */}
               <div className="absolute bottom-[-2px] right-[-8px] flex items-center gap-1 opacity-60 select-none">
+                {msg.isEdited && <span className="text-[8px] uppercase font-bold mr-1">Edited</span>}
                 <span className="text-[10px] font-medium leading-none">{timeStr}</span>
                 {isMe && !msg.isDeleted && (
                   isReadByOthers ? <CheckCheck className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />
@@ -268,6 +290,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const { user } = useUser();
   const db = useFirestore();
@@ -300,6 +323,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages?.length, messageLimit]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop === 0 && messages && messages.length >= messageLimit) {
+      setMessageLimit(prev => prev + 30);
+    }
+  };
 
   const updateTypingStatus = (isTyping: boolean) => {
     if (!roomRef || !user) return;
@@ -407,6 +436,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     const reactions = { ...(message.reactions || {}) };
     const hadThisEmoji = Array.isArray(reactions[emoji]) && reactions[emoji].includes(user.uid);
     
+    // Clear other emojis by this user (one reaction limit)
     Object.keys(reactions).forEach(e => {
       if (Array.isArray(reactions[e])) {
         reactions[e] = reactions[e].filter((uid: string) => uid !== user.uid);
@@ -463,7 +493,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               <ChevronLeft className="h-5 w-5" />
             </Button>
           )}
-          <Avatar className="h-10 w-10 border border-border shrink-0 shadow-sm">
+          <Avatar className={cn("h-10 w-10 border-border shrink-0 shadow-sm transition-all duration-500", otherUser?.onlineStatus ? "ring-2 ring-accent ring-offset-2 ring-offset-background" : "border")}>
             <AvatarImage src={room?.isGroupChat ? room.groupImageUrl : otherUser?.profilePictureUrl} className="object-cover" />
             <AvatarFallback className="bg-primary/10 text-primary font-bold">{room?.name?.[0]}</AvatarFallback>
           </Avatar>
@@ -532,7 +562,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                           <Trash2 className="h-4 w-4" /> Delete Conversation
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-[2rem] border-none bg-card/95 backdrop-blur-xl p-8 max-w-sm">
+                      <AlertDialogContent className="rounded-[2rem] border-none bg-card/95 backdrop-blur-xl p-8 max-sm">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="text-xl font-bold">Erase Chat?</AlertDialogTitle>
                           <AlertDialogDescription className="text-muted-foreground">
@@ -557,7 +587,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </Sheet>
       </header>
 
-      <div className="flex-1 overflow-y-auto py-4 scrollbar-hide z-[1]">
+      <div className="flex-1 overflow-y-auto py-4 scrollbar-hide z-[1]" onScroll={handleScroll}>
         {messages?.map((msg, idx) => (
           <MessageItem 
             key={msg.id}
@@ -596,6 +626,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             </div>
           )}
           
+          {editingMessage && (
+            <div className="px-4 py-2 bg-accent/10 rounded-lg flex items-center justify-between border-l-4 border-accent">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[11px] font-bold text-accent">Editing message</span>
+                <span className="text-[13px] text-muted-foreground truncate max-w-md">{editingMessage.content}</span>
+              </div>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingMessage(null); setInputValue(''); }}><X className="h-4 w-4" /></Button>
+            </div>
+          )}
+
           <div className="flex items-end gap-2 bg-secondary/80 dark:bg-white/[0.05] rounded-[1.5rem] p-1 border border-border">
             <input 
               type="file" 
