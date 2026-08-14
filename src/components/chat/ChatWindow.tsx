@@ -50,7 +50,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { 
   AlertDialog,
@@ -267,7 +267,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const groupImageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { user } = useUser();
@@ -363,6 +362,22 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     });
     if (type === 'text') setInputValue('');
   };
+
+  useEffect(() => {
+    if (!room?.vanishMode || !conversationId || !user) return;
+
+    const handleBlur = () => {
+      handleSend('text', '🚨 Someone just left the chat window or may have taken a screenshot.');
+      toast({
+        title: "Security Alert",
+        description: "Activity outside the chat detected while in Vanish Mode.",
+        variant: "destructive",
+      });
+    };
+
+    window.addEventListener('blur', handleBlur);
+    return () => window.removeEventListener('blur', handleBlur);
+  }, [room?.vanishMode, conversationId, user]);
 
   const handleAction = (action: 'delete' | 'edit' | 'reply' | 'forward', message: any) => {
     if (action === 'delete') {
@@ -468,6 +483,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             </Button>
           </SheetTrigger>
           <SheetContent className="sm:max-w-md acrylic border-none shadow-2xl p-0">
+             <SheetHeader className="sr-only">
+               <SheetTitle>Chat Information</SheetTitle>
+             </SheetHeader>
              <div className="p-8 flex flex-col items-center gap-6 overflow-y-auto h-full scrollbar-hide">
                 <Avatar className="h-32 w-32 shadow-2xl border-4 border-background">
                   <AvatarImage src={room?.isGroupChat ? room.groupImageUrl : otherUser?.profilePictureUrl} className="object-cover" />
@@ -507,23 +525,32 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                       <Switch checked={room?.vanishMode || false} onCheckedChange={(val) => roomRef && updateDocumentNonBlocking(roomRef, { vanishMode: val })} />
                    </div>
 
-                   <AlertDialog>
+                   <div className="pt-4 border-t border-white/5">
+                    <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="outline" className="w-full border-destructive text-destructive hover:bg-destructive hover:text-white transition-colors">
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete Chat
+                        <Button variant="destructive" className="w-full h-12 rounded-xl font-bold flex gap-2">
+                          <Trash2 className="h-4 w-4" /> Delete Conversation
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent>
+                      <AlertDialogContent className="rounded-[2rem] border-none bg-card/95 backdrop-blur-xl p-8 max-w-sm">
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Conversation?</AlertDialogTitle>
-                          <AlertDialogDescription>This will permanently erase all history for everyone.</AlertDialogDescription>
+                          <AlertDialogTitle className="text-xl font-bold">Erase Chat?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-muted-foreground">
+                            This action is permanent and will delete history for all participants.
+                          </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => roomRef && deleteDocumentNonBlocking(roomRef)}>Delete</AlertDialogAction>
+                        <AlertDialogFooter className="mt-6 gap-3">
+                          <AlertDialogCancel className="rounded-xl border-white/10 h-12">Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 h-12 font-bold"
+                            onClick={() => roomRef && deleteDocumentNonBlocking(roomRef)}
+                          >
+                            Delete
+                          </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
-                   </AlertDialog>
+                    </AlertDialog>
+                  </div>
                 </div>
              </div>
           </SheetContent>
@@ -631,6 +658,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
         <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 border-none bg-black/98 rounded-2xl overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Image Preview</DialogTitle>
+          </DialogHeader>
           <div className="relative w-full h-full flex flex-col items-center justify-center p-4">
             {lightboxImage && <img src={lightboxImage.url} alt="Shared" className="max-w-full max-h-[80vh] object-contain rounded-lg" />}
             {lightboxImage?.isViewOnce && (
