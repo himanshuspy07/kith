@@ -10,22 +10,23 @@
     --card-foreground: 224 71.4% 2%;
     --popover: 0 0% 100%;
     --popover-foreground: 224 71.4% 2%;
-    /* Bright Peach */
-    --primary: 14 100% 75%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 255 100% 90%;
-    --secondary-foreground: 220.9 39.3% 11%;
-    --muted: 220 14.3% 94%;
-    --muted-foreground: 220 8.9% 45%;
+    /* Snap Yellow */
+    --primary: 59 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    /* Snap Blue */
+    --secondary: 199 100% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
     /* Neon Mint Green */
     --accent: 150 100% 66%;
-    --accent-foreground: 210 20% 98%;
-    --destructive: 0 84.2% 60%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 20% 98%;
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 14 100% 75%;
-    --radius: 1.25rem;
+    --ring: 199 100% 50%;
+    --radius: 1.5rem;
   }
 
   .dark {
@@ -35,19 +36,19 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 14 100% 75%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 255 20% 10%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 12%;
+    --primary: 59 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 199 100% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
     --accent: 150 100% 66%;
-    --accent-foreground: 0 0% 98%;
+    --accent-foreground: 0 0% 0%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 12%;
-    --input: 240 3.7% 12%;
-    --ring: 14 100% 75%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 199 100% 50%;
   }
 }
 
@@ -60,21 +61,12 @@
   }
 }
 
-/* Modern Minimalist Utilities */
+.snap-shadow {
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.1);
+}
+
 .acrylic {
-  @apply bg-white/70 dark:bg-black/70 backdrop-blur-xl border border-white/10 dark:border-white/5;
-}
-
-.sidebar-item-active {
-  @apply bg-primary/10 shadow-sm border-r-4 border-primary;
-}
-
-.bubble-shadow {
-  box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.05);
-}
-
-.bubble-shadow-me {
-  box-shadow: 0 8px 20px -5px hsla(14, 100%, 75%, 0.3);
+  @apply bg-white/80 dark:bg-black/80 backdrop-blur-2xl border-none;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
@@ -90,33 +82,15 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.mention {
-  @apply font-semibold text-primary bg-primary/5 px-1 rounded;
-}
-
-/* Typing Indicator Animation */
-.typing-dot {
-  @apply h-1.5 w-1.5 bg-primary rounded-full;
-  animation: typing 1.4s infinite ease-in-out both;
-}
-
-.typing-dot:nth-child(1) { animation-delay: -0.32s; }
-.typing-dot:nth-child(2) { animation-delay: -0.16s; }
-
-@keyframes typing {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
-  40% { transform: scale(1); opacity: 1; }
-}
-
-/* KITH Custom Bubbly Logotype */
 .kith-text {
+  @apply font-black tracking-tighter uppercase italic;
   font-family: var(--font-jakarta);
-  @apply font-black tracking-tighter uppercase italic skew-x-[-12deg];
-  background: linear-gradient(135deg, hsl(14, 100%, 75%), hsl(255, 100%, 80%));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+}
+
+.online-ring {
+  @apply ring-2 ring-accent ring-offset-2 ring-offset-background;
 }
