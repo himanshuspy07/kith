@@ -1,4 +1,3 @@
-
 import type {Metadata, Viewport} from 'next';
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
@@ -22,11 +21,11 @@ const plusJakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   metadataBase: new URL('https://kith.chat'),
   title: {
-    default: 'kith - Connecting You Simply',
+    default: 'kith - Friendly Messaging',
     template: '%s | kith',
   },
-  description: 'A modern, real-time chat application for professional and private conversations. Secure, aesthetic, and reliable messaging.',
-  keywords: ['chat', 'messaging', 'real-time', 'kith', 'communication', 'professional messenger'],
+  description: 'A vibrant, modern space for friendly conversations. Secure, aesthetic, and fun.',
+  keywords: ['chat', 'messaging', 'kith', 'social', 'friendly', 'PWA'],
   authors: [{ name: 'kith' }],
   creator: 'kith',
   openGraph: {
@@ -34,8 +33,8 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://kith.chat',
     siteName: 'kith',
-    title: 'kith - Connecting You Simply',
-    description: 'Modern messaging for a connected world.',
+    title: 'kith - Friendly Messaging',
+    description: 'Vibrant messaging for a fun world.',
     images: [
       {
         url: '/icon.svg',
@@ -45,12 +44,6 @@ export const metadata: Metadata = {
       },
     ],
   },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'kith - Connecting You Simply',
-    description: 'Modern messaging for a connected world.',
-    images: ['/icon.svg'],
-  },
   manifest: '/manifest.json',
   icons: {
     icon: '/icon.svg',
@@ -59,7 +52,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#3B82F6',
+  themeColor: '#FFB5A7',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -105,12 +98,10 @@ export default function RootLayout({
           {`
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                  console.log('KITH Service Worker Registered');
+                }).catch(err => {
                   console.error('SW registration failed:', err);
-                });
-                
-                navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(function(err) {
-                  console.error('FCM SW registration failed:', err);
                 });
               });
             }
