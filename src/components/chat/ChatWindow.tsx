@@ -16,7 +16,8 @@ import {
   Eye,
   EyeOff,
   Clock,
-  MessageSquare
+  MessageSquare,
+  SmilePlus
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
@@ -67,6 +73,8 @@ import {
 } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
 interface ChatWindowProps {
   conversationId?: string;
   onBack?: () => void;
@@ -85,6 +93,17 @@ const MessageItem = memo(({
   const isViewOnce = msg.type === 'view-once';
   const isOpened = isViewOnce && msg.openedBy && msg.openedBy.includes(currentUserId);
   const timeStr = msg.createdAt?.toDate ? format(msg.createdAt.toDate(), 'HH:mm') : '';
+
+  const reactions = msg.reactions || {};
+  const reactionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    Object.values(reactions).forEach((emoji: any) => {
+      counts[emoji] = (counts[emoji] || 0) + 1;
+    });
+    return Object.entries(counts);
+  }, [reactions]);
+
+  const myReaction = reactions[currentUserId];
 
   return (
     <div className={cn(
@@ -141,6 +160,27 @@ const MessageItem = memo(({
               </div>
             )}
 
+            {/* Reactions Display */}
+            {reactionCounts.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {reactionCounts.map(([emoji, count]) => (
+                  <button
+                    key={emoji}
+                    onClick={() => onReact(emoji)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all",
+                      myReaction === emoji 
+                        ? "bg-primary/10 border-primary/30 text-primary" 
+                        : "bg-muted/50 border-border/50 text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    <span>{emoji}</span>
+                    <span>{count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {isMe && !msg.isDeleted && (
               <div className="flex items-center gap-1 mt-1.5 opacity-50">
                 {isReadByOthers ? <CheckCheck className="h-3 w-3 text-primary" /> : <Check className="h-3 w-3" />}
@@ -153,6 +193,28 @@ const MessageItem = memo(({
         {/* Floating Quick Actions */}
         {!msg.isDeleted && (
           <div className="absolute -right-2 top-1/2 -translate-y-1/2 translate-x-full opacity-0 group-hover:opacity-100 flex items-center gap-2 pl-4 transition-all pointer-events-none group-hover:pointer-events-auto z-10">
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="h-8 w-8 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-primary transition-colors border border-border/50">
+                  <SmilePlus className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="center" className="w-fit p-1.5 flex gap-1 rounded-full bg-card/95 backdrop-blur shadow-2xl border-border/50">
+                {REACTION_EMOJIS.map(emoji => (
+                  <button
+                    key={emoji}
+                    onClick={() => onReact(emoji)}
+                    className={cn(
+                      "h-8 w-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-lg",
+                      myReaction === emoji && "bg-primary/20"
+                    )}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+
             <button onClick={() => onAction('reply', msg)} className="h-8 w-8 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-primary transition-colors border border-border/50">
               <Reply className="h-4 w-4" />
             </button>
@@ -188,6 +250,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
 
   const { user } = useUser();
   const db = useFirestore();
@@ -215,38 +278,48 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
-  // Scroll to bottom on initial load and new messages
+  // Scroll logic fixed to prevent jumping during infinite scroll
   useEffect(() => {
-    if (messages && messages.length > 0 && isInitialLoad) {
+    if (!messages || messages.length === 0) return;
+
+    const currentLastMessage = messages[messages.length - 1];
+    const currentLastMessageId = currentLastMessage.id;
+    const isNewMessageAtEnd = currentLastMessageId !== lastMessageIdRef.current;
+    
+    if (isInitialLoad) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
       setIsInitialLoad(false);
-    } else if (messages && messages.length > 0 && !isInitialLoad) {
+      lastMessageIdRef.current = currentLastMessageId;
+    } else if (isNewMessageAtEnd) {
       const container = scrollContainerRef.current;
       if (container) {
         const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
-        const lastMsg = messages[messages.length - 1];
-        if (isNearBottom || lastMsg.senderId === user?.uid) {
+        const isFromMe = currentLastMessage.senderId === user?.uid;
+        
+        if (isNearBottom || isFromMe) {
            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
       }
+      lastMessageIdRef.current = currentLastMessageId;
     }
-  }, [messages?.length, isInitialLoad, user?.uid]);
+  }, [messages, isInitialLoad, user?.uid]);
 
-  // Infinite Scroll Observer
+  // Infinite Scroll Observer refined
   useEffect(() => {
     if (!topSentinelRef.current || !scrollContainerRef.current) return;
 
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && messages && messages.length >= messageLimit) {
-        const currentScrollHeight = scrollContainerRef.current?.scrollHeight || 0;
+        const prevScrollHeight = scrollContainerRef.current?.scrollHeight || 0;
         setMessageLimit(prev => prev + 25);
-        // Maintain scroll position after loading more
+        
+        // Maintain scroll position after fetch
         setTimeout(() => {
           if (scrollContainerRef.current) {
             const newScrollHeight = scrollContainerRef.current.scrollHeight;
-            scrollContainerRef.current.scrollTop = newScrollHeight - currentScrollHeight;
+            scrollContainerRef.current.scrollTop = newScrollHeight - prevScrollHeight;
           }
-        }, 50);
+        }, 100);
       }
     }, { threshold: 0.1, root: scrollContainerRef.current });
 
@@ -307,6 +380,19 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     setInputValue('');
     setReplyingTo(null);
     updateTypingStatus(false);
+  };
+
+  const handleReact = (messageId: string, emoji: string) => {
+    if (!conversationId || !user) return;
+    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', messageId);
+    const currentMsg = messages?.find(m => m.id === messageId);
+    const existingReaction = currentMsg?.reactions?.[user.uid];
+
+    if (existingReaction === emoji) {
+      updateDocumentNonBlocking(msgRef, { [`reactions.${user.uid}`]: deleteField() });
+    } else {
+      updateDocumentNonBlocking(msgRef, { [`reactions.${user.uid}`]: emoji });
+    }
   };
 
   const otherUser = useMemo(() => {
@@ -427,6 +513,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                  setInputValue(m.content);
                }
             }}
+            onReact={(emoji: string) => handleReact(msg.id, emoji)}
             onImageClick={(url: string, id?: string, viewOnce?: boolean) => {
               setLightboxImage({ url, id, isViewOnce: viewOnce });
               if (viewOnce && id && user) {
