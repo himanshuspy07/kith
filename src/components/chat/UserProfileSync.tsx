@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -28,7 +29,7 @@ export default function UserProfileSync() {
       getDoc(userRef)
         .then((docSnap) => {
           if (!docSnap.exists()) {
-            // First time initialization: use Auth provider defaults
+            // First time initialization
             const username = user.displayName || user.email?.split('@')[0] || 'kith_user';
             const initialData = {
               id: user.uid,
@@ -46,21 +47,11 @@ export default function UserProfileSync() {
             };
             setDocumentNonBlocking(userRef, initialData, { merge: true });
           } else {
-            // Profile exists: update presence ONLY
-            const existingData = docSnap.data();
+            // Update presence ONLY
             const updates: any = {
               onlineStatus: true,
               lastActiveAt: serverTimestamp(),
             };
-            
-            if (!existingData.usernameLowercase && existingData.username) {
-              updates.usernameLowercase = existingData.username.toLowerCase();
-            }
-            if (existingData.bio === undefined) updates.bio = '';
-            if (existingData.hasSeenTutorial === undefined) {
-              updates.hasSeenTutorial = false;
-            }
-
             updateDocumentNonBlocking(userRef, updates);
           }
         })
@@ -74,16 +65,29 @@ export default function UserProfileSync() {
 
     syncProfile();
 
-    // Heartbeat every 60 seconds
+    // Fast Heartbeat every 30 seconds for better real-time feel
     heartbeatIntervalRef.current = setInterval(() => {
       updateDocumentNonBlocking(userRef, {
         lastActiveAt: serverTimestamp(),
         onlineStatus: true
       });
-    }, 1000 * 60);
+    }, 1000 * 30);
+
+    // Handle visibility changes for more immediate status updates
+    const handleVisibilityChange = () => {
+      const status = document.visibilityState === 'visible';
+      updateDocumentNonBlocking(userRef, {
+        onlineStatus: status,
+        lastActiveAt: serverTimestamp()
+      });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // Try to mark offline on unmount
       updateDoc(userRef, {
         onlineStatus: false,
         lastActiveAt: serverTimestamp()

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
@@ -38,19 +39,24 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     <div
       onClick={() => onClick(room.id)}
       className={cn(
-        "p-4 flex items-center gap-4 cursor-pointer transition-all active:bg-muted/50",
-        isSelected ? "bg-muted" : "hover:bg-muted/30"
+        "p-4 flex items-center gap-4 cursor-pointer transition-all active:bg-muted/50 border-b border-border/40",
+        isSelected ? "bg-muted" : "hover:bg-muted/20"
       )}
     >
-      <div className="relative shrink-0">
-        <Avatar className={cn("h-14 w-14", room.isOnline ? "online-ring" : "border")}>
-          <AvatarImage src={room.displayAvatar || undefined} className="object-cover" />
-          <AvatarFallback className="bg-muted text-muted-foreground text-lg font-bold">{room.displayName?.[0]}</AvatarFallback>
-        </Avatar>
+      <div className="relative shrink-0 p-1">
+        <div className={cn(
+          "rounded-full transition-all duration-300",
+          room.isOnline ? "ring-2 ring-accent ring-offset-2 ring-offset-background" : ""
+        )}>
+          <Avatar className="h-14 w-14 border">
+            <AvatarImage src={room.displayAvatar || undefined} className="object-cover" />
+            <AvatarFallback className="bg-muted text-muted-foreground text-lg font-bold">{room.displayName?.[0]}</AvatarFallback>
+          </Avatar>
+        </div>
       </div>
       
       <div className="flex-1 min-w-0">
-        <h3 className="text-[17px] font-bold text-foreground truncate">
+        <h3 className="text-[17px] font-bold text-foreground truncate uppercase tracking-tighter">
           {room.displayName}
         </h3>
         <div className="flex items-center gap-2">
@@ -67,7 +73,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground">
+        <button className="h-10 w-10 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
           <Camera className="h-5 w-5" />
         </button>
       </div>
@@ -116,6 +122,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           displayName = otherUserProfile.username;
           displayAvatar = otherUserProfile.profilePictureUrl;
           const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
+          // Standard online threshold: 3 minutes
           isOnline = otherUserProfile.onlineStatus === true && differenceInMinutes(new Date(), lastActive) < 3;
         }
       }
@@ -132,18 +139,22 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     });
   }, [rooms, participantProfiles, user]);
 
+  const filteredConversations = conversationListData.filter(c => 
+    c.displayName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className={cn("h-full flex flex-col bg-background", className)}>
-      <header className="px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10 bg-muted">
+      <header className="px-4 py-4 flex items-center justify-between border-b border-border/80 sticky top-0 z-10 bg-background/95 backdrop-blur-xl">
+        <div className="flex items-center gap-3 flex-1">
+          <Avatar className="h-10 w-10 bg-muted shrink-0">
             <AvatarFallback className="text-sm font-bold">{user?.displayName?.[0] || 'U'}</AvatarFallback>
           </Avatar>
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="relative group flex-1 max-w-[240px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input 
               placeholder="Search Friends" 
-              className="bg-muted border-none h-10 rounded-full pl-10 w-48 md:w-64 font-bold" 
+              className="bg-muted/80 border-none h-10 rounded-full pl-10 w-full font-bold focus-visible:ring-2 ring-primary/30" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -152,12 +163,12 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         <NewChatDialog onChatCreated={onSelectConversation} />
       </header>
 
-      <div className="flex-1 overflow-y-auto scrollbar-hide">
+      <div className="flex-1 overflow-y-auto scrollbar-hide pb-20">
         {isLoading ? (
-          <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" /></div>
-        ) : conversationListData.length > 0 ? (
-          <div className="divide-y divide-border/50">
-            {conversationListData.map((room) => (
+          <div className="flex justify-center p-12"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
+        ) : filteredConversations.length > 0 ? (
+          <div className="flex flex-col">
+            {filteredConversations.map((room) => (
               <ConversationItem 
                 key={room.id}
                 room={room}
@@ -168,10 +179,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <UserPlus className="h-16 w-16 mb-4 text-muted-foreground opacity-20" />
-            <h3 className="text-xl font-bold">No Friends Yet</h3>
-            <p className="text-muted-foreground mt-2">Start a conversation to see your friends here.</p>
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
+            <UserPlus className="h-16 w-16 mb-4 text-muted-foreground" />
+            <h3 className="text-xl font-bold uppercase tracking-tighter italic">No Friends Yet</h3>
+            <p className="text-muted-foreground mt-2 font-medium text-sm">Start a conversation to see your friends here.</p>
           </div>
         )}
       </div>

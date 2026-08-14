@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -101,10 +102,12 @@ const MessageItem = memo(({
       isMe ? "items-start" : "items-start"
     )}>
       <div className="flex items-start gap-4 max-w-full relative">
-        <Avatar className={cn("h-10 w-10 mt-1", !isMe && sender?.onlineStatus && "online-ring")}>
-          <AvatarImage src={sender?.profilePictureUrl} className="object-cover" />
-          <AvatarFallback className="bg-muted text-[10px] font-black">{sender?.username?.[0]}</AvatarFallback>
-        </Avatar>
+        <div className="relative shrink-0">
+          <Avatar className={cn("h-10 w-10 mt-1", !isMe && sender?.onlineStatus && "ring-2 ring-accent ring-offset-1")}>
+            <AvatarImage src={sender?.profilePictureUrl} className="object-cover" />
+            <AvatarFallback className="bg-muted text-[10px] font-black">{sender?.username?.[0]}</AvatarFallback>
+          </Avatar>
+        </div>
 
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
@@ -209,8 +212,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [editingMessage, setEditingMessage] = useState<any>(null);
   const [lightboxImage, setLightboxImage] = useState<{url: string, id?: string, isViewOnce?: boolean} | null>(null);
+  const [messageLimit, setMessageLimit] = useState(25);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { user } = useUser();
@@ -228,9 +235,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return query(
       collection(db, 'chatRooms', conversationId, 'messages'),
       orderBy('createdAt', 'asc'),
-      limitToLast(50)
+      limitToLast(messageLimit)
     );
-  }, [db, conversationId]);
+  }, [db, conversationId, messageLimit]);
   const { data: messages } = useCollection(messagesQuery);
 
   const participantsQuery = useMemoFirebase(() => {
@@ -239,9 +246,38 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
+  // Scroll to bottom on initial load and new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages?.length]);
+    if (messages && messages.length > 0 && isInitialLoad) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      setIsInitialLoad(false);
+    } else if (messages && messages.length > 0 && !isInitialLoad) {
+      // Only scroll to bottom if we were already near the bottom or it's a new message from ME
+      const container = scrollContainerRef.current;
+      if (container) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+        const lastMsg = messages[messages.length - 1];
+        if (isNearBottom || lastMsg.senderId === user?.uid) {
+           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    }
+  }, [messages?.length, isInitialLoad, user?.uid]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    if (!topSentinelRef.current) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && messages && messages.length >= messageLimit) {
+        // User scrolled to top, load more
+        setMessageLimit(prev => prev + 25);
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(topSentinelRef.current);
+    return () => observer.disconnect();
+  }, [messages, messageLimit]);
 
   const updateTypingStatus = (isTyping: boolean) => {
     if (!roomRef || !user) return;
@@ -305,18 +341,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (!msg) return;
 
     const reactions = { ...(msg.reactions || {}) };
-    
-    // Remove user's previous reaction if they react again with same or different
     Object.keys(reactions).forEach(key => {
       reactions[key] = reactions[key].filter((uid: string) => uid !== user.uid);
       if (reactions[key].length === 0) delete reactions[key];
     });
 
-    // Toggle logic: if clicking a new emoji, add it
     if (!msg.reactions?.[emoji]?.includes(user.uid)) {
       reactions[emoji] = [...(reactions[emoji] || []), user.uid];
     }
-
     updateDocumentNonBlocking(msgRef, { reactions });
   };
 
@@ -327,9 +359,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   if (!conversationId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-background text-center p-8 animate-in-fade">
-        <div className="h-32 w-32 bg-muted/50 flex items-center justify-center rounded-[3rem] mb-8 shadow-inner border border-border/50">
-          <MessageSquare className="h-14 w-14 text-muted-foreground/30" />
+      <div className="flex-1 flex flex-col items-center justify-center bg-background text-center p-8 animate-in-fade h-full">
+        <div className="h-32 w-32 bg-muted/30 flex items-center justify-center rounded-[3rem] mb-8 border border-border/50">
+          <MessageSquare className="h-14 w-14 text-muted-foreground/20" />
         </div>
         <h2 className="text-3xl font-black italic uppercase tracking-tighter">Choose a Friend</h2>
         <p className="text-muted-foreground mt-3 max-w-[240px] font-bold text-sm uppercase tracking-widest opacity-60">Send a Snap or text to start the conversation.</p>
@@ -339,14 +371,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-      <header className="h-20 px-6 flex items-center justify-between border-b border-border/50 sticky top-0 z-20 bg-background/80 backdrop-blur-xl">
+      <header className="h-20 px-6 flex items-center justify-between border-b border-border/80 sticky top-0 z-30 bg-background/95 backdrop-blur-xl">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={onBack}>
-            <ChevronLeft className="h-6 w-6" />
-          </Button>
+          {onBack && (
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={onBack}>
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+          )}
           <div className="flex flex-col">
             <h3 className="text-[17px] font-black uppercase tracking-tighter leading-none">{room?.isGroupChat ? room.name : otherUser?.username}</h3>
-            <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", otherUser?.onlineStatus ? "text-primary" : "text-muted-foreground opacity-50")}>
+            <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", otherUser?.onlineStatus ? "text-accent" : "text-muted-foreground opacity-50")}>
               {otherUser?.onlineStatus ? "Active Now" : "Away"}
             </span>
           </div>
@@ -354,20 +388,19 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-muted/50 border border-border/50 shadow-sm">
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-muted/80 border border-border/50 shadow-sm">
               <Info className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent className="sm:max-w-md bg-card/95 backdrop-blur-2xl border-l border-border/50 shadow-2xl p-0">
+          <SheetContent className="sm:max-w-md bg-card/98 backdrop-blur-2xl border-l border-border/50 shadow-2xl p-0">
             <SheetHeader className="p-10 border-b border-border/50 bg-muted/20">
-              <SheetTitle className="sr-only">Chat Details</SheetTitle>
               <div className="flex flex-col items-center gap-6">
                 <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-4 ring-primary/20">
                   <AvatarImage src={room?.isGroupChat ? room.groupImageUrl : otherUser?.profilePictureUrl} />
                   <AvatarFallback className="text-4xl font-black bg-muted text-primary">{room?.name?.[0] || otherUser?.username?.[0]}</AvatarFallback>
                 </Avatar>
                 <div className="text-center space-y-1">
-                   <h3 className="text-2xl font-black uppercase italic tracking-tighter">{room?.name || otherUser?.username}</h3>
+                   <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">{room?.name || otherUser?.username}</SheetTitle>
                    <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Created {room?.createdAt?.toDate ? format(room.createdAt.toDate(), 'MMM yyyy') : ''}</p>
                 </div>
               </div>
@@ -389,12 +422,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="w-full h-16 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-destructive/20 border border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-white transition-all">
-                      <Trash2 className="h-5 w-5 mr-2" /> Clear History
+                      <Trash2 className="h-5 w-5 mr-2" /> Delete Chat
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl">
                     <AlertDialogHeader>
-                      <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Clear Conversation?</AlertDialogTitle>
+                      <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Delete Chat?</AlertDialogTitle>
                       <AlertDialogDescription className="text-muted-foreground font-medium">
                         This action cannot be undone. All messages will be permanently removed for you.
                       </AlertDialogDescription>
@@ -402,10 +435,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     <AlertDialogFooter className="gap-2">
                       <AlertDialogCancel className="rounded-xl font-bold">Cancel</AlertDialogCancel>
                       <AlertDialogAction className="rounded-xl bg-destructive font-black uppercase tracking-widest" onClick={() => {
-                        // Permanent delete logic
                         messages?.forEach(m => deleteDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id)));
-                        toast({ title: "History Cleared" });
-                      }}>Clear</AlertDialogAction>
+                        toast({ title: "Chat Deleted" });
+                      }}>Delete</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -415,7 +447,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </Sheet>
       </header>
 
-      <div className="flex-1 overflow-y-auto py-6 px-2 scrollbar-hide">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto py-6 px-2 scrollbar-hide flex flex-col"
+      >
+        <div ref={topSentinelRef} className="h-1 w-full" />
         {messages?.map((msg) => (
           <MessageItem 
             key={msg.id}
@@ -448,7 +484,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <div ref={messagesEndRef} />
       </div>
 
-      <footer className="p-6 bg-background/80 backdrop-blur-xl border-t border-border/50 sticky bottom-0 z-20">
+      <footer className="p-4 md:p-6 bg-background/95 backdrop-blur-xl border-t border-border/80 sticky bottom-0 z-30">
         <div className="max-w-4xl mx-auto space-y-4">
           {replyingTo && (
             <div className="px-6 py-3 bg-primary/10 rounded-[1.5rem] flex items-center justify-between border border-primary/20 animate-in slide-in-from-bottom-2">
@@ -474,10 +510,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             </div>
           )}
 
-          <div className="flex items-center gap-4 bg-muted/50 rounded-[2.5rem] p-2 pl-3 border border-border shadow-inner focus-within:ring-4 ring-primary/10 transition-all">
+          <div className="flex items-center gap-4 bg-muted/60 rounded-[2.5rem] p-2 pl-3 border border-border shadow-inner focus-within:ring-4 ring-primary/10 transition-all">
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="h-12 w-12 rounded-full flex items-center justify-center text-muted-foreground hover:bg-background hover:text-primary transition-all shadow-sm bg-background/50"
+              className="h-12 w-12 rounded-full flex items-center justify-center text-muted-foreground hover:bg-background hover:text-primary transition-all shadow-sm bg-background/80"
             >
               <Camera className="h-6 w-6" />
             </button>
@@ -504,7 +540,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 size="icon" 
                 className={cn("h-12 w-12 rounded-full transition-all", isViewOnceEnabled && "text-primary bg-primary/10")}
                 onClick={() => setIsViewOnceEnabled(!isViewOnceEnabled)}
-                title="View Once Toggle"
+                title="View Once"
               >
                 <Eye className="h-6 w-6" />
               </Button>
@@ -522,7 +558,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
         <DialogContent className="max-w-full h-full p-0 border-none bg-black">
-          <DialogHeader className="sr-only"><DialogTitle>Snap Preview</DialogTitle></DialogHeader>
+          <DialogTitle className="sr-only">Image Preview</DialogTitle>
           <div className="relative w-full h-full flex items-center justify-center p-6">
             {lightboxImage && <img src={lightboxImage.url} alt="Snap" className="max-w-full max-h-full object-contain rounded-[2rem] shadow-2xl" />}
             <Button variant="ghost" size="icon" className="absolute top-8 right-8 text-white bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-xl h-14 w-14" onClick={() => setLightboxImage(null)}>

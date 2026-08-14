@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -32,7 +33,7 @@ export default function Home() {
 
   if (isUserLoading || !hasMounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFC00]">
+      <div className="flex h-svh w-full flex-col items-center justify-center bg-[#FFFC00]">
         <div className="animate-in zoom-in-95 duration-700">
           <BrandLogo size="lg" showText={false} className="scale-125" />
         </div>
@@ -84,7 +85,7 @@ export default function Home() {
 
   return (
     <AppLockOverlay>
-      <div className="flex h-screen w-full bg-background flex-col overflow-hidden">
+      <div className="flex h-svh w-full bg-background flex-col overflow-hidden">
         <UserProfileSync />
         <NotificationManager currentConversationId={selectedConversationId} />
         <AppTutorial />
@@ -93,11 +94,11 @@ export default function Home() {
           {renderActiveView()}
         </div>
 
-        {/* Snapchat-style Bottom Navigation */}
-        <nav className="h-20 bg-background border-t border-border px-6 flex items-center justify-around z-50">
+        {/* Snapchat-style Bottom Navigation - Fixed height and high contrast */}
+        <nav className="h-20 bg-background border-t border-border/80 px-6 flex items-center justify-around z-50 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
           <button 
             onClick={() => setActiveTab('profile')}
-            className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'profile' ? "text-primary" : "text-muted-foreground")}
+            className={cn("flex flex-col items-center gap-1 transition-all py-2", activeTab === 'profile' ? "text-primary" : "text-muted-foreground hover:text-foreground")}
           >
             <User className={cn("h-7 w-7", activeTab === 'profile' && "fill-current")} />
             <span className="text-[10px] font-bold uppercase tracking-widest">Profile</span>
@@ -105,7 +106,7 @@ export default function Home() {
           
           <button 
             onClick={() => setActiveTab('chat')}
-            className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'chat' ? "text-secondary" : "text-muted-foreground")}
+            className={cn("flex flex-col items-center gap-1 transition-all py-2", activeTab === 'chat' ? "text-secondary" : "text-muted-foreground hover:text-foreground")}
           >
             <MessageSquare className={cn("h-7 w-7", activeTab === 'chat' && "fill-current")} />
             <span className="text-[10px] font-bold uppercase tracking-widest">Chat</span>
@@ -113,7 +114,7 @@ export default function Home() {
 
           <button 
             onClick={() => setActiveTab('settings')}
-            className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'settings' ? "text-foreground" : "text-muted-foreground")}
+            className={cn("flex flex-col items-center gap-1 transition-all py-2", activeTab === 'settings' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
           >
             <SettingsIcon className={cn("h-7 w-7", activeTab === 'settings' && "fill-current")} />
             <span className="text-[10px] font-bold uppercase tracking-widest">Settings</span>
