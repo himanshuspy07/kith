@@ -1,17 +1,23 @@
 {
-  "name": "KITH Chat",
-  "short_name": "KITH",
-  "description": "A playful and vibrant social chat application.",
+  "name": "kith - Friendly Messaging",
+  "short_name": "kith",
+  "description": "A vibrant, modern space for friendly conversations.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#FFB5A7",
+  "background_color": "#121212",
+  "theme_color": "#121212",
   "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icon.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     }
   ]
 }
