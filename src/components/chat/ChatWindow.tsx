@@ -469,8 +469,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   <AvatarFallback className="text-4xl font-black bg-muted text-primary">{room?.name?.[0] || otherUser?.username?.[0]}</AvatarFallback>
                 </Avatar>
                 <div className="text-center space-y-1">
-                   <h2 className="text-2xl font-black uppercase italic tracking-tighter">{room?.name || otherUser?.username}</h2>
-                   <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Created {room?.createdAt?.toDate ? format(room.createdAt.toDate(), 'MMM yyyy') : ''}</p>
+                   <h2 className="text-2xl font-black uppercase italic tracking-tighter">{room?.isGroupChat ? room.name : (otherUser?.username || "Friend")}</h2>
+                   {room?.isGroupChat ? (
+                     <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Created {room?.createdAt?.toDate ? format(room.createdAt.toDate(), 'MMM yyyy') : ''}</p>
+                   ) : (
+                     <p className="text-sm font-medium text-muted-foreground line-clamp-2 px-4">{otherUser?.bio || "No bio yet"}</p>
+                   )}
                 </div>
               </div>
             </SheetHeader>
