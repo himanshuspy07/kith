@@ -101,6 +101,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const { user } = useUser();
   const db = useFirestore();
 
+  // Fetch current user's profile data from Firestore to get the profile picture
+  const currentUserRef = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return doc(db, 'users', user.uid);
+  }, [db, user?.uid]);
+  const { data: currentUserData } = useDoc(currentUserRef);
+
   const roomsQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(collection(db, 'chatRooms'), where(`members.${user.uid}`, '==', true));
@@ -162,7 +169,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       <header className="px-4 py-4 flex items-center justify-between border-b border-border/80 sticky top-0 z-10 bg-background/95 backdrop-blur-xl">
         <div className="flex items-center gap-3 flex-1">
           <Avatar className="h-10 w-10 bg-muted shrink-0">
-            <AvatarFallback className="text-sm font-bold">{user?.displayName?.[0] || 'U'}</AvatarFallback>
+            <AvatarImage src={currentUserData?.profilePictureUrl || user?.photoURL || undefined} className="object-cover" />
+            <AvatarFallback className="text-sm font-bold">{currentUserData?.username?.[0] || user?.displayName?.[0] || 'U'}</AvatarFallback>
           </Avatar>
           <div className="relative group flex-1 max-w-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
