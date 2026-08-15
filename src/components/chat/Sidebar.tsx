@@ -51,26 +51,34 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
         isSelected ? "bg-muted" : "hover:bg-muted/20"
       )}
     >
-      <div className="relative shrink-0 p-1">
+      <div className="relative shrink-0 p-0.5">
         <div className={cn(
-          "rounded-full transition-all duration-300",
-          room.isOnline ? "ring-2 ring-accent ring-offset-2 ring-offset-background" : ""
+          "rounded-full p-0.5 transition-all duration-300",
+          room.isOnline ? "ring-[3px] ring-accent ring-offset-2 ring-offset-background" : "ring-1 ring-border"
         )}>
-          <Avatar className="h-14 w-14 border">
+          <Avatar className="h-14 w-14">
             <AvatarImage src={room.displayAvatar || undefined} className="object-cover" />
             <AvatarFallback className="bg-muted text-muted-foreground text-lg font-bold">{room.displayName?.[0]}</AvatarFallback>
           </Avatar>
         </div>
+        {room.isOnline && (
+          <div className="absolute bottom-1 right-1 w-3.5 h-3.5 bg-accent border-2 border-background rounded-full shadow-sm" />
+        )}
       </div>
       
       <div className="flex-1 min-w-0">
-        <h3 className="text-[17px] font-bold text-foreground truncate uppercase tracking-tighter">
-          {room.displayName}
-        </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex justify-between items-baseline gap-2">
+          <h3 className="text-[17px] font-bold text-foreground truncate uppercase tracking-tighter">
+            {room.displayName}
+          </h3>
+          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter shrink-0">
+            {timeDisplay}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mt-0.5">
           {isTyping ? (
             <div className="flex items-center gap-1">
-               <span className="text-[14px] text-accent font-black animate-pulse">Typing...</span>
+               <span className="text-[13px] text-accent font-black animate-pulse">Typing...</span>
             </div>
           ) : (
             <p className={cn(
@@ -80,9 +88,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
               {room.lastMessageText || 'New Friend'}
             </p>
           )}
-          <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-tighter">
-            {timeDisplay}
-          </span>
+          {room.isUnread && <div className="h-2 w-2 rounded-full bg-secondary shrink-0" />}
         </div>
       </div>
 
@@ -168,10 +174,13 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     <div className={cn("h-full flex flex-col bg-background", className)}>
       <header className="px-4 py-4 flex items-center justify-between border-b border-border/80 sticky top-0 z-10 bg-background/95 backdrop-blur-xl">
         <div className="flex items-center gap-3 flex-1">
-          <Avatar className="h-10 w-10 bg-muted shrink-0">
-            <AvatarImage src={currentUserData?.profilePictureUrl || user?.photoURL || undefined} className="object-cover" />
-            <AvatarFallback className="text-sm font-bold">{currentUserData?.username?.[0] || user?.displayName?.[0] || 'U'}</AvatarFallback>
-          </Avatar>
+          <div className="relative p-0.5 ring-2 ring-accent ring-offset-2 ring-offset-background rounded-full">
+            <Avatar className="h-10 w-10 bg-muted shrink-0">
+              <AvatarImage src={currentUserData?.profilePictureUrl || user?.photoURL || undefined} className="object-cover" />
+              <AvatarFallback className="text-sm font-bold">{currentUserData?.username?.[0] || user?.displayName?.[0] || 'U'}</AvatarFallback>
+            </Avatar>
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-accent border-2 border-background rounded-full" />
+          </div>
           <div className="relative group flex-1 max-w-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input 
@@ -202,9 +211,11 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
-            <UserPlus className="h-16 w-16 mb-4 text-muted-foreground" />
+            <div className="h-20 w-20 bg-muted/30 rounded-[2rem] flex items-center justify-center mb-6">
+              <UserPlus className="h-10 w-10 text-muted-foreground" />
+            </div>
             <h3 className="text-xl font-bold uppercase tracking-tighter italic">No Friends Yet</h3>
-            <p className="text-muted-foreground mt-2 font-medium text-sm">Start a conversation to see your friends here.</p>
+            <p className="text-muted-foreground mt-2 font-medium text-sm max-w-[200px]">Start a conversation to see your friends here.</p>
           </div>
         )}
       </div>

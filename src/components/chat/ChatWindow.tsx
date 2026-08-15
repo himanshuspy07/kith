@@ -116,7 +116,7 @@ const MessageItem = memo(({
     )}>
       <div className="flex items-start gap-4 max-w-full relative">
         <div className="relative shrink-0">
-          <Avatar className={cn("h-10 w-10 mt-1", !isMe && sender?.onlineStatus && "ring-2 ring-accent ring-offset-1")}>
+          <Avatar className="h-10 w-10 mt-1">
             <AvatarImage src={sender?.profilePictureUrl} className="object-cover" />
             <AvatarFallback className="bg-muted text-[10px] font-black">{sender?.username?.[0]}</AvatarFallback>
           </Avatar>
@@ -446,11 +446,22 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               <ChevronLeft className="h-6 w-6" />
             </Button>
           )}
-          <div className="flex flex-col">
-            <h3 className="text-[17px] font-black uppercase tracking-tighter leading-none">{room?.isGroupChat ? room.name : otherUser?.username}</h3>
-            <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", otherUser?.onlineStatus ? "text-accent" : "text-muted-foreground opacity-50")}>
-              {otherUser?.onlineStatus ? "Active Now" : "Away"}
-            </span>
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "p-0.5 rounded-full ring-2 ring-offset-2 ring-offset-background",
+              otherUser?.onlineStatus ? "ring-accent" : "ring-transparent"
+            )}>
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={otherUser?.profilePictureUrl} />
+                <AvatarFallback className="font-bold">{otherUser?.username?.[0]}</AvatarFallback>
+              </Avatar>
+            </div>
+            <div className="flex flex-col">
+              <h3 className="text-[17px] font-black uppercase tracking-tighter leading-none">{room?.isGroupChat ? room.name : otherUser?.username}</h3>
+              <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", otherUser?.onlineStatus ? "text-accent" : "text-muted-foreground opacity-50")}>
+                {otherUser?.onlineStatus ? "Active Now" : "Away"}
+              </span>
+            </div>
           </div>
         </div>
         
