@@ -10,6 +10,7 @@ const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
+  weight: ['400', '500', '600', '700'],
 });
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -52,7 +53,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#FFB5A7',
+  themeColor: '#121212',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,

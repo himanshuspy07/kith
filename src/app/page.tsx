@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -32,7 +31,7 @@ export default function Home() {
 
   if (isUserLoading || !hasMounted) {
     return (
-      <div className="flex h-svh w-full flex-col items-center justify-center bg-[#FFFC00]">
+      <div className="flex h-svh w-full flex-col items-center justify-center bg-[#121212]">
         <div className="animate-in zoom-in-95 duration-700">
           <BrandLogo size="lg" showText={false} className="scale-125" />
         </div>
