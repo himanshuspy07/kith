@@ -267,6 +267,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, conversationId]);
   const { data: room } = useDoc(roomRef);
 
+  // Fetch current user's profile data to ensure their avatar shows in chat
+  const currentUserRef = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return doc(db, 'users', user.uid);
+  }, [db, user?.uid]);
+  const { data: currentUserData } = useDoc(currentUserRef);
+
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !conversationId) return null;
     return query(
@@ -536,36 +543,40 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide flex flex-col bg-background"
       >
         <div ref={topSentinelRef} className="h-4 w-full shrink-0" />
-        {messages?.map((msg) => (
-          <MessageItem 
-            key={msg.id}
-            msg={msg}
-            isMe={msg.senderId === user?.uid}
-            sender={participants?.find(p => p.id === msg.senderId)}
-            currentUserId={user?.uid}
-            roomReadBy={room?.readBy}
-            onAction={(action: string, m: any) => {
-               if (action === 'delete') {
-                 updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id), { isDeleted: true });
-               }
-               if (action === 'reply') setReplyingTo(m);
-               if (action === 'edit') {
-                 setEditingMessage(m);
-                 setInputValue(m.content);
-               }
-            }}
-            onReact={(emoji: string) => handleReact(msg.id, emoji)}
-            onImageClick={(url: string, id?: string, viewOnce?: boolean) => {
-              setLightboxImage({ url, id, isViewOnce: viewOnce });
-              if (viewOnce && id && user) {
-                const msgRef = doc(db, 'chatRooms', conversationId, 'messages', id);
-                updateDocumentNonBlocking(msgRef, {
-                  openedBy: arrayUnion(user.uid)
-                });
-              }
-            }}
-          />
-        ))}
+        {messages?.map((msg) => {
+          const isMe = msg.senderId === user?.uid;
+          const sender = isMe ? currentUserData : participants?.find(p => p.id === msg.senderId);
+          return (
+            <MessageItem 
+              key={msg.id}
+              msg={msg}
+              isMe={isMe}
+              sender={sender}
+              currentUserId={user?.uid}
+              roomReadBy={room?.readBy}
+              onAction={(action: string, m: any) => {
+                 if (action === 'delete') {
+                   updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id), { isDeleted: true });
+                 }
+                 if (action === 'reply') setReplyingTo(m);
+                 if (action === 'edit') {
+                   setEditingMessage(m);
+                   setInputValue(m.content);
+                 }
+              }}
+              onReact={(emoji: string) => handleReact(msg.id, emoji)}
+              onImageClick={(url: string, id?: string, viewOnce?: boolean) => {
+                setLightboxImage({ url, id, isViewOnce: viewOnce });
+                if (viewOnce && id && user) {
+                  const msgRef = doc(db, 'chatRooms', conversationId, 'messages', id);
+                  updateDocumentNonBlocking(msgRef, {
+                    openedBy: arrayUnion(user.uid)
+                  });
+                }
+              }}
+            />
+          );
+        })}
         <div ref={messagesEndRef} className="h-4 w-full shrink-0" />
       </div>
 
