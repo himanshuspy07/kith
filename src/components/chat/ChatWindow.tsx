@@ -17,7 +17,8 @@ import {
   EyeOff,
   Clock,
   MessageSquare,
-  SmilePlus
+  SmilePlus,
+  Palette
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -73,6 +74,7 @@ import {
   deleteDocumentNonBlocking
 } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
+import wallpaperData from '@/app/lib/placeholder-images.json';
 
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
@@ -89,10 +91,9 @@ const MessageItem = memo(({
   onReact, 
   onImageClick,
   currentUserId,
-  roomReadBy 
+  roomReadBy,
+  hasWallpaper
 }: any) => {
-  // A message is "Opened" if anyone other than the sender is in the room's readBy list
-  // and the message was sent before or at the time the room was marked read.
   const isReadByOthers = isMe && roomReadBy?.some((uid: string) => uid !== currentUserId);
   const isViewOnce = msg.type === 'view-once';
   const isOpened = isViewOnce && msg.openedBy && msg.openedBy.includes(currentUserId);
@@ -124,16 +125,26 @@ const MessageItem = memo(({
 
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2">
-            <span className={cn("text-[14px] font-black uppercase tracking-tighter", isMe ? "text-secondary" : "text-primary")}>
+            <span className={cn(
+              "text-[14px] font-black uppercase tracking-tighter", 
+              isMe ? "text-secondary" : "text-primary",
+              hasWallpaper && "drop-shadow-md"
+            )}>
               {isMe ? "ME" : sender?.username}
             </span>
-            <span className="text-[9px] text-muted-foreground font-black opacity-60 uppercase">{timeStr}</span>
+            <span className={cn(
+              "text-[9px] font-black opacity-60 uppercase",
+              hasWallpaper ? "text-white" : "text-muted-foreground"
+            )}>{timeStr}</span>
             {msg.isEdited && <span className="text-[8px] text-muted-foreground font-bold uppercase italic opacity-40">Edited</span>}
           </div>
 
           <div className="relative mt-1">
             {msg.replyTo && (
-              <div className="mb-2 p-2 bg-muted/30 border-l-4 border-primary rounded-r-xl text-[11px] max-w-[200px] opacity-70">
+              <div className={cn(
+                "mb-2 p-2 border-l-4 border-primary rounded-r-xl text-[11px] max-w-[200px] opacity-70",
+                hasWallpaper ? "bg-black/40 text-white" : "bg-muted/30"
+              )}>
                  <p className="font-bold uppercase tracking-widest text-[9px] mb-1">Replying to:</p>
                  <p className="truncate italic">{msg.replyToContent}</p>
               </div>
@@ -142,9 +153,12 @@ const MessageItem = memo(({
             {isViewOnce ? (
               <div 
                 onClick={() => !isOpened && onImageClick(msg.content, msg.id, true)}
-                className="flex items-center gap-3 py-2 px-4 rounded-2xl bg-muted/50 cursor-pointer hover:bg-muted transition-colors border border-border/50"
+                className={cn(
+                  "flex items-center gap-3 py-2 px-4 rounded-2xl cursor-pointer transition-colors border",
+                  hasWallpaper ? "bg-black/40 border-white/20 text-white backdrop-blur-sm" : "bg-muted/50 border-border/50"
+                )}
               >
-                <div className="h-8 w-8 rounded-xl bg-background flex items-center justify-center shadow-sm">
+                <div className="h-8 w-8 rounded-xl bg-background/20 flex items-center justify-center shadow-sm">
                   {isOpened ? <EyeOff className="h-4 w-4 opacity-40" /> : <Eye className="h-4 w-4 text-primary" />}
                 </div>
                 <span className="text-sm font-black uppercase tracking-widest">{isOpened ? "Snap Opened" : "New Photo"}</span>
@@ -158,7 +172,11 @@ const MessageItem = memo(({
               />
             ) : (
               <div className="relative">
-                <p className={cn("text-[16px] font-medium leading-normal break-words py-1", msg.isDeleted && "italic opacity-50 line-through")}>
+                <p className={cn(
+                  "text-[16px] font-medium leading-normal break-words py-1", 
+                  msg.isDeleted && "italic opacity-50 line-through",
+                  hasWallpaper ? "text-white drop-shadow-md" : "text-foreground"
+                )}>
                   {msg.isDeleted ? "Message deleted" : msg.content}
                 </p>
               </div>
@@ -175,7 +193,9 @@ const MessageItem = memo(({
                       "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all",
                       myReaction === emoji 
                         ? "bg-primary/10 border-primary/30 text-primary" 
-                        : "bg-muted/50 border-border/50 text-muted-foreground hover:bg-muted"
+                        : hasWallpaper 
+                          ? "bg-black/40 border-white/20 text-white hover:bg-black/60"
+                          : "bg-muted/50 border-border/50 text-muted-foreground hover:bg-muted"
                     )}
                   >
                     <span>{emoji}</span>
@@ -187,8 +207,10 @@ const MessageItem = memo(({
 
             {isMe && !msg.isDeleted && (
               <div className="flex items-center gap-1 mt-1.5 opacity-50">
-                {isReadByOthers ? <CheckCheck className="h-3 w-3 text-primary" /> : <Check className="h-3 w-3" />}
-                <span className="text-[9px] font-black uppercase tracking-[0.2em]">{isReadByOthers ? "Opened" : "Sent"}</span>
+                {isReadByOthers ? <CheckCheck className="h-3 w-3 text-primary" /> : <Check className={cn("h-3 w-3", hasWallpaper && "text-white")} />}
+                <span className={cn("text-[9px] font-black uppercase tracking-[0.2em]", hasWallpaper ? "text-white" : "text-foreground")}>
+                  {isReadByOthers ? "Opened" : "Sent"}
+                </span>
               </div>
             )}
           </div>
@@ -267,7 +289,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, conversationId]);
   const { data: room } = useDoc(roomRef);
 
-  // Fetch current user's profile data to ensure their avatar shows in chat
   const currentUserRef = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return doc(db, 'users', user.uid);
@@ -290,7 +311,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
-  // Mark room as read when active
   useEffect(() => {
     if (roomRef && user && room && !room.readBy?.includes(user.uid)) {
       updateDocumentNonBlocking(roomRef, {
@@ -299,7 +319,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   }, [room, user, roomRef]);
 
-  // Scroll logic fixed to prevent jumping during infinite scroll
   useEffect(() => {
     if (!messages || messages.length === 0) return;
 
@@ -325,7 +344,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   }, [messages, isInitialLoad, user?.uid]);
 
-  // Infinite Scroll Observer refined
   useEffect(() => {
     if (!topSentinelRef.current || !scrollContainerRef.current) return;
 
@@ -334,7 +352,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         const prevScrollHeight = scrollContainerRef.current?.scrollHeight || 0;
         setMessageLimit(prev => prev + 25);
         
-        // Maintain scroll position after fetch
         setTimeout(() => {
           if (scrollContainerRef.current) {
             const newScrollHeight = scrollContainerRef.current.scrollHeight;
@@ -405,7 +422,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       lastMessageText: type === 'image' ? 'Sent a photo' : type === 'view-once' ? 'Sent a Snap' : finalContent,
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
-      readBy: [user.uid], // Reset readBy to only sender
+      readBy: [user.uid],
       [`typing.${user.uid}`]: deleteField()
     });
     
@@ -427,10 +444,18 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   };
 
+  const handleWallpaperSelect = (url: string | null) => {
+    if (!roomRef) return;
+    updateDocumentNonBlocking(roomRef, { wallpaperUrl: url });
+    toast({ title: url ? "Wallpaper updated" : "Wallpaper removed" });
+  };
+
   const otherUser = useMemo(() => {
     if (!room || !participants || !user) return null;
     return participants.find(p => p.id !== user.uid);
   }, [room, participants, user]);
+
+  const wallpapers = wallpaperData.placeholderImages.filter(img => img.id.startsWith('wallpaper-'));
 
   if (!conversationId) {
     return (
@@ -498,6 +523,35 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             </SheetHeader>
             
             <div className="p-8 space-y-8 h-full overflow-y-auto scrollbar-hide">
+              {/* Wallpaper Section */}
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Chat Wallpaper</h4>
+                <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+                  <button 
+                    onClick={() => handleWallpaperSelect(null)}
+                    className={cn(
+                      "h-20 w-14 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all",
+                      !room?.wallpaperUrl ? "border-primary bg-primary/10" : "border-border/50 bg-muted/30"
+                    )}
+                  >
+                    <X className="h-4 w-4 opacity-50" />
+                  </button>
+                  {wallpapers.map((wp) => (
+                    <button
+                      key={wp.id}
+                      onClick={() => handleWallpaperSelect(wp.imageUrl)}
+                      className={cn(
+                        "h-20 w-14 shrink-0 rounded-xl border-2 overflow-hidden transition-all relative group",
+                        room?.wallpaperUrl === wp.imageUrl ? "border-primary scale-110 shadow-lg" : "border-transparent opacity-70 hover:opacity-100"
+                      )}
+                    >
+                      <img src={wp.imageUrl} alt={wp.description} className="h-full w-full object-cover" data-ai-hint={wp.imageHint} />
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-4">
                 <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Privacy Settings</h4>
                 <div className="flex items-center justify-between p-4 bg-muted/50 rounded-[2rem] border border-border/50">
@@ -540,44 +594,59 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide flex flex-col bg-background"
+        className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide flex flex-col bg-background relative"
       >
-        <div ref={topSentinelRef} className="h-4 w-full shrink-0" />
-        {messages?.map((msg) => {
-          const isMe = msg.senderId === user?.uid;
-          const sender = isMe ? currentUserData : participants?.find(p => p.id === msg.senderId);
-          return (
-            <MessageItem 
-              key={msg.id}
-              msg={msg}
-              isMe={isMe}
-              sender={sender}
-              currentUserId={user?.uid}
-              roomReadBy={room?.readBy}
-              onAction={(action: string, m: any) => {
-                 if (action === 'delete') {
-                   updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id), { isDeleted: true });
-                 }
-                 if (action === 'reply') setReplyingTo(m);
-                 if (action === 'edit') {
-                   setEditingMessage(m);
-                   setInputValue(m.content);
-                 }
-              }}
-              onReact={(emoji: string) => handleReact(msg.id, emoji)}
-              onImageClick={(url: string, id?: string, viewOnce?: boolean) => {
-                setLightboxImage({ url, id, isViewOnce: viewOnce });
-                if (viewOnce && id && user) {
-                  const msgRef = doc(db, 'chatRooms', conversationId, 'messages', id);
-                  updateDocumentNonBlocking(msgRef, {
-                    openedBy: arrayUnion(user.uid)
-                  });
-                }
-              }}
+        {/* Background Wallpaper */}
+        {room?.wallpaperUrl && (
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <img 
+              src={room.wallpaperUrl} 
+              alt="Wallpaper" 
+              className="h-full w-full object-cover fixed" 
             />
-          );
-        })}
-        <div ref={messagesEndRef} className="h-4 w-full shrink-0" />
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
+          </div>
+        )}
+
+        <div className="relative z-10 flex flex-col flex-1">
+          <div ref={topSentinelRef} className="h-4 w-full shrink-0" />
+          {messages?.map((msg) => {
+            const isMe = msg.senderId === user?.uid;
+            const sender = isMe ? currentUserData : participants?.find(p => p.id === msg.senderId);
+            return (
+              <MessageItem 
+                key={msg.id}
+                msg={msg}
+                isMe={isMe}
+                sender={sender}
+                currentUserId={user?.uid}
+                roomReadBy={room?.readBy}
+                hasWallpaper={!!room?.wallpaperUrl}
+                onAction={(action: string, m: any) => {
+                   if (action === 'delete') {
+                     updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id), { isDeleted: true });
+                   }
+                   if (action === 'reply') setReplyingTo(m);
+                   if (action === 'edit') {
+                     setEditingMessage(m);
+                     setInputValue(m.content);
+                   }
+                }}
+                onReact={(emoji: string) => handleReact(msg.id, emoji)}
+                onImageClick={(url: string, id?: string, viewOnce?: boolean) => {
+                  setLightboxImage({ url, id, isViewOnce: viewOnce });
+                  if (viewOnce && id && user) {
+                    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', id);
+                    updateDocumentNonBlocking(msgRef, {
+                      openedBy: arrayUnion(user.uid)
+                    });
+                  }
+                }}
+              />
+            );
+          })}
+          <div ref={messagesEndRef} className="h-4 w-full shrink-0" />
+        </div>
       </div>
 
       <footer className="p-4 md:p-6 bg-background border-t border-border/40 shrink-0 z-30">
