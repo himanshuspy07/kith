@@ -13,9 +13,9 @@ import {
   initiateGoogleSignIn
 } from '@/firebase/non-blocking-login';
 import BrandLogo from '@/components/ui/brand-logo';
-import { Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { updateProfile } from 'firebase/auth';
+import { updateProfile, signOut } from 'firebase/auth';
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
@@ -24,6 +24,7 @@ export default function AuthScreen() {
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
   const [resetSent, setResetSent] = useState(false);
 
   const auth = useAuth();
@@ -41,6 +42,10 @@ export default function AuthScreen() {
         if (userCredential.user && username) {
           await updateProfile(userCredential.user, { displayName: username });
         }
+        setVerificationSent(true);
+        // Sign out to prevent auto-login before verification if desired
+        // For Snap-style, we often show a verification requirement
+        await signOut(auth);
         toast({ title: "Verification sent", description: "Please check your inbox." });
       } else if (mode === 'reset') {
         await initiatePasswordReset(auth, email);
@@ -52,6 +57,24 @@ export default function AuthScreen() {
       setIsLoading(false);
     }
   };
+
+  if (verificationSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <Card className="w-full max-w-sm border-none shadow-none text-center space-y-8 p-10 bg-card rounded-[3rem]">
+          <div className="flex justify-center relative">
+            <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-150" />
+            <Mail className="h-20 w-20 text-primary relative z-10" />
+          </div>
+          <div className="space-y-4">
+            <h1 className="text-3xl font-black italic tracking-tighter uppercase">Verify Email</h1>
+            <p className="text-muted-foreground text-sm font-medium">We've sent a verification link to your email. Please verify to start chatting on kith.</p>
+          </div>
+          <Button variant="default" className="w-full h-14 rounded-2xl font-bold uppercase tracking-widest" onClick={() => { setVerificationSent(false); setMode('login'); }}>Got it, Sign In</Button>
+        </Card>
+      </div>
+    );
+  }
 
   if (resetSent) {
     return (
