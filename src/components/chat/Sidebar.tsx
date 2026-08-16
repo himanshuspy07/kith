@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
@@ -107,7 +106,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const { user } = useUser();
   const db = useFirestore();
 
-  // Fetch current user's profile data from Firestore to get the profile picture
   const currentUserRef = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return doc(db, 'users', user.uid);
@@ -149,14 +147,17 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           displayName = otherUserProfile.username;
           displayAvatar = otherUserProfile.profilePictureUrl;
           const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
-          // Standard online threshold: 3 minutes
-          isOnline = otherUserProfile.onlineStatus === true && differenceInMinutes(new Date(), lastActive) < 3;
+          const now = new Date();
+          // Stricter online threshold: 1 minute
+          isOnline = otherUserProfile.onlineStatus === true && (now.getTime() - lastActive.getTime()) < 60000;
         }
       }
 
+      // Check if last message was seen by current user
+      const lastRead = room.lastRead?.[user.uid];
       const isUnread = room.lastMessageText && 
                        room.lastMessageSenderId !== user.uid && 
-                       (!room.readBy || !room.readBy.includes(user.uid));
+                       (!lastRead || room.updatedAt?.toMillis() > lastRead.toMillis());
 
       return { ...room, displayName, displayAvatar, isOnline, isUnread };
     }).sort((a, b) => {
@@ -170,16 +171,25 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     c.displayName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const isMeOnline = useMemo(() => {
+    if (!currentUserData?.lastActiveAt) return true;
+    const lastActive = currentUserData.lastActiveAt.toDate();
+    return (Date.now() - lastActive.getTime()) < 60000;
+  }, [currentUserData]);
+
   return (
     <div className={cn("h-full flex flex-col bg-background", className)}>
       <header className="px-4 py-4 flex items-center justify-between border-b border-border/80 sticky top-0 z-10 bg-background/95 backdrop-blur-xl">
         <div className="flex items-center gap-3 flex-1">
-          <div className="relative p-0.5 ring-2 ring-accent ring-offset-2 ring-offset-background rounded-full">
+          <div className={cn(
+            "relative p-0.5 ring-2 ring-offset-2 ring-offset-background rounded-full transition-all duration-500",
+            isMeOnline ? "ring-accent" : "ring-transparent"
+          )}>
             <Avatar className="h-10 w-10 bg-muted shrink-0">
               <AvatarImage src={currentUserData?.profilePictureUrl || user?.photoURL || undefined} className="object-cover" />
               <AvatarFallback className="text-sm font-bold">{currentUserData?.username?.[0] || user?.displayName?.[0] || 'U'}</AvatarFallback>
             </Avatar>
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-accent border-2 border-background rounded-full" />
+            {isMeOnline && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-accent border-2 border-background rounded-full" />}
           </div>
           <div className="relative group flex-1 max-w-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />

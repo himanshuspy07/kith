@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -91,10 +90,21 @@ const MessageItem = memo(({
   onReact, 
   onImageClick,
   currentUserId,
-  roomReadBy,
+  otherUserLastRead,
   hasWallpaper
 }: any) => {
-  const isReadByOthers = isMe && roomReadBy?.some((uid: string) => uid !== currentUserId);
+  // A message is "Opened" if the recipient's lastRead timestamp is >= message's createdAt
+  const isReadByOthers = useMemo(() => {
+    if (!isMe || !otherUserLastRead || !msg.createdAt) return false;
+    try {
+      const msgTime = msg.createdAt.toMillis ? msg.createdAt.toMillis() : Date.now();
+      const readTime = otherUserLastRead.toMillis ? otherUserLastRead.toMillis() : 0;
+      return readTime >= msgTime;
+    } catch (e) {
+      return false;
+    }
+  }, [isMe, otherUserLastRead, msg.createdAt]);
+
   const isViewOnce = msg.type === 'view-once';
   const isOpened = isViewOnce && msg.openedBy && msg.openedBy.includes(currentUserId);
   const timeStr = msg.createdAt?.toDate ? format(msg.createdAt.toDate(), 'HH:mm') : '';
@@ -311,13 +321,15 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
+  // Update "Read" status correctly
   useEffect(() => {
-    if (roomRef && user && room && !room.readBy?.includes(user.uid)) {
+    if (roomRef && user && room) {
       updateDocumentNonBlocking(roomRef, {
-        readBy: arrayUnion(user.uid)
+        readBy: arrayUnion(user.uid),
+        [`lastRead.${user.uid}`]: serverTimestamp()
       });
     }
-  }, [room, user, roomRef]);
+  }, [messages?.length, user?.uid, roomRef]);
 
   useEffect(() => {
     if (!messages || messages.length === 0) return;
@@ -418,11 +430,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (type === 'view-once') messageData.openedBy = [];
 
     addDocumentNonBlocking(collection(db, 'chatRooms', conversationId, 'messages'), messageData);
+    
+    // When sending, reset readBy to ONLY the sender, but mark the sender's lastRead
     updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId), {
       lastMessageText: type === 'image' ? 'Sent a photo' : type === 'view-once' ? 'Sent a Snap' : finalContent,
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
       readBy: [user.uid],
+      [`lastRead.${user.uid}`]: serverTimestamp(),
       [`typing.${user.uid}`]: deleteField()
     });
     
@@ -454,6 +469,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (!room || !participants || !user) return null;
     return participants.find(p => p.id !== user.uid);
   }, [room, participants, user]);
+
+  const otherUserLastRead = useMemo(() => {
+    if (!room?.lastRead || !otherUser) return null;
+    return room.lastRead[otherUser.id];
+  }, [room?.lastRead, otherUser]);
 
   const wallpapers = wallpaperData.placeholderImages.filter(img => img.id.startsWith('wallpaper-'));
 
@@ -620,7 +640,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 isMe={isMe}
                 sender={sender}
                 currentUserId={user?.uid}
-                roomReadBy={room?.readBy}
+                otherUserLastRead={otherUserLastRead}
                 hasWallpaper={!!room?.wallpaperUrl}
                 onAction={(action: string, m: any) => {
                    if (action === 'delete') {

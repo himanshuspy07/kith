@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -11,7 +10,6 @@ import { FirestorePermissionError } from '@/firebase/errors';
 /**
  * Handles initializing and updating the user's Firestore profile.
  * Updates online status and last active timestamp.
- * Ensures custom profile data (username, avatar) isn't overwritten on refresh.
  */
 export default function UserProfileSync() {
   const { user } = useUser();
@@ -29,7 +27,6 @@ export default function UserProfileSync() {
       getDoc(userRef)
         .then((docSnap) => {
           if (!docSnap.exists()) {
-            // First time initialization
             const username = user.displayName || user.email?.split('@')[0] || 'kith_user';
             const initialData = {
               id: user.uid,
@@ -47,12 +44,10 @@ export default function UserProfileSync() {
             };
             setDocumentNonBlocking(userRef, initialData, { merge: true });
           } else {
-            // Update presence ONLY
-            const updates: any = {
+            updateDocumentNonBlocking(userRef, {
               onlineStatus: true,
               lastActiveAt: serverTimestamp(),
-            };
-            updateDocumentNonBlocking(userRef, updates);
+            });
           }
         })
         .catch((error) => {
@@ -65,19 +60,19 @@ export default function UserProfileSync() {
 
     syncProfile();
 
-    // Fast Heartbeat every 30 seconds for better real-time feel
+    // Heartbeat every 30 seconds
     heartbeatIntervalRef.current = setInterval(() => {
       updateDocumentNonBlocking(userRef, {
         lastActiveAt: serverTimestamp(),
-        onlineStatus: true
+        onlineStatus: document.visibilityState === 'visible'
       });
     }, 1000 * 30);
 
-    // Handle visibility changes for more immediate status updates
+    // Handle visibility changes aggressively
     const handleVisibilityChange = () => {
-      const status = document.visibilityState === 'visible';
+      const isVisible = document.visibilityState === 'visible';
       updateDocumentNonBlocking(userRef, {
-        onlineStatus: status,
+        onlineStatus: isVisible,
         lastActiveAt: serverTimestamp()
       });
     };
