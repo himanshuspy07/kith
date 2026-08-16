@@ -207,9 +207,14 @@ export default function SettingsView() {
               </AlertDialogContent>
             </AlertDialog>
 
-            <p className="text-[9px] text-center text-muted-foreground/30 uppercase font-black tracking-[0.4em] pt-8">
-              KITH &copy; 2026 • Built for Privacy
-            </p>
+            <div className="pt-8 text-center space-y-1">
+              <p className="text-[9px] text-muted-foreground/30 uppercase font-black tracking-[0.4em]">
+                KITH &copy; 2026 • Built for Privacy
+              </p>
+              <p className="text-[8px] text-primary/40 uppercase font-black tracking-[0.6em]">
+                Made by Himanshu
+              </p>
+            </div>
         </div>
       </div>
     </div>

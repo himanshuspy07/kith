@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -146,8 +145,9 @@ export default function NotificationCenter() {
             </div>
           )}
         </ScrollArea>
-        <div className="p-3 bg-black/20 text-center border-t border-white/5">
+        <div className="p-3 bg-black/20 text-center border-t border-white/5 flex flex-col gap-0.5">
           <p className="text-[9px] text-muted-foreground/50 uppercase font-black tracking-[0.3em]">kith &copy; 2026</p>
+          <p className="text-[7px] text-primary/30 uppercase font-black tracking-[0.5em]">Made by Himanshu</p>
         </div>
       </PopoverContent>
     </Popover>

@@ -17,7 +17,8 @@ import {
   Clock,
   MessageSquare,
   SmilePlus,
-  Palette
+  Palette,
+  Upload
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -93,7 +94,6 @@ const MessageItem = memo(({
   otherUserLastRead,
   hasWallpaper
 }: any) => {
-  // A message is "Opened" if the recipient's lastRead timestamp is >= message's createdAt
   const isReadByOthers = useMemo(() => {
     if (!isMe || !otherUserLastRead || !msg.createdAt) return false;
     try {
@@ -192,7 +192,6 @@ const MessageItem = memo(({
               </div>
             )}
 
-            {/* Reactions Display */}
             {reactionCounts.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
                 {reactionCounts.map(([emoji, count]) => (
@@ -226,7 +225,6 @@ const MessageItem = memo(({
           </div>
         </div>
 
-        {/* Floating Quick Actions */}
         {!msg.isDeleted && (
           <div className="absolute -right-2 top-1/2 -translate-y-1/2 translate-x-full opacity-0 group-hover:opacity-100 flex items-center gap-2 pl-4 transition-all pointer-events-none group-hover:pointer-events-auto z-10">
             <Popover>
@@ -287,6 +285,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const wallpaperInputRef = useRef<HTMLInputElement>(null);
   const lastMessageIdRef = useRef<string | null>(null);
 
   const { user } = useUser();
@@ -321,7 +320,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, room?.memberIds]);
   const { data: participants } = useCollection(participantsQuery);
 
-  // Update "Read" status correctly
   useEffect(() => {
     if (roomRef && user && room) {
       updateDocumentNonBlocking(roomRef, {
@@ -431,7 +429,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
     addDocumentNonBlocking(collection(db, 'chatRooms', conversationId, 'messages'), messageData);
     
-    // When sending, reset readBy to ONLY the sender, but mark the sender's lastRead
     updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId), {
       lastMessageText: type === 'image' ? 'Sent a photo' : type === 'view-once' ? 'Sent a Snap' : finalContent,
       lastMessageSenderId: user.uid,
@@ -463,6 +460,18 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (!roomRef) return;
     updateDocumentNonBlocking(roomRef, { wallpaperUrl: url });
     toast({ title: url ? "Wallpaper updated" : "Wallpaper removed" });
+  };
+
+  const handleCustomWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && roomRef) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        updateDocumentNonBlocking(roomRef, { wallpaperUrl: reader.result as string });
+        toast({ title: "Custom wallpaper set!" });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const otherUser = useMemo(() => {
@@ -543,9 +552,17 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             </SheetHeader>
             
             <div className="p-8 space-y-8 h-full overflow-y-auto scrollbar-hide">
-              {/* Wallpaper Section */}
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Chat Wallpaper</h4>
+                <div className="flex items-center justify-between px-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Chat Wallpaper</h4>
+                  <button 
+                    onClick={() => wallpaperInputRef.current?.click()}
+                    className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-primary hover:opacity-80"
+                  >
+                    <Upload className="h-3 w-3" /> Upload
+                  </button>
+                  <input type="file" ref={wallpaperInputRef} className="hidden" accept="image/*" onChange={handleCustomWallpaperUpload} />
+                </div>
                 <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
                   <button 
                     onClick={() => handleWallpaperSelect(null)}
@@ -616,7 +633,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide flex flex-col bg-background relative"
       >
-        {/* Background Wallpaper */}
         {room?.wallpaperUrl && (
           <div className="absolute inset-0 z-0 pointer-events-none">
             <img 
