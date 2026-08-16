@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -6,6 +7,7 @@ import ChatWindow from '@/components/chat/ChatWindow';
 import AuthScreen from '@/components/auth/AuthScreen';
 import UserProfileSync from '@/components/chat/UserProfileSync';
 import NotificationManager from '@/components/chat/NotificationManager';
+import CallManager from '@/components/chat/CallManager';
 import AppTutorial from '@/components/chat/AppTutorial';
 import AppLockOverlay from '@/components/chat/AppLockOverlay';
 import ProfileView from '@/components/chat/ProfileView';
@@ -48,6 +50,7 @@ export default function Home() {
     return (
       <AppLockOverlay>
         <div className="h-svh w-full overflow-hidden flex flex-col bg-background">
+          <CallManager />
           <ChatWindow 
             conversationId={selectedConversationId} 
             onBack={() => setSelectedConversationId(undefined)}
@@ -88,6 +91,7 @@ export default function Home() {
       <div className="flex h-svh w-full bg-background flex-col overflow-hidden">
         <UserProfileSync />
         <NotificationManager currentConversationId={selectedConversationId} />
+        <CallManager />
         <AppTutorial />
         
         <div className="flex-1 relative overflow-hidden flex flex-col">

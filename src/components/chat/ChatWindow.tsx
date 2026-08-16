@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -18,7 +19,9 @@ import {
   MessageSquare,
   SmilePlus,
   Palette,
-  Upload
+  Upload,
+  Phone,
+  Video
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -66,7 +69,8 @@ import {
   where, 
   limitToLast,
   deleteField,
-  arrayUnion
+  arrayUnion,
+  addDoc
 } from 'firebase/firestore';
 import { 
   addDocumentNonBlocking, 
@@ -456,6 +460,20 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   };
 
+  const startCall = (type: 'audio' | 'video') => {
+    if (!db || !user || !otherUser) return;
+    const callData = {
+      callerId: user.uid,
+      callerName: currentUserData?.username || 'Kith User',
+      receiverId: otherUser.id,
+      receiverName: otherUser.username,
+      type,
+      status: 'ringing',
+      createdAt: serverTimestamp()
+    };
+    addDoc(collection(db, 'calls'), callData);
+  };
+
   const handleWallpaperSelect = (url: string | null) => {
     if (!roomRef) return;
     updateDocumentNonBlocking(roomRef, { wallpaperUrl: url });
@@ -525,113 +543,126 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             </div>
           </div>
         </div>
-        
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-muted/80 border border-border/50 shadow-sm">
-              <Info className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="sm:max-w-md bg-card/98 backdrop-blur-2xl border-l border-border/50 shadow-2xl p-0">
-            <SheetHeader className="p-10 border-b border-border/50 bg-muted/20">
-              <SheetTitle className="sr-only">Conversation Info</SheetTitle>
-              <div className="flex flex-col items-center gap-6">
-                <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-4 ring-primary/20">
-                  <AvatarImage src={room?.isGroupChat ? room.groupImageUrl : otherUser?.profilePictureUrl} />
-                  <AvatarFallback className="text-4xl font-black bg-muted text-primary">{room?.name?.[0] || otherUser?.username?.[0]}</AvatarFallback>
-                </Avatar>
-                <div className="text-center space-y-1">
-                   <h2 className="text-2xl font-black uppercase italic tracking-tighter">{room?.isGroupChat ? room.name : (otherUser?.username || "Friend")}</h2>
-                   {room?.isGroupChat ? (
-                     <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Created {room?.createdAt?.toDate ? format(room.createdAt.toDate(), 'MMM yyyy') : ''}</p>
-                   ) : (
-                     <p className="text-sm font-medium text-muted-foreground line-clamp-2 px-4">{otherUser?.bio || "No bio yet"}</p>
-                   )}
+
+        <div className="flex items-center gap-2">
+          {!room?.isGroupChat && (
+            <>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={() => startCall('audio')}>
+                <Phone className="h-5 w-5 text-muted-foreground" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={() => startCall('video')}>
+                <Video className="h-5 w-5 text-muted-foreground" />
+              </Button>
+            </>
+          )}
+          
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-muted/80 border border-border/50 shadow-sm">
+                <Info className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="sm:max-w-md bg-card/98 backdrop-blur-2xl border-l border-border/50 shadow-2xl p-0">
+              <SheetHeader className="p-10 border-b border-border/50 bg-muted/20">
+                <SheetTitle className="sr-only">Conversation Info</SheetTitle>
+                <div className="flex flex-col items-center gap-6">
+                  <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-4 ring-primary/20">
+                    <AvatarImage src={room?.isGroupChat ? room.groupImageUrl : otherUser?.profilePictureUrl} />
+                    <AvatarFallback className="text-4xl font-black bg-muted text-primary">{room?.name?.[0] || otherUser?.username?.[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="text-center space-y-1">
+                     <h2 className="text-2xl font-black uppercase italic tracking-tighter">{room?.isGroupChat ? room.name : (otherUser?.username || "Friend")}</h2>
+                     {room?.isGroupChat ? (
+                       <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Created {room?.createdAt?.toDate ? format(room.createdAt.toDate(), 'MMM yyyy') : ''}</p>
+                     ) : (
+                       <p className="text-sm font-medium text-muted-foreground line-clamp-2 px-4">{otherUser?.bio || "No bio yet"}</p>
+                     )}
+                  </div>
                 </div>
-              </div>
-            </SheetHeader>
-            
-            <div className="p-8 space-y-8 h-full overflow-y-auto scrollbar-hide">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between px-2">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Chat Wallpaper</h4>
-                  <button 
-                    onClick={() => wallpaperInputRef.current?.click()}
-                    className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-primary hover:opacity-80"
-                  >
-                    <Upload className="h-3 w-3" /> Upload
-                  </button>
-                  <input type="file" ref={wallpaperInputRef} className="hidden" accept="image/*" onChange={handleCustomWallpaperUpload} />
-                </div>
-                <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
-                  <button 
-                    onClick={() => handleWallpaperSelect(null)}
-                    className={cn(
-                      "h-20 w-14 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all",
-                      !room?.wallpaperUrl ? "border-primary bg-primary/10" : "border-border/50 bg-muted/30"
-                    )}
-                  >
-                    <X className="h-4 w-4 opacity-50" />
-                  </button>
-                  {wallpapers.map((wp) => (
-                    <button
-                      key={wp.id}
-                      onClick={() => handleWallpaperSelect(wp.imageUrl)}
+              </SheetHeader>
+              
+              <div className="p-8 space-y-8 h-full overflow-y-auto scrollbar-hide">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between px-2">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Chat Wallpaper</h4>
+                    <button 
+                      onClick={() => wallpaperInputRef.current?.click()}
+                      className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-primary hover:opacity-80"
+                    >
+                      <Upload className="h-3 w-3" /> Upload
+                    </button>
+                    <input type="file" ref={wallpaperInputRef} className="hidden" accept="image/*" onChange={handleCustomWallpaperUpload} />
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+                    <button 
+                      onClick={() => handleWallpaperSelect(null)}
                       className={cn(
-                        "h-20 w-14 shrink-0 rounded-xl border-2 overflow-hidden transition-all relative group",
-                        room?.wallpaperUrl === wp.imageUrl ? "border-primary scale-110 shadow-lg" : "border-transparent opacity-70 hover:opacity-100"
+                        "h-20 w-14 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all",
+                        !room?.wallpaperUrl ? "border-primary bg-primary/10" : "border-border/50 bg-muted/30"
                       )}
                     >
-                      <img src={wp.imageUrl} alt={wp.description} className="h-full w-full object-cover" data-ai-hint={wp.imageHint} />
-                      <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                      <X className="h-4 w-4 opacity-50" />
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Privacy Settings</h4>
-                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-[2rem] border border-border/50">
-                  <div className="flex items-center gap-4">
-                    <Clock className="h-5 w-5 text-primary" />
-                    <span className="text-xs font-black uppercase tracking-widest">Vanish Mode</span>
+                    {wallpapers.map((wp) => (
+                      <button
+                        key={wp.id}
+                        onClick={() => handleWallpaperSelect(wp.imageUrl)}
+                        className={cn(
+                          "h-20 w-14 shrink-0 rounded-xl border-2 overflow-hidden transition-all relative group",
+                          room?.wallpaperUrl === wp.imageUrl ? "border-primary scale-110 shadow-lg" : "border-transparent opacity-70 hover:opacity-100"
+                        )}
+                      >
+                        <img src={wp.imageUrl} alt={wp.description} className="h-full w-full object-cover" data-ai-hint={wp.imageHint} />
+                        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                      </button>
+                    ))}
                   </div>
-                  <Switch checked={room?.vanishMode} onCheckedChange={(v) => roomRef && updateDocumentNonBlocking(roomRef, { vanishMode: v })} />
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Privacy Settings</h4>
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-[2rem] border border-border/50">
+                    <div className="flex items-center gap-4">
+                      <Clock className="h-5 w-5 text-primary" />
+                      <span className="text-xs font-black uppercase tracking-widest">Vanish Mode</span>
+                    </div>
+                    <Switch checked={room?.vanishMode} onCheckedChange={(v) => roomRef && updateDocumentNonBlocking(roomRef, { vanishMode: v })} />
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-border/50 space-y-8">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="w-full h-16 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-destructive/20 border border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-white transition-all">
+                        <Trash2 className="h-5 w-5 mr-2" /> Delete Chat
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Delete Chat?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground font-medium">
+                          This action cannot be undone. All messages will be permanently removed for you.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="gap-2">
+                        <AlertDialogCancel className="rounded-xl font-bold">Cancel</AlertDialogCancel>
+                        <AlertDialogAction className="rounded-xl bg-destructive font-black uppercase tracking-widest" onClick={() => {
+                          messages?.forEach(m => deleteDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id)));
+                          toast({ title: "Chat Deleted" });
+                        }}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <div className="text-center py-4 opacity-30">
+                    <p className="text-[9px] font-black uppercase tracking-[0.3em]">kith &copy; 2026</p>
+                    <p className="text-[7px] font-black uppercase tracking-[0.5em] text-primary">Made by Himanshu</p>
+                  </div>
                 </div>
               </div>
-
-              <div className="pt-8 border-t border-border/50 space-y-8">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" className="w-full h-16 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-destructive/20 border border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-white transition-all">
-                      <Trash2 className="h-5 w-5 mr-2" /> Delete Chat
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Delete Chat?</AlertDialogTitle>
-                      <AlertDialogDescription className="text-muted-foreground font-medium">
-                        This action cannot be undone. All messages will be permanently removed for you.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2">
-                      <AlertDialogCancel className="rounded-xl font-bold">Cancel</AlertDialogCancel>
-                      <AlertDialogAction className="rounded-xl bg-destructive font-black uppercase tracking-widest" onClick={() => {
-                        messages?.forEach(m => deleteDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id)));
-                        toast({ title: "Chat Deleted" });
-                      }}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-
-                <div className="text-center py-4 opacity-30">
-                  <p className="text-[9px] font-black uppercase tracking-[0.3em]">kith &copy; 2026</p>
-                  <p className="text-[7px] font-black uppercase tracking-[0.5em] text-primary">Made by Himanshu</p>
-                </div>
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
+        </div>
       </header>
 
       <div 

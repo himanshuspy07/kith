@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
@@ -103,8 +104,15 @@ ConversationItem.displayName = 'ConversationItem';
 
 export default function Sidebar({ onSelectConversation, selectedConversationId, className }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [ticker, setTicker] = useState(0);
   const { user } = useUser();
   const db = useFirestore();
+
+  // Periodic ticker to refresh relative times and presence
+  useEffect(() => {
+    const interval = setInterval(() => setTicker(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const currentUserRef = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
@@ -135,6 +143,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
   const conversationListData = useMemo(() => {
     if (!rooms || !user) return [];
+    const now = new Date();
     return rooms.map(room => {
       let displayName = room.name || 'Friend';
       let displayAvatar = room.isGroupChat ? room.groupImageUrl : null;
@@ -147,17 +156,19 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           displayName = otherUserProfile.username;
           displayAvatar = otherUserProfile.profilePictureUrl;
           const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
-          const now = new Date();
-          // Stricter online threshold: 1 minute
-          isOnline = otherUserProfile.onlineStatus === true && (now.getTime() - lastActive.getTime()) < 60000;
+          // 3-minute threshold for online ring
+          isOnline = otherUserProfile.onlineStatus === true && (now.getTime() - lastActive.getTime()) < 180000;
         }
       }
 
       // Check if last message was seen by current user
       const lastRead = room.lastRead?.[user.uid];
+      const roomUpdateTime = room.updatedAt?.toMillis() || 0;
+      const userReadTime = lastRead?.toMillis() || 0;
+      
       const isUnread = room.lastMessageText && 
                        room.lastMessageSenderId !== user.uid && 
-                       (!lastRead || room.updatedAt?.toMillis() > lastRead.toMillis());
+                       roomUpdateTime > userReadTime;
 
       return { ...room, displayName, displayAvatar, isOnline, isUnread };
     }).sort((a, b) => {
@@ -165,7 +176,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       const timeB = b.updatedAt?.toDate?.()?.getTime() || 0;
       return timeB - timeA;
     });
-  }, [rooms, participantProfiles, user]);
+  }, [rooms, participantProfiles, user, ticker]);
 
   const filteredConversations = conversationListData.filter(c => 
     c.displayName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -174,8 +185,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const isMeOnline = useMemo(() => {
     if (!currentUserData?.lastActiveAt) return true;
     const lastActive = currentUserData.lastActiveAt.toDate();
-    return (Date.now() - lastActive.getTime()) < 60000;
-  }, [currentUserData]);
+    return (Date.now() - lastActive.getTime()) < 180000;
+  }, [currentUserData, ticker]);
 
   return (
     <div className={cn("h-full flex flex-col bg-background", className)}>
@@ -228,6 +239,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             <p className="text-muted-foreground mt-2 font-medium text-sm max-w-[200px]">Start a conversation to see your friends here.</p>
           </div>
         )}
+      </div>
+      
+      <div className="p-4 text-center opacity-20 border-t border-border/20">
+        <p className="text-[8px] font-black uppercase tracking-[0.4em]">Made by Himanshu</p>
       </div>
     </div>
   );

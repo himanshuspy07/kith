@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -62,10 +63,12 @@ export default function UserProfileSync() {
 
     // Heartbeat every 30 seconds
     heartbeatIntervalRef.current = setInterval(() => {
-      updateDocumentNonBlocking(userRef, {
-        lastActiveAt: serverTimestamp(),
-        onlineStatus: document.visibilityState === 'visible'
-      });
+      if (document.visibilityState === 'visible') {
+        updateDocumentNonBlocking(userRef, {
+          lastActiveAt: serverTimestamp(),
+          onlineStatus: true
+        });
+      }
     }, 1000 * 30);
 
     // Handle visibility changes aggressively
@@ -78,6 +81,9 @@ export default function UserProfileSync() {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', () => {
+       updateDoc(userRef, { onlineStatus: false, lastActiveAt: serverTimestamp() }).catch(() => {});
+    });
 
     return () => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
