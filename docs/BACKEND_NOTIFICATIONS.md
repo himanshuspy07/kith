@@ -1,6 +1,6 @@
-# Kith Automatic Notification System
+# Kith Automatic Notification System (Backend Trigger)
 
-To enable background notifications that deliver even when the app is closed, you must deploy the following Firebase Cloud Function. This function "watches" for new messages and triggers a push to the recipients' devices.
+To enable background notifications that deliver even when the app is completely closed (just like WhatsApp or Snapchat), you must deploy this Firebase Cloud Function. This function "watches" for new messages in Firestore and triggers a push to the recipients' registered device tokens.
 
 ## 1. The Cloud Function Code (index.js)
 
@@ -65,7 +65,7 @@ exports.notifyOnNewMessage = onDocumentCreated("/chatRooms/{chatRoomId}/messages
       data: payload.data,
       webpush: {
         fcmOptions: {
-          link: `https://kith.indevs.in/?roomId=${chatRoomId}`
+          link: `https://kith.chat/?roomId=${chatRoomId}`
         }
       }
     });
@@ -76,17 +76,16 @@ exports.notifyOnNewMessage = onDocumentCreated("/chatRooms/{chatRoomId}/messages
 });
 ```
 
-## 2. Deployment Instructions
+## 2. Deployment Instructions (For Future)
 
 1. **Install Firebase CLI**: `npm install -g firebase-tools`
 2. **Login**: `firebase login`
 3. **Initialize**: In your project root, run `firebase init functions`.
-4. **Select Project**: Select your project `studio-7823896099-d3f14`.
-5. **Paste Code**: Replace the contents of `functions/index.js` with the code above.
-6. **Deploy**: Run `firebase deploy --only functions`.
+4. **Paste Code**: Replace the contents of the generated `functions/index.js` with the code above.
+5. **Deploy**: Run `firebase deploy --only functions`.
 
-## 3. Client Side Setup
-The application is already configured to:
-- Register a Service Worker (`sw.js` and `firebase-messaging-sw.js`).
+## 3. Current Client Side Status
+The application is **already configured** to:
 - Request notification permissions from the user.
 - Save unique device tokens to `users/{userId}/fcmTokens` in Firestore.
+- Handle real-time "Open Tab" notifications using the browser's Notification API.

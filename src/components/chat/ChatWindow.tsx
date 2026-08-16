@@ -600,7 +600,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 </div>
               </div>
 
-              <div className="pt-8 border-t border-border/50">
+              <div className="pt-8 border-t border-border/50 space-y-8">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="w-full h-16 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-destructive/20 border border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-white transition-all">
@@ -623,6 +623,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+
+                <div className="text-center py-4 opacity-30">
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em]">kith &copy; 2026</p>
+                  <p className="text-[7px] font-black uppercase tracking-[0.5em] text-primary">Made by Himanshu</p>
+                </div>
               </div>
             </div>
           </SheetContent>
