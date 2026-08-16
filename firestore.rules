@@ -65,7 +65,8 @@ service cloud.firestore {
 
     // Generic rule for system collections (like calls)
     match /calls/{callId} {
-      allow create, get, update, delete: if isSignedIn();
+      // Added 'list' permission so users can query for incoming/outgoing calls
+      allow create, get, update, delete, list: if isSignedIn();
       
       match /callerCandidates/{candidateId} {
         allow create, list, get: if isSignedIn();
