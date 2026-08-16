@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -19,9 +18,7 @@ import {
   MessageSquare,
   SmilePlus,
   Palette,
-  Upload,
-  Phone,
-  Video
+  Upload
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -460,20 +457,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   };
 
-  const startCall = (type: 'audio' | 'video') => {
-    if (!db || !user || !otherUser) return;
-    const callData = {
-      callerId: user.uid,
-      callerName: currentUserData?.username || 'Kith User',
-      receiverId: otherUser.id,
-      receiverName: otherUser.username,
-      type,
-      status: 'ringing',
-      createdAt: serverTimestamp()
-    };
-    addDoc(collection(db, 'calls'), callData);
-  };
-
   const handleWallpaperSelect = (url: string | null) => {
     if (!roomRef) return;
     updateDocumentNonBlocking(roomRef, { wallpaperUrl: url });
@@ -545,17 +528,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
 
         <div className="flex items-center gap-2">
-          {!room?.isGroupChat && (
-            <>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={() => startCall('audio')}>
-                <Phone className="h-5 w-5 text-muted-foreground" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={() => startCall('video')}>
-                <Video className="h-5 w-5 text-muted-foreground" />
-              </Button>
-            </>
-          )}
-          
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-muted/80 border border-border/50 shadow-sm">

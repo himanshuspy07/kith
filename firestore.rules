@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -60,19 +59,6 @@ service cloud.firestore {
           resource.data.senderId == request.auth.uid || 
           get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid
         );
-      }
-    }
-
-    // Generic rule for system collections (like calls)
-    match /calls/{callId} {
-      // Added 'list' permission so users can query for incoming/outgoing calls
-      allow create, get, update, delete, list: if isSignedIn();
-      
-      match /callerCandidates/{candidateId} {
-        allow create, list, get: if isSignedIn();
-      }
-      match /receiverCandidates/{candidateId} {
-        allow create, list, get: if isSignedIn();
       }
     }
   }
