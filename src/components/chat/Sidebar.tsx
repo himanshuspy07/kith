@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
@@ -19,11 +18,17 @@ interface SidebarProps {
 }
 
 const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any) => {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const timeDisplay = useMemo(() => {
     if (!room.updatedAt || !room.updatedAt.toDate) return null;
     try {
       const date = room.updatedAt.toDate();
-      const now = new Date();
       if (differenceInMinutes(now, date) < 1440) {
         return formatDistanceToNow(date, { addSuffix: true });
       }
@@ -31,24 +36,24 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     } catch (e) {
       return null;
     }
-  }, [room.updatedAt]);
+  }, [room.updatedAt, now]);
 
   const isTyping = useMemo(() => {
     if (!room.typing) return false;
-    const now = Date.now();
+    const nowMs = now.getTime();
     return Object.entries(room.typing).some(([id, timestamp]: any) => {
       if (id === currentUserId) return false;
       const ts = timestamp?.toMillis ? timestamp.toMillis() : 0;
-      return (now - ts) < 5000; // Typing status valid for 5 seconds
+      return (nowMs - ts) < 5000;
     });
-  }, [room.typing, currentUserId]);
+  }, [room.typing, currentUserId, now]);
 
   return (
     <div
       onClick={() => onClick(room.id)}
       className={cn(
         "p-4 flex items-center gap-4 cursor-pointer transition-all active:bg-muted/50 border-b border-border/40",
-        isSelected ? "bg-muted" : "hover:bg-muted/20"
+        isSelected ? "bg-muted shadow-inner" : "hover:bg-muted/20"
       )}
     >
       <div className="relative shrink-0 p-0.5">
@@ -105,11 +110,12 @@ ConversationItem.displayName = 'ConversationItem';
 export default function Sidebar({ onSelectConversation, selectedConversationId, className }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [ticker, setTicker] = useState(0);
+  const [mounted, setMounted] = useState(false);
   const { user } = useUser();
   const db = useFirestore();
 
-  // Periodic ticker to refresh relative times and presence
   useEffect(() => {
+    setMounted(true);
     const interval = setInterval(() => setTicker(t => t + 1), 60000);
     return () => clearInterval(interval);
   }, []);
@@ -132,6 +138,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     rooms.forEach(room => {
       room.memberIds?.forEach((id: string) => { if (id !== user.uid) ids.add(id); });
     });
+    // Slice to Firestore limit for 'in' queries (max 30)
     return Array.from(ids).slice(0, 30);
   }, [rooms, user]);
 
@@ -142,7 +149,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const { data: participantProfiles } = useCollection(usersQuery);
 
   const conversationListData = useMemo(() => {
-    if (!rooms || !user) return [];
+    if (!rooms || !user || !mounted) return [];
     const now = new Date();
     return rooms.map(room => {
       let displayName = room.name || 'Friend';
@@ -156,12 +163,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           displayName = otherUserProfile.username;
           displayAvatar = otherUserProfile.profilePictureUrl;
           const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
-          // 3-minute threshold for online ring
           isOnline = otherUserProfile.onlineStatus === true && (now.getTime() - lastActive.getTime()) < 180000;
         }
       }
 
-      // Check if last message was seen by current user
       const lastRead = room.lastRead?.[user.uid];
       const roomUpdateTime = room.updatedAt?.toMillis() || 0;
       const userReadTime = lastRead?.toMillis() || 0;
@@ -172,21 +177,23 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
       return { ...room, displayName, displayAvatar, isOnline, isUnread };
     }).sort((a, b) => {
-      const timeA = a.updatedAt?.toDate?.()?.getTime() || 0;
-      const timeB = b.updatedAt?.toDate?.()?.getTime() || 0;
+      const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : 0;
+      const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0;
       return timeB - timeA;
     });
-  }, [rooms, participantProfiles, user, ticker]);
+  }, [rooms, participantProfiles, user, ticker, mounted]);
 
   const filteredConversations = conversationListData.filter(c => 
     c.displayName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const isMeOnline = useMemo(() => {
-    if (!currentUserData?.lastActiveAt) return true;
+    if (!currentUserData?.lastActiveAt || !mounted) return true;
     const lastActive = currentUserData.lastActiveAt.toDate();
     return (Date.now() - lastActive.getTime()) < 180000;
-  }, [currentUserData, ticker]);
+  }, [currentUserData, ticker, mounted]);
+
+  if (!mounted) return <div className={cn("h-full flex flex-col bg-background", className)} />;
 
   return (
     <div className={cn("h-full flex flex-col bg-background", className)}>

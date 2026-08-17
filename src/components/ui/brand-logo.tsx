@@ -40,9 +40,9 @@ export default function BrandLogo({ className, iconClassName, size = 'md', showT
           />
           {/* Black K */}
           <path 
-            d="M190 160V352M190 256L280 160M215 256L322 352" 
+            d="M210 160V352M210 256L300 160M235 256L342 352" 
             stroke="black" 
-            strokeWidth="48" 
+            strokeWidth="54" 
             strokeLinecap="round" 
             strokeLinejoin="round" 
           />

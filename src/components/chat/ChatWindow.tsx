@@ -315,10 +315,15 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, conversationId, messageLimit]);
   const { data: messages } = useCollection(messagesQuery);
 
+  const participantIds = useMemo(() => {
+    if (!room?.memberIds) return [];
+    return room.memberIds.slice(0, 30);
+  }, [room?.memberIds]);
+
   const participantsQuery = useMemoFirebase(() => {
-    if (!db || !room?.memberIds) return null;
-    return query(collection(db, 'users'), where('id', 'in', room.memberIds));
-  }, [db, room?.memberIds]);
+    if (!db || participantIds.length === 0) return null;
+    return query(collection(db, 'users'), where('id', 'in', participantIds));
+  }, [db, participantIds]);
   const { data: participants } = useCollection(participantsQuery);
 
   useEffect(() => {
@@ -563,7 +568,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     >
                       <Upload className="h-3 w-3" /> Upload
                     </button>
-                    <input type="file" ref={wallpaperInputRef} className="hidden" accept="image/*" onChange={handleCustomWallpaperUpload} />
+                    <input type="file" id="custom-wallpaper" ref={wallpaperInputRef} className="hidden" accept="image/*" onChange={handleCustomWallpaperUpload} />
                   </div>
                   <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
                     <button 
@@ -598,7 +603,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                       <Clock className="h-5 w-5 text-primary" />
                       <span className="text-xs font-black uppercase tracking-widest">Vanish Mode</span>
                     </div>
-                    <Switch checked={room?.vanishMode} onCheckedChange={(v) => roomRef && updateDocumentNonBlocking(roomRef, { vanishMode: v })} />
+                    <Switch checked={room?.vanishMode || false} onCheckedChange={(v) => roomRef && updateDocumentNonBlocking(roomRef, { vanishMode: v })} />
                   </div>
                 </div>
 

@@ -19,7 +19,6 @@ service cloud.firestore {
 
     function isRoomMember(chatRoomId) {
       return isSignedIn() && 
-             exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) &&
              get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.members[request.auth.uid] == true;
     }
 
@@ -30,23 +29,29 @@ service cloud.firestore {
       allow get, list: if isSignedIn();
       
       // Allow users to manage their own profile document
-      // Explicitly allow create, update and delete for the owner
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && request.auth.uid == userId;
-      allow delete: if isSignedIn() && request.auth.uid == userId;
+      allow create, update, delete: if isOwner(userId);
     }
 
     match /chatRooms/{chatRoomId} {
-      allow list: if isSignedIn();
-      allow get: if isSignedIn();
+      // Allow list if the user is a member (requires query filtering)
+      allow list: if isSignedIn() && resource.data.members[request.auth.uid] == true;
+      
+      // Allow get if user is a member
+      allow get: if isSignedIn() && (
+        resource == null || resource.data.members[request.auth.uid] == true
+      );
       
       // Only allow creation if the creator is part of the members map
       allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] == true;
       
       // Only members can update or delete the room
-      allow update, delete: if isSignedIn() && resource.data.members[request.auth.uid] == true;
+      allow update: if isSignedIn() && resource.data.members[request.auth.uid] == true;
+      allow delete: if isSignedIn() && (
+        resource.data.members[request.auth.uid] == true || resource.data.createdBy == request.auth.uid
+      );
 
       match /messages/{messageId} {
+        // Messages must be sent by/read by authenticated room members
         allow list, get: if isRoomMember(chatRoomId);
         
         // Messages must be sent by the authenticated user
@@ -55,14 +60,10 @@ service cloud.firestore {
         // Update logic for editing, deleting (soft delete), or system updates like 'readBy'
         allow update: if isRoomMember(chatRoomId) && (
           resource.data.senderId == request.auth.uid ||
-          (exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) && get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid) ||
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'reactions'])
+          request.resource.data.diff(resource.data).affectedKeys().hasAny(['readBy', 'reactions', 'openedBy'])
         );
         
-        allow delete: if isRoomMember(chatRoomId) && (
-          resource.data.senderId == request.auth.uid || 
-          (exists(/databases/$(database)/documents/chatRooms/$(chatRoomId)) && get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.createdBy == request.auth.uid)
-        );
+        allow delete: if isRoomMember(chatRoomId) && resource.data.senderId == request.auth.uid;
       }
     }
   }
