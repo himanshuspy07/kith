@@ -98,26 +98,26 @@ export default function Home() {
         <nav className="h-20 bg-background border-t border-border/40 px-6 flex items-center justify-around z-50 shrink-0">
           <button 
             onClick={() => setActiveTab('profile')}
-            className={cn("flex flex-col items-center gap-1 transition-all py-2", activeTab === 'profile' ? "text-primary" : "text-muted-foreground hover:text-foreground")}
+            className="flex flex-col items-center gap-1 transition-all py-2"
           >
-            <User className={cn("h-7 w-7", activeTab === 'profile' && "fill-current")} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Profile</span>
+            <User className={cn("h-7 w-7", activeTab === 'profile' ? "text-primary fill-current" : "text-muted-foreground hover:text-foreground")} />
+            <span className={cn("text-[10px] font-bold uppercase tracking-widest", activeTab === 'profile' ? "text-primary" : "text-muted-foreground")}>Profile</span>
           </button>
           
           <button 
             onClick={() => setActiveTab('chat')}
-            className={cn("flex flex-col items-center gap-1 transition-all py-2", activeTab === 'chat' ? "text-secondary" : "text-muted-foreground hover:text-foreground")}
+            className="flex flex-col items-center gap-1 transition-all py-2"
           >
-            <MessageSquare className={cn("h-7 w-7", activeTab === 'chat' && "fill-current")} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Chat</span>
+            <MessageSquare className={cn("h-7 w-7", activeTab === 'chat' ? "text-secondary fill-current" : "text-muted-foreground hover:text-foreground")} />
+            <span className={cn("text-[10px] font-bold uppercase tracking-widest", activeTab === 'chat' ? "text-secondary" : "text-muted-foreground")}>Chat</span>
           </button>
 
           <button 
             onClick={() => setActiveTab('settings')}
-            className={cn("flex flex-col items-center gap-1 transition-all py-2", activeTab === 'settings' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+            className="flex flex-col items-center gap-1 transition-all py-2"
           >
-            <SettingsIcon className={cn("h-7 w-7", activeTab === 'settings' && "fill-current")} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Settings</span>
+            <SettingsIcon className={cn("h-7 w-7", activeTab === 'settings' ? "text-foreground fill-current" : "text-muted-foreground hover:text-foreground")} />
+            <span className={cn("text-[10px] font-bold uppercase tracking-widest", activeTab === 'settings' ? "text-foreground" : "text-muted-foreground")}>Settings</span>
           </button>
         </nav>
       </div>
