@@ -31,9 +31,28 @@ export default function Home() {
 
   if (isUserLoading || !hasMounted) {
     return (
-      <div className="flex h-svh w-full flex-col items-center justify-center bg-[#121212]">
-        <div className="animate-in zoom-in-95 duration-700">
-          <BrandLogo size="lg" showText={false} className="scale-125" />
+      <div className="flex h-svh w-full flex-col items-center justify-center bg-[#121212] relative overflow-hidden">
+        {/* Animated Background Glow */}
+        <div className="absolute inset-0 bg-primary/5 blur-[120px] rounded-full animate-pulse pointer-events-none" />
+        
+        <div className="flex flex-col items-center gap-8 animate-in zoom-in-95 duration-700">
+          <BrandLogo size="lg" showText={false} className="scale-125 drop-shadow-[0_0_25px_rgba(0,173,255,0.3)]" />
+          
+          <div className="flex flex-col items-center gap-2">
+            <h2 className="kith-text text-2xl tracking-[0.2em] animate-in slide-in-from-bottom-4 duration-1000">KITH</h2>
+            <div className="flex items-center gap-2 overflow-hidden h-6">
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-primary animate-in slide-in-from-top-4 duration-700 opacity-60">
+                Made by Himanshu
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading Progress Dot */}
+        <div className="absolute bottom-12 flex gap-1.5">
+          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" />
         </div>
       </div>
     );

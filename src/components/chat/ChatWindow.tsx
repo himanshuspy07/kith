@@ -54,7 +54,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { 
@@ -271,6 +271,25 @@ const MessageItem = memo(({
   );
 });
 MessageItem.displayName = 'MessageItem';
+
+const DateSeparator = ({ date, hasWallpaper }: { date: Date, hasWallpaper: boolean }) => {
+  let label = format(date, 'MMMM d, yyyy');
+  if (isToday(date)) label = 'Today';
+  else if (isYesterday(date)) label = 'Yesterday';
+
+  return (
+    <div className="flex justify-center my-4 animate-in-fade">
+      <div className={cn(
+        "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border backdrop-blur-md shadow-sm",
+        hasWallpaper 
+          ? "bg-black/40 border-white/10 text-white/80" 
+          : "bg-muted/80 border-border/50 text-muted-foreground"
+      )}>
+        {label}
+      </div>
+    </div>
+  );
+};
 
 export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
@@ -659,39 +678,48 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
         <div className="relative z-10 flex flex-col flex-1">
           <div ref={topSentinelRef} className="h-4 w-full shrink-0" />
-          {messages?.map((msg) => {
+          {messages?.map((msg, idx) => {
             const isMe = msg.senderId === user?.uid;
             const sender = isMe ? currentUserData : participants?.find(p => p.id === msg.senderId);
+            
+            // Date separation logic
+            const msgDate = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date();
+            const prevMsg = idx > 0 ? messages[idx - 1] : null;
+            const prevMsgDate = prevMsg?.createdAt?.toDate ? prevMsg.createdAt.toDate() : null;
+            const showDate = !prevMsgDate || !isSameDay(msgDate, prevMsgDate);
+
             return (
-              <MessageItem 
-                key={msg.id}
-                msg={msg}
-                isMe={isMe}
-                sender={sender}
-                currentUserId={user?.uid}
-                otherUserLastRead={otherUserLastRead}
-                hasWallpaper={!!room?.wallpaperUrl}
-                onAction={(action: string, m: any) => {
-                   if (action === 'delete') {
-                     updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id), { isDeleted: true });
-                   }
-                   if (action === 'reply') setReplyingTo(m);
-                   if (action === 'edit') {
-                     setEditingMessage(m);
-                     setInputValue(m.content);
-                   }
-                }}
-                onReact={(emoji: string) => handleReact(msg.id, emoji)}
-                onImageClick={(url: string, id?: string, viewOnce?: boolean) => {
-                  setLightboxImage({ url, id, isViewOnce: viewOnce });
-                  if (viewOnce && id && user) {
-                    const msgRef = doc(db, 'chatRooms', conversationId, 'messages', id);
-                    updateDocumentNonBlocking(msgRef, {
-                      openedBy: arrayUnion(user.uid)
-                    });
-                  }
-                }}
-              />
+              <React.Fragment key={msg.id}>
+                {showDate && <DateSeparator date={msgDate} hasWallpaper={!!room?.wallpaperUrl} />}
+                <MessageItem 
+                  msg={msg}
+                  isMe={isMe}
+                  sender={sender}
+                  currentUserId={user?.uid}
+                  otherUserLastRead={otherUserLastRead}
+                  hasWallpaper={!!room?.wallpaperUrl}
+                  onAction={(action: string, m: any) => {
+                     if (action === 'delete') {
+                       updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id), { isDeleted: true });
+                     }
+                     if (action === 'reply') setReplyingTo(m);
+                     if (action === 'edit') {
+                       setEditingMessage(m);
+                       setInputValue(m.content);
+                     }
+                  }}
+                  onReact={(emoji: string) => handleReact(msg.id, emoji)}
+                  onImageClick={(url: string, id?: string, viewOnce?: boolean) => {
+                    setLightboxImage({ url, id, isViewOnce: viewOnce });
+                    if (viewOnce && id && user) {
+                      const msgRef = doc(db, 'chatRooms', conversationId, 'messages', id);
+                      updateDocumentNonBlocking(msgRef, {
+                        openedBy: arrayUnion(user.uid)
+                      });
+                    }
+                  }}
+                />
+              </React.Fragment>
             );
           })}
           <div ref={messagesEndRef} className="h-4 w-full shrink-0" />
