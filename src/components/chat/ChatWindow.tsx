@@ -139,13 +139,13 @@ const MessageItem = memo(({
             <span className={cn(
               "text-[14px] font-black uppercase tracking-tighter", 
               isMe ? "text-secondary" : "text-primary",
-              hasWallpaper && "drop-shadow-md"
+              hasWallpaper && "drop-shadow-md text-white/90"
             )}>
               {isMe ? "ME" : sender?.username}
             </span>
             <span className={cn(
               "text-[9px] font-black opacity-60 uppercase",
-              hasWallpaper ? "text-white" : "text-muted-foreground"
+              hasWallpaper ? "text-white/70" : "text-muted-foreground"
             )}>{timeStr}</span>
             {msg.isEdited && <span className="text-[8px] text-muted-foreground font-bold uppercase italic opacity-40">Edited</span>}
           </div>
@@ -154,7 +154,7 @@ const MessageItem = memo(({
             {msg.replyTo && (
               <div className={cn(
                 "mb-2 p-2 border-l-4 border-primary rounded-r-xl text-[11px] max-w-[200px] opacity-70",
-                hasWallpaper ? "bg-black/40 text-white" : "bg-muted/30"
+                hasWallpaper ? "bg-black/60 text-white" : "bg-muted/30"
               )}>
                  <p className="font-bold uppercase tracking-widest text-[9px] mb-1">Replying to:</p>
                  <p className="truncate italic">{msg.replyToContent}</p>
@@ -166,7 +166,7 @@ const MessageItem = memo(({
                 onClick={() => !isOpened && onImageClick(msg.content, msg.id, true)}
                 className={cn(
                   "flex items-center gap-3 py-2 px-4 rounded-2xl cursor-pointer transition-colors border",
-                  hasWallpaper ? "bg-black/40 border-white/20 text-white backdrop-blur-sm" : "bg-muted/50 border-border/50"
+                  hasWallpaper ? "bg-black/60 border-white/20 text-white backdrop-blur-sm" : "bg-muted/50 border-border/50"
                 )}
               >
                 <div className="h-8 w-8 rounded-xl bg-background/20 flex items-center justify-center shadow-sm">
@@ -204,7 +204,7 @@ const MessageItem = memo(({
                       myReaction === emoji 
                         ? "bg-primary/10 border-primary/30 text-primary" 
                         : hasWallpaper 
-                          ? "bg-black/40 border-white/20 text-white hover:bg-black/60"
+                          ? "bg-black/60 border-white/20 text-white hover:bg-black/80"
                           : "bg-muted/50 border-border/50 text-muted-foreground hover:bg-muted"
                     )}
                   >
@@ -273,17 +273,18 @@ const MessageItem = memo(({
 MessageItem.displayName = 'MessageItem';
 
 const DateSeparator = ({ date, hasWallpaper }: { date: Date, hasWallpaper: boolean }) => {
-  let label = format(date, 'MMMM d, yyyy');
+  let label = format(date, 'MMMM d');
   if (isToday(date)) label = 'Today';
   else if (isYesterday(date)) label = 'Yesterday';
+  else if (date.getFullYear() !== new Date().getFullYear()) label = format(date, 'MMMM d, yyyy');
 
   return (
-    <div className="flex justify-center my-4 animate-in-fade">
+    <div className="flex justify-center my-6 sticky top-2 z-20 pointer-events-none">
       <div className={cn(
-        "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border backdrop-blur-md shadow-sm",
+        "px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-[0.1em] border backdrop-blur-md shadow-sm transition-all",
         hasWallpaper 
-          ? "bg-black/40 border-white/10 text-white/80" 
-          : "bg-muted/80 border-border/50 text-muted-foreground"
+          ? "bg-black/60 border-white/10 text-white" 
+          : "bg-background/80 border-border text-muted-foreground"
       )}>
         {label}
       </div>
@@ -525,6 +526,18 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
+      {/* Background layer stays fixed while content scrolls */}
+      {room?.wallpaperUrl && (
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <img 
+            src={room.wallpaperUrl} 
+            alt="Wallpaper" 
+            className="h-full w-full object-cover" 
+          />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />
+        </div>
+      )}
+
       <header className="h-20 px-6 flex items-center justify-between border-b border-border/40 shrink-0 bg-background/95 backdrop-blur-xl z-30">
         <div className="flex items-center gap-4">
           {onBack && (
@@ -663,26 +676,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide flex flex-col bg-background relative"
+        className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide flex flex-col bg-transparent relative z-10"
       >
-        {room?.wallpaperUrl && (
-          <div className="absolute inset-0 z-0 pointer-events-none">
-            <img 
-              src={room.wallpaperUrl} 
-              alt="Wallpaper" 
-              className="h-full w-full object-cover fixed" 
-            />
-            <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
-          </div>
-        )}
-
         <div className="relative z-10 flex flex-col flex-1">
           <div ref={topSentinelRef} className="h-4 w-full shrink-0" />
           {messages?.map((msg, idx) => {
             const isMe = msg.senderId === user?.uid;
             const sender = isMe ? currentUserData : participants?.find(p => p.id === msg.senderId);
             
-            // Date separation logic
             const msgDate = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date();
             const prevMsg = idx > 0 ? messages[idx - 1] : null;
             const prevMsgDate = prevMsg?.createdAt?.toDate ? prevMsg.createdAt.toDate() : null;

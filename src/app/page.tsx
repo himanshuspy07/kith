@@ -32,7 +32,6 @@ export default function Home() {
   if (isUserLoading || !hasMounted) {
     return (
       <div className="flex h-svh w-full flex-col items-center justify-center bg-[#121212] relative overflow-hidden">
-        {/* Animated Background Glow */}
         <div className="absolute inset-0 bg-primary/5 blur-[120px] rounded-full animate-pulse pointer-events-none" />
         
         <div className="flex flex-col items-center gap-8 animate-in zoom-in-95 duration-700">
@@ -48,7 +47,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Loading Progress Dot */}
         <div className="absolute bottom-12 flex gap-1.5">
           <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
           <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
@@ -62,7 +60,6 @@ export default function Home() {
     return <AuthScreen />;
   }
 
-  // Handle mobile full-screen chat with explicit height lock
   if (isMobile && selectedConversationId) {
     return (
       <AppLockOverlay>
@@ -113,7 +110,6 @@ export default function Home() {
           {renderActiveView()}
         </div>
 
-        {/* Snapchat-style Bottom Navigation */}
         <nav className="h-20 bg-background border-t border-border/40 px-6 flex items-center justify-around z-50 shrink-0">
           <button 
             onClick={() => setActiveTab('profile')}
