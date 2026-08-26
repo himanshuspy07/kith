@@ -49,23 +49,5 @@ service cloud.firestore {
         allow delete: if isRoomMember(chatRoomId) && resource.data.senderId == request.auth.uid;
       }
     }
-
-    // --- Calling Rules ---
-    match /calls/{callId} {
-      allow create: if isSignedIn();
-      allow list: if isSignedIn();
-      // Allow if user is caller or receiver
-      allow get, update, delete: if isSignedIn() && (
-        request.auth.uid == resource.data.callerId || 
-        request.auth.uid == resource.data.receiverId
-      );
-
-      match /callerCandidates/{id} {
-        allow read, write: if isSignedIn();
-      }
-      match /receiverCandidates/{id} {
-        allow read, write: if isSignedIn();
-      }
-    }
   }
 }
