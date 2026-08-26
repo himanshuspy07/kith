@@ -39,7 +39,7 @@ export default function Home() {
           
           <div className="flex flex-col items-center gap-2">
             <h2 className="kith-text text-2xl tracking-[0.2em] animate-in slide-in-from-bottom-4 duration-1000">KITH</h2>
-            <div className="flex items-center gap-2 overflow-hidden h-6">
+            <div className="flex flex-col items-center gap-2 overflow-hidden">
               <p className="text-[10px] font-black uppercase tracking-[0.4em] text-primary animate-in slide-in-from-top-4 duration-700 opacity-60">
                 Made by Himanshu
               </p>
@@ -81,11 +81,11 @@ export default function Home() {
         return <SettingsView />;
       default:
         return (
-          <div className="flex flex-1 h-full overflow-hidden">
+          <div className="flex flex-1 h-full overflow-hidden min-w-0">
             <Sidebar 
               onSelectConversation={setSelectedConversationId} 
               selectedConversationId={selectedConversationId} 
-              className={cn(isMobile ? "w-full" : "w-80 md:w-96 border-r border-border/40")}
+              className={cn(isMobile ? "w-full" : "w-80 md:w-96 border-r border-border/40 shrink-0")}
             />
             {!isMobile && (
               <main className="flex-1 h-full flex flex-col min-w-0">
@@ -106,13 +106,13 @@ export default function Home() {
         <NotificationManager currentConversationId={selectedConversationId} />
         <AppTutorial />
         
-        <div className="flex-1 relative overflow-hidden flex flex-col">
+        <div className="flex-1 relative overflow-hidden flex flex-col min-w-0">
           {renderActiveView()}
         </div>
 
         <nav className="h-20 bg-background border-t border-border/40 px-6 flex items-center justify-around z-50 shrink-0">
           <button 
-            onClick={() => setActiveTab('profile')}
+            onClick={() => { setActiveTab('profile'); setSelectedConversationId(undefined); }}
             className="flex flex-col items-center gap-1 transition-all py-2"
           >
             <User className={cn("h-7 w-7", activeTab === 'profile' ? "text-primary fill-current" : "text-muted-foreground hover:text-foreground")} />
@@ -128,7 +128,7 @@ export default function Home() {
           </button>
 
           <button 
-            onClick={() => setActiveTab('settings')}
+            onClick={() => { setActiveTab('settings'); setSelectedConversationId(undefined); }}
             className="flex flex-col items-center gap-1 transition-all py-2"
           >
             <SettingsIcon className={cn("h-7 w-7", activeTab === 'settings' ? "text-foreground fill-current" : "text-muted-foreground hover:text-foreground")} />

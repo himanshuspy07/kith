@@ -53,12 +53,12 @@ export default function SettingsView() {
 
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('dark');
   const [notifications, setNotifications] = useState(true);
-  const [pinMode, setPinMode] = useState(false);
+  const [isPinVisible, setIsPinVisible] = useState(false);
   const [pin, setPin] = useState('');
 
   useEffect(() => {
     if (userData) {
-      setPinMode(userData.appLockEnabled || false);
+      setIsPinVisible(userData.appLockEnabled || false);
       setPin(userData.appLockPin || '');
     }
     const savedTheme = localStorage.getItem('kith-theme') as any;
@@ -77,17 +77,33 @@ export default function SettingsView() {
 
   const handleToggleLock = (enabled: boolean) => {
     if (!userRef) return;
-    setPinMode(enabled);
-    updateDocumentNonBlocking(userRef, { appLockEnabled: enabled });
-    toast({ title: enabled ? "App Lock Enabled" : "App Lock Disabled" });
+    
+    if (!enabled) {
+      // Turning off is immediate
+      updateDocumentNonBlocking(userRef, { appLockEnabled: false });
+      setIsPinVisible(false);
+      toast({ title: "App Lock Disabled" });
+    } else {
+      // Turning on just shows the input field; we don't enable in DB until PIN is 4 digits
+      setIsPinVisible(true);
+      if (!userData?.appLockPin || userData.appLockPin.length < 4) {
+        toast({ title: "Please set a 4-digit PIN to enable lock" });
+      } else {
+         updateDocumentNonBlocking(userRef, { appLockEnabled: true });
+         toast({ title: "App Lock Enabled" });
+      }
+    }
   };
 
   const handleUpdatePin = (newPin: string) => {
     const cleanPin = newPin.replace(/\D/g, '').slice(0, 4);
     setPin(cleanPin);
     if (cleanPin.length === 4 && userRef) {
-      updateDocumentNonBlocking(userRef, { appLockPin: cleanPin });
-      toast({ title: "PIN Updated" });
+      updateDocumentNonBlocking(userRef, { 
+        appLockPin: cleanPin,
+        appLockEnabled: true // Auto-enable once a valid PIN is set
+      });
+      toast({ title: "PIN Updated & Lock Enabled" });
     }
   };
 
@@ -146,14 +162,14 @@ export default function SettingsView() {
                   <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">Require 4-digit PIN</p>
                 </div>
               </div>
-              <Switch checked={pinMode} onCheckedChange={handleToggleLock} />
+              <Switch checked={userData?.appLockEnabled || false} onCheckedChange={handleToggleLock} />
             </div>
 
-            {pinMode && (
+            {isPinVisible && (
               <div className="p-4 bg-primary/5 rounded-2xl border border-primary/20 space-y-4 animate-in slide-in-from-top-2">
                 <div className="flex items-center gap-2">
                   <Key className="h-4 w-4 text-primary" />
-                  <Label className="text-[10px] font-black uppercase tracking-widest">Set New PIN</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest">Set 4-Digit PIN</Label>
                 </div>
                 <Input 
                   type="password" 
@@ -163,6 +179,7 @@ export default function SettingsView() {
                   placeholder="••••"
                   className="h-14 bg-background border-none text-center text-2xl tracking-[1.5em] rounded-xl font-black"
                 />
+                <p className="text-[9px] text-center text-primary/60 font-bold uppercase">Lock activates after setting a 4-digit PIN</p>
               </div>
             )}
             
@@ -209,10 +226,7 @@ export default function SettingsView() {
 
             <div className="pt-8 text-center space-y-1">
               <p className="text-[9px] text-muted-foreground/30 uppercase font-black tracking-[0.4em]">
-                KITH &copy; 2026 • Built for Privacy
-              </p>
-              <p className="text-[8px] text-primary/40 uppercase font-black tracking-[0.6em]">
-                Made by Himanshu
+                KITH &copy; 2026 • Built for Privacy • Made by Himanshu
               </p>
             </div>
         </div>

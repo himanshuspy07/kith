@@ -52,7 +52,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
     <div
       onClick={() => onClick(room.id)}
       className={cn(
-        "p-4 flex items-center gap-4 cursor-pointer transition-all active:bg-muted/50 border-b border-border/40",
+        "p-4 flex items-center gap-4 cursor-pointer transition-all active:bg-muted/50 border-b border-border/40 min-w-0",
         isSelected ? "bg-muted shadow-inner" : "hover:bg-muted/20"
       )}
     >
@@ -82,8 +82,8 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           {isTyping ? (
-            <div className="flex items-center gap-1">
-               <span className="text-[13px] text-accent font-black animate-pulse">Typing...</span>
+            <div className="flex items-center gap-1 overflow-hidden">
+               <span className="text-[13px] text-accent font-black animate-pulse whitespace-nowrap">Typing...</span>
             </div>
           ) : (
             <p className={cn(
@@ -97,7 +97,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
         <button className="h-10 w-10 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
           <Camera className="h-5 w-5" />
         </button>
@@ -193,33 +193,35 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     return (Date.now() - lastActive.getTime()) < 180000;
   }, [currentUserData, ticker, mounted]);
 
-  if (!mounted) return <div className={cn("h-full flex flex-col bg-background", className)} />;
+  if (!mounted) return <div className={cn("h-full flex flex-col bg-background max-w-full", className)} />;
 
   return (
-    <div className={cn("h-full flex flex-col bg-background", className)}>
-      <header className="px-4 py-4 flex items-center justify-between border-b border-border/80 sticky top-0 z-10 bg-background/95 backdrop-blur-xl">
-        <div className="flex items-center gap-3 flex-1">
+    <div className={cn("h-full flex flex-col bg-background max-w-full", className)}>
+      <header className="px-4 py-4 flex items-center justify-between border-b border-border/80 sticky top-0 z-10 bg-background/95 backdrop-blur-xl shrink-0">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className={cn(
-            "relative p-0.5 ring-2 ring-offset-2 ring-offset-background rounded-full transition-all duration-500",
+            "relative p-0.5 ring-2 ring-offset-2 ring-offset-background rounded-full transition-all duration-500 shrink-0",
             isMeOnline ? "ring-accent" : "ring-transparent"
           )}>
-            <Avatar className="h-10 w-10 bg-muted shrink-0">
+            <Avatar className="h-10 w-10 bg-muted">
               <AvatarImage src={currentUserData?.profilePictureUrl || user?.photoURL || undefined} className="object-cover" />
               <AvatarFallback className="text-sm font-bold">{currentUserData?.username?.[0] || user?.displayName?.[0] || 'U'}</AvatarFallback>
             </Avatar>
             {isMeOnline && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-accent border-2 border-background rounded-full" />}
           </div>
-          <div className="relative group flex-1 max-w-[240px]">
+          <div className="relative group flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input 
               placeholder="Search Friends" 
-              className="bg-muted/80 border-none h-10 rounded-full pl-10 w-full font-bold focus-visible:ring-2 ring-primary/30" 
+              className="bg-muted/80 border-none h-10 rounded-full pl-10 w-full font-bold focus-visible:ring-2 ring-primary/30 text-xs" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
-        <NewChatDialog onChatCreated={onSelectConversation} />
+        <div className="ml-2">
+          <NewChatDialog onChatCreated={onSelectConversation} />
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto scrollbar-hide pb-20">
@@ -248,7 +250,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         )}
       </div>
       
-      <div className="p-4 text-center opacity-20 border-t border-border/20">
+      <div className="p-4 text-center opacity-20 border-t border-border/20 shrink-0">
         <p className="text-[8px] font-black uppercase tracking-[0.4em]">Made by Himanshu</p>
       </div>
     </div>

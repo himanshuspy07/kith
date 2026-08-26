@@ -123,7 +123,7 @@ const MessageItem = memo(({
 
   return (
     <div className={cn(
-      "flex flex-col animate-in-fade px-6 py-2 group transition-colors", 
+      "flex flex-col animate-in-fade px-6 py-2 group transition-colors w-full", 
       isMe ? "items-start" : "items-start"
     )}>
       <div className="flex items-start gap-4 max-w-full relative">
@@ -134,26 +134,26 @@ const MessageItem = memo(({
           </Avatar>
         </div>
 
-        <div className="flex flex-col min-w-0">
+        <div className="flex flex-col min-w-0 max-w-[85%] md:max-w-[70%]">
           <div className="flex items-center gap-2">
             <span className={cn(
-              "text-[14px] font-black uppercase tracking-tighter", 
+              "text-[14px] font-black uppercase tracking-tighter truncate", 
               isMe ? "text-secondary" : "text-primary",
               hasWallpaper && "drop-shadow-md text-white/90"
             )}>
               {isMe ? "ME" : sender?.username}
             </span>
             <span className={cn(
-              "text-[9px] font-black opacity-60 uppercase",
+              "text-[9px] font-black opacity-60 uppercase shrink-0",
               hasWallpaper ? "text-white/70" : "text-muted-foreground"
             )}>{timeStr}</span>
-            {msg.isEdited && <span className="text-[8px] text-muted-foreground font-bold uppercase italic opacity-40">Edited</span>}
+            {msg.isEdited && <span className="text-[8px] text-muted-foreground font-bold uppercase italic opacity-40 shrink-0">Edited</span>}
           </div>
 
           <div className="relative mt-1">
             {msg.replyTo && (
               <div className={cn(
-                "mb-2 p-2 border-l-4 border-primary rounded-r-xl text-[11px] max-w-[200px] opacity-70",
+                "mb-2 p-2 border-l-4 border-primary rounded-r-xl text-[11px] max-w-full opacity-70",
                 hasWallpaper ? "bg-black/60 text-white" : "bg-muted/30"
               )}>
                  <p className="font-bold uppercase tracking-widest text-[9px] mb-1">Replying to:</p>
@@ -165,24 +165,26 @@ const MessageItem = memo(({
               <div 
                 onClick={() => !isOpened && onImageClick(msg.content, msg.id, true)}
                 className={cn(
-                  "flex items-center gap-3 py-2 px-4 rounded-2xl cursor-pointer transition-colors border",
+                  "flex items-center gap-3 py-2 px-4 rounded-2xl cursor-pointer transition-colors border max-w-full",
                   hasWallpaper ? "bg-black/60 border-white/20 text-white backdrop-blur-sm" : "bg-muted/50 border-border/50"
                 )}
               >
-                <div className="h-8 w-8 rounded-xl bg-background/20 flex items-center justify-center shadow-sm">
+                <div className="h-8 w-8 rounded-xl bg-background/20 flex items-center justify-center shadow-sm shrink-0">
                   {isOpened ? <EyeOff className="h-4 w-4 opacity-40" /> : <Eye className="h-4 w-4 text-primary" />}
                 </div>
-                <span className="text-sm font-black uppercase tracking-widest">{isOpened ? "Snap Opened" : "New Photo"}</span>
+                <span className="text-sm font-black uppercase tracking-widest truncate">{isOpened ? "Snap Opened" : "New Photo"}</span>
               </div>
             ) : msg.type === 'image' ? (
-              <img 
-                src={msg.content} 
-                alt="Shared" 
-                className="rounded-2xl max-w-[280px] h-auto object-cover mt-1 cursor-zoom-in shadow-xl hover:scale-[1.01] transition-transform border border-border/20" 
-                onClick={() => onImageClick(msg.content)}
-              />
+              <div className="relative mt-1 max-w-full">
+                <img 
+                  src={msg.content} 
+                  alt="Shared" 
+                  className="rounded-2xl max-w-full h-auto object-cover cursor-zoom-in shadow-xl hover:scale-[1.01] transition-transform border border-border/20" 
+                  onClick={() => onImageClick(msg.content)}
+                />
+              </div>
             ) : (
-              <div className="relative">
+              <div className="relative max-w-full">
                 <p className={cn(
                   "text-[16px] font-medium leading-normal break-words py-1", 
                   msg.isDeleted && "italic opacity-50 line-through",
@@ -279,9 +281,9 @@ const DateSeparator = ({ date, hasWallpaper }: { date: Date, hasWallpaper: boole
   else if (date.getFullYear() !== new Date().getFullYear()) label = format(date, 'MMMM d, yyyy');
 
   return (
-    <div className="flex justify-center my-6 sticky top-2 z-20 pointer-events-none">
+    <div className="flex justify-center my-6 sticky top-2 z-20 pointer-events-none w-full">
       <div className={cn(
-        "px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-[0.1em] border backdrop-blur-md shadow-sm transition-all",
+        "px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-[0.1em] border backdrop-blur-md shadow-sm transition-all whitespace-nowrap",
         hasWallpaper 
           ? "bg-black/60 border-white/10 text-white" 
           : "bg-background/80 border-border text-muted-foreground"
@@ -514,7 +516,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   if (!conversationId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-background text-center p-8 animate-in-fade h-full">
+      <div className="flex-1 flex flex-col items-center justify-center bg-background text-center p-8 animate-in-fade h-full max-w-full">
         <div className="h-32 w-32 bg-muted/30 flex items-center justify-center rounded-[3rem] mb-8 border border-border/50">
           <MessageSquare className="h-14 w-14 text-muted-foreground/20" />
         </div>
@@ -525,7 +527,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
+    <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden max-w-full">
       {/* Background layer stays fixed while content scrolls */}
       {room?.wallpaperUrl && (
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -538,16 +540,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       )}
 
-      <header className="h-20 px-6 flex items-center justify-between border-b border-border/40 shrink-0 bg-background/95 backdrop-blur-xl z-30">
-        <div className="flex items-center gap-4">
+      <header className="h-20 px-6 flex items-center justify-between border-b border-border/40 shrink-0 bg-background/95 backdrop-blur-xl z-30 max-w-full">
+        <div className="flex items-center gap-4 min-w-0">
           {onBack && (
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={onBack}>
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted shrink-0" onClick={onBack}>
               <ChevronLeft className="h-6 w-6" />
             </Button>
           )}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className={cn(
-              "p-0.5 rounded-full ring-2 ring-offset-2 ring-offset-background",
+              "p-0.5 rounded-full ring-2 ring-offset-2 ring-offset-background shrink-0",
               otherUser?.onlineStatus ? "ring-accent" : "ring-transparent"
             )}>
               <Avatar className="h-10 w-10">
@@ -555,8 +557,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 <AvatarFallback className="font-bold">{otherUser?.username?.[0]}</AvatarFallback>
               </Avatar>
             </div>
-            <div className="flex flex-col">
-              <h3 className="text-[17px] font-black uppercase tracking-tighter leading-none">{room?.isGroupChat ? room.name : otherUser?.username}</h3>
+            <div className="flex flex-col min-w-0">
+              <h3 className="text-[17px] font-black uppercase tracking-tighter leading-none truncate">{room?.isGroupChat ? room.name : otherUser?.username}</h3>
               <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", otherUser?.onlineStatus ? "text-accent" : "text-muted-foreground opacity-50")}>
                 {otherUser?.onlineStatus ? "Active Now" : "Away"}
               </span>
@@ -564,7 +566,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-muted/80 border border-border/50 shadow-sm">
@@ -676,9 +678,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide flex flex-col bg-transparent relative z-10"
+        className="flex-1 overflow-y-auto py-4 px-2 scrollbar-hide flex flex-col bg-transparent relative z-10 max-w-full"
       >
-        <div className="relative z-10 flex flex-col flex-1">
+        <div className="relative z-10 flex flex-col flex-1 max-w-full">
           <div ref={topSentinelRef} className="h-4 w-full shrink-0" />
           {messages?.map((msg, idx) => {
             const isMe = msg.senderId === user?.uid;
@@ -727,7 +729,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       </div>
 
-      <footer className="p-4 md:p-6 bg-background border-t border-border/40 shrink-0 z-30">
+      <footer className="p-4 md:p-6 bg-background border-t border-border/40 shrink-0 z-30 max-w-full">
         <div className="max-w-4xl mx-auto space-y-3">
           {replyingTo && (
             <div className="px-6 py-2.5 bg-primary/10 rounded-[1.5rem] flex items-center justify-between border border-primary/20 animate-in slide-in-from-bottom-2">
@@ -753,14 +755,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             </div>
           )}
 
-          <div className="flex items-center gap-3 bg-muted/60 rounded-[2.5rem] p-1.5 pl-2.5 border border-border/50 shadow-inner focus-within:ring-4 ring-primary/5 transition-all">
+          <div className="flex items-center gap-3 bg-muted/60 rounded-[2.5rem] p-1.5 pl-2.5 border border-border/50 shadow-inner focus-within:ring-4 ring-primary/5 transition-all max-w-full">
             <button 
               onClick={() => fileInputRef.current?.click()}
               className="h-11 w-11 rounded-full flex items-center justify-center text-muted-foreground hover:bg-background hover:text-primary transition-all shadow-sm bg-background/80 shrink-0"
             >
               <Camera className="h-5 w-5" />
             </button>
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
+            <input type="file" id="chat-file-input" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
                const file = e.target.files?.[0];
                if (file) {
                  const reader = new FileReader();
@@ -774,7 +776,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
               placeholder="Start a Chat..."
-              className="bg-transparent border-none min-h-[40px] h-[40px] focus-visible:ring-0 text-[15px] font-bold resize-none py-2 px-1 placeholder:opacity-50"
+              className="bg-transparent border-none min-h-[40px] h-[40px] focus-visible:ring-0 text-[15px] font-bold resize-none py-2 px-1 placeholder:opacity-50 flex-1"
             />
 
             <div className="flex items-center gap-2 pr-1 shrink-0">
@@ -790,7 +792,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               <Button 
                 onClick={() => handleSend()} 
                 disabled={!inputValue.trim()}
-                className="h-11 px-6 rounded-full bg-foreground text-background font-black uppercase tracking-widest text-[11px] shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+                className="h-11 px-4 rounded-full bg-foreground text-background font-black uppercase tracking-widest text-[11px] shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
               >
                 {editingMessage ? 'Update' : 'Send'}
               </Button>
