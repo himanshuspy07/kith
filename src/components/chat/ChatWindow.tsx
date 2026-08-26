@@ -18,7 +18,8 @@ import {
   MessageSquare,
   SmilePlus,
   Palette,
-  Upload
+  Upload,
+  Phone
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -502,6 +503,25 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   };
 
+  const initiateAudioCall = () => {
+    if (!db || !user || !otherUser) return;
+    const callId = doc(collection(db, 'calls')).id;
+    const callRef = doc(db, 'calls', callId);
+
+    const callData = {
+      id: callId,
+      callerId: user.uid,
+      callerName: currentUserData?.username,
+      receiverId: otherUser.id,
+      receiverName: otherUser.username,
+      status: 'ringing',
+      createdAt: serverTimestamp()
+    };
+
+    addDocumentNonBlocking(collection(db, 'calls'), callData);
+    toast({ title: "Calling...", description: `Ringing ${otherUser.username}` });
+  };
+
   const otherUser = useMemo(() => {
     if (!room || !participants || !user) return null;
     return participants.find(p => p.id !== user.uid);
@@ -567,6 +587,17 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {!room?.isGroupChat && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-10 w-10 rounded-full bg-muted/80 border border-border/50 shadow-sm text-primary"
+              onClick={initiateAudioCall}
+            >
+              <Phone className="h-5 w-5" />
+            </Button>
+          )}
+          
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-muted/80 border border-border/50 shadow-sm">
@@ -602,7 +633,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     >
                       <Upload className="h-3 w-3" /> Upload
                     </button>
-                    <input type="file" id="custom-wallpaper" ref={wallpaperInputRef} className="hidden" accept="image/*" onChange={handleCustomWallpaperUpload} />
+                    <input type="file" id="custom-wallpaper" border-none ref={wallpaperInputRef} className="hidden" accept="image/*" onChange={handleCustomWallpaperUpload} />
                   </div>
                   <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
                     <button 

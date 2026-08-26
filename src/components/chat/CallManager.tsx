@@ -1,16 +1,15 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Camera, User, Loader2 } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, User, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, onSnapshot, setDoc, addDoc, serverTimestamp, deleteDoc, updateDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, doc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -31,13 +30,10 @@ export default function CallManager() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const iceUnsubscribeRef = useRef<(() => void) | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
   // Listen for incoming calls
   const incomingCallsQuery = useMemoFirebase(() => {
@@ -48,18 +44,8 @@ export default function CallManager() {
       where('status', '==', 'ringing')
     );
   }, [db, user?.uid]);
+  
   const { data: incomingCalls } = useCollection(incomingCallsQuery);
-
-  // Listen for outgoing calls started by the user to manage caller flow
-  const outgoingCallsQuery = useMemoFirebase(() => {
-    if (!db || !user?.uid) return null;
-    return query(
-      collection(db, 'calls'),
-      where('callerId', '==', user.uid),
-      where('status', '==', 'ringing')
-    );
-  }, [db, user?.uid]);
-  const { data: outgoingCalls } = useCollection(outgoingCallsQuery);
 
   useEffect(() => {
     if (incomingCalls && incomingCalls.length > 0 && !activeCall) {
@@ -68,125 +54,64 @@ export default function CallManager() {
     }
   }, [incomingCalls, activeCall]);
 
-  useEffect(() => {
-    if (outgoingCalls && outgoingCalls.length > 0 && !activeCall) {
-      handleInitiateOutgoingCall(outgoingCalls[0]);
-    }
-  }, [outgoingCalls, activeCall]);
-
-  const cleanup = async () => {
-    if (iceUnsubscribeRef.current) {
-      iceUnsubscribeRef.current();
-      iceUnsubscribeRef.current = null;
-    }
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
-    }
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      setLocalStream(null);
-    }
+  const cleanup = () => {
+    if (iceUnsubscribeRef.current) iceUnsubscribeRef.current();
+    if (pcRef.current) pcRef.current.close();
+    if (localStream) localStream.getTracks().forEach(track => track.stop());
+    setLocalStream(null);
     setRemoteStream(null);
     setActiveCall(null);
     setCallStatus('idle');
+    pcRef.current = null;
   };
 
-  const setupMedia = async (type: 'audio' | 'video') => {
+  const setupMedia = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: type === 'video',
-        audio: true
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setLocalStream(stream);
-      setHasCameraPermission(true);
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
       return stream;
     } catch (error) {
-      setHasCameraPermission(false);
       toast({
         variant: 'destructive',
-        title: 'Permission Denied',
-        description: 'Please enable camera and microphone permissions.',
+        title: 'Microphone Required',
+        description: 'Please enable microphone access to use audio calls.',
       });
       return null;
     }
   };
 
-  const createPeerConnection = (callId: string) => {
+  const createPeerConnection = (callId: string, isCaller: boolean) => {
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
     pc.onicecandidate = (event) => {
       if (event.candidate && db) {
-        const side = activeCall?.callerId === user?.uid ? 'callerCandidates' : 'receiverCandidates';
-        const candidateData = event.candidate.toJSON();
+        const side = isCaller ? 'callerCandidates' : 'receiverCandidates';
         const candidatesCol = collection(db, 'calls', callId, side);
-        addDocumentNonBlocking(candidatesCol, candidateData);
+        addDocumentNonBlocking(candidatesCol, event.candidate.toJSON());
       }
     };
 
     pc.ontrack = (event) => {
       setRemoteStream(event.streams[0]);
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = event.streams[0];
+      }
     };
 
     pcRef.current = pc;
     return pc;
   };
 
-  const handleInitiateOutgoingCall = async (call: any) => {
-    setActiveCall(call);
-    setCallStatus('calling');
+  const handleAnswer = async () => {
+    if (!activeCall || !db || !user) return;
 
-    const stream = await setupMedia(call.type);
+    const stream = await setupMedia();
     if (!stream) {
       handleHangup();
       return;
     }
 
-    const pc = createPeerConnection(call.id);
-    stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-    try {
-      const offerDescription = await pc.createOffer();
-      await pc.setLocalDescription(offerDescription);
-
-      const callRef = doc(db, 'calls', call.id);
-      updateDocumentNonBlocking(callRef, {
-        offer: {
-          type: offerDescription.type,
-          sdp: offerDescription.sdp,
-        }
-      });
-
-      // Listen for receiver ICE candidates
-      const candidatesCol = collection(db, 'calls', call.id, 'receiverCandidates');
-      const unsubscribe = onSnapshot(candidatesCol, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === 'added') {
-            pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-          }
-        });
-      }, async (serverError) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: candidatesCol.path,
-          operation: 'list'
-        }));
-      });
-      
-      iceUnsubscribeRef.current = unsubscribe;
-    } catch (error) {
-      cleanup();
-    }
-  };
-
-  const handleAnswer = async () => {
-    if (!activeCall || !db || !user) return;
-
-    const stream = await setupMedia(activeCall.type);
-    if (!stream) return;
-
-    const pc = createPeerConnection(activeCall.id);
+    const pc = createPeerConnection(activeCall.id, false);
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     try {
@@ -205,7 +130,7 @@ export default function CallManager() {
 
       setCallStatus('ongoing');
 
-      // Listen for caller ICE candidates
+      // Listen for caller candidates
       const candidatesCol = collection(db, 'calls', activeCall.id, 'callerCandidates');
       const unsubscribe = onSnapshot(candidatesCol, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
@@ -213,13 +138,9 @@ export default function CallManager() {
             pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
           }
         });
-      }, async (serverError) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: candidatesCol.path,
-          operation: 'list'
-        }));
+      }, (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: candidatesCol.path, operation: 'list' }));
       });
-      
       iceUnsubscribeRef.current = unsubscribe;
     } catch (error) {
       cleanup();
@@ -242,72 +163,50 @@ export default function CallManager() {
         if (data?.status === 'ended') {
           cleanup();
         }
-        if (data?.status === 'ongoing' && callStatus === 'calling' && data.answer) {
-          pcRef.current?.setRemoteDescription(new RTCSessionDescription(data.answer));
-          setCallStatus('ongoing');
-        }
-      }, async (serverError) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: callRef.path,
-          operation: 'get'
-        }));
       });
       return () => unsubscribe();
     }
-  }, [activeCall, db, callStatus]);
+  }, [activeCall, db]);
 
   if (callStatus === 'idle') return null;
 
+  const otherPartyName = activeCall?.callerId === user?.uid ? activeCall?.receiverName : activeCall?.callerName;
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-4xl aspect-video bg-card border-none shadow-2xl relative overflow-hidden flex flex-col md:flex-row">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/90 backdrop-blur-md p-6 animate-in-fade">
+      <audio ref={remoteAudioRef} autoPlay />
+      
+      <Card className="w-full max-w-sm bg-card/10 border-white/5 shadow-2xl flex flex-col items-center gap-12 p-12 rounded-[3.5rem] relative overflow-hidden">
+        <div className="absolute inset-0 bg-primary/5 blur-[100px] animate-pulse" />
         
-        <div className="flex-1 bg-muted relative">
-          <video 
-            ref={remoteVideoRef} 
-            className="w-full h-full object-cover" 
-            autoPlay 
-            playsInline 
-          />
-          {(!remoteStream || callStatus === 'ringing' || callStatus === 'calling') && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-6">
-              <Avatar className="h-32 w-32 border-4 border-primary/20 animate-pulse">
-                <AvatarFallback className="text-4xl">
-                  {activeCall?.callerId === user?.uid ? activeCall?.receiverName?.[0] : activeCall?.callerName?.[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div className="text-center">
-                <h2 className="text-2xl font-bold">
-                  {activeCall?.callerId === user?.uid ? 'Calling...' : activeCall?.callerName}
-                </h2>
-                <p className="text-muted-foreground">
-                  {callStatus === 'ringing' ? 'Incoming call' : 'Waiting for answer...'}
-                </p>
-              </div>
-            </div>
-          )}
+        <div className="relative flex flex-col items-center gap-6">
+          <div className="relative">
+            <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150 animate-pulse" />
+            <Avatar className="h-32 w-32 border-4 border-background ring-4 ring-primary/20 shadow-2xl">
+              <AvatarFallback className="text-4xl font-black bg-muted text-primary">
+                {otherPartyName?.[0]}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+          
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-black uppercase italic tracking-tighter">{otherPartyName}</h2>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.3em]">
+              {callStatus === 'ringing' ? 'Incoming Audio Call' : 
+               callStatus === 'calling' ? 'Calling...' : 
+               callStatus === 'ongoing' ? 'On Call' : 'Call Ended'}
+            </p>
+          </div>
         </div>
 
-        <div className="absolute top-4 right-4 w-48 aspect-video bg-black rounded-xl border border-white/10 shadow-xl overflow-hidden z-10">
-          <video 
-            ref={localVideoRef} 
-            className="w-full h-full object-cover mirror" 
-            autoPlay 
-            muted 
-            playsInline 
-          />
-          {isVideoOff && (
-            <div className="absolute inset-0 bg-muted flex items-center justify-center">
-              <VideoOff className="h-6 w-6 text-muted-foreground" />
-            </div>
-          )}
-        </div>
-
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-background/50 backdrop-blur-xl p-4 rounded-full border border-white/10 shadow-2xl z-20">
+        <div className="flex items-center gap-6 relative z-10">
           <Button 
             variant="ghost" 
             size="icon" 
-            className={cn("h-12 w-12 rounded-full", isMicMuted ? "bg-destructive text-white" : "bg-muted/50")}
+            className={cn(
+              "h-16 w-16 rounded-full border border-white/5 transition-all",
+              isMicMuted ? "bg-destructive text-white" : "bg-white/5"
+            )}
             onClick={() => {
               if (localStream) {
                 const track = localStream.getAudioTracks()[0];
@@ -316,64 +215,28 @@ export default function CallManager() {
               }
             }}
           >
-            {isMicMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            {isMicMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
           </Button>
 
-          {activeCall?.type === 'video' && (
+          {callStatus === 'ringing' && (
             <Button 
-              variant="ghost" 
-              size="icon" 
-              className={cn("h-12 w-12 rounded-full", isVideoOff ? "bg-destructive text-white" : "bg-muted/50")}
-              onClick={() => {
-                if (localStream) {
-                  const track = localStream.getVideoTracks()[0];
-                  track.enabled = !track.enabled;
-                  setIsVideoOff(!track.enabled);
-                }
-              }}
+              className="h-16 px-8 rounded-full bg-accent text-accent-foreground font-black uppercase tracking-widest shadow-xl shadow-accent/20 hover:scale-105 active:scale-95"
+              onClick={handleAnswer}
             >
-              {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+              <Phone className="h-6 w-6 mr-2" /> Answer
             </Button>
           )}
 
-          {callStatus === 'ringing' ? (
-            <>
-              <Button 
-                className="h-12 px-8 rounded-full bg-accent hover:bg-accent/90 text-accent-foreground font-bold flex gap-2"
-                onClick={handleAnswer}
-              >
-                <Phone className="h-5 w-5" />
-                Answer
-              </Button>
-              <Button 
-                variant="destructive"
-                className="h-12 w-12 rounded-full"
-                onClick={handleHangup}
-              >
-                <PhoneOff className="h-5 w-5" />
-              </Button>
-            </>
-          ) : (
-            <Button 
-              variant="destructive"
-              className="h-12 px-8 rounded-full font-bold flex gap-2"
-              onClick={handleHangup}
-            >
-              <PhoneOff className="h-5 w-5" />
-              End Call
-            </Button>
-          )}
+          <Button 
+            variant="destructive"
+            size="icon"
+            className="h-16 w-16 rounded-full shadow-xl shadow-destructive/20 hover:scale-105 active:scale-95"
+            onClick={handleHangup}
+          >
+            <PhoneOff className="h-6 w-6" />
+          </Button>
         </div>
       </Card>
-      
-      {hasCameraPermission === false && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-full max-w-sm px-4 z-[110]">
-          <Card className="p-4 bg-destructive text-destructive-foreground border-none">
-            <h3 className="font-bold">Camera Access Required</h3>
-            <p className="text-sm">Please allow camera access to use video calls.</p>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

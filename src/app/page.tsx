@@ -10,6 +10,7 @@ import AppTutorial from '@/components/chat/AppTutorial';
 import AppLockOverlay from '@/components/chat/AppLockOverlay';
 import ProfileView from '@/components/chat/ProfileView';
 import SettingsView from '@/components/chat/SettingsView';
+import CallManager from '@/components/chat/CallManager';
 import BrandLogo from '@/components/ui/brand-logo';
 import { useUser } from '@/firebase';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -104,6 +105,7 @@ export default function Home() {
       <div className="flex h-svh w-full bg-background flex-col overflow-hidden">
         <UserProfileSync />
         <NotificationManager currentConversationId={selectedConversationId} />
+        <CallManager />
         <AppTutorial />
         
         <div className="flex-1 relative overflow-hidden flex flex-col min-w-0">
