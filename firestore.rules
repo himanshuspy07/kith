@@ -53,8 +53,9 @@ service cloud.firestore {
     // --- Calling Rules ---
     match /calls/{callId} {
       allow create: if isSignedIn();
+      allow list: if isSignedIn();
       // Allow if user is caller or receiver
-      allow get, list, update, delete: if isSignedIn() && (
+      allow get, update, delete: if isSignedIn() && (
         request.auth.uid == resource.data.callerId || 
         request.auth.uid == resource.data.receiverId
       );
