@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -93,7 +94,8 @@ const MessageItem = memo(({
   onImageClick,
   currentUserId,
   otherUserLastRead,
-  hasWallpaper
+  hasWallpaper,
+  showAvatar // New prop to control avatar and name visibility
 }: any) => {
   const isReadByOthers = useMemo(() => {
     if (!isMe || !otherUserLastRead || !msg.createdAt) return false;
@@ -123,29 +125,36 @@ const MessageItem = memo(({
 
   return (
     <div className={cn(
-      "flex flex-col animate-in-fade px-6 py-2 group transition-colors w-full", 
-      isMe ? "items-start" : "items-start"
+      "flex flex-col animate-in-fade px-6 group transition-colors w-full", 
+      showAvatar ? "mt-4 mb-1" : "mt-0.5 mb-0.5"
     )}>
       <div className="flex items-start gap-4 max-w-full relative">
         <div className="relative shrink-0">
-          <Avatar className="h-10 w-10 mt-1">
-            <AvatarImage src={sender?.profilePictureUrl} className="object-cover" />
-            <AvatarFallback className="bg-muted text-[10px] font-black">{sender?.username?.[0]}</AvatarFallback>
-          </Avatar>
+          {showAvatar ? (
+            <Avatar className="h-10 w-10 mt-1">
+              <AvatarImage src={sender?.profilePictureUrl} className="object-cover" />
+              <AvatarFallback className="bg-muted text-[10px] font-black">{sender?.username?.[0]}</AvatarFallback>
+            </Avatar>
+          ) : (
+            <div className="w-10" /> /* Placeholder to maintain alignment */
+          )}
         </div>
 
         <div className="flex flex-col min-w-0 max-w-[85%] md:max-w-[70%]">
           <div className="flex items-center gap-2">
-            <span className={cn(
-              "text-[14px] font-black uppercase tracking-tighter truncate", 
-              isMe ? "text-secondary" : "text-primary",
-              hasWallpaper && "drop-shadow-md text-white/90"
-            )}>
-              {isMe ? "ME" : sender?.username}
-            </span>
+            {showAvatar && (
+              <span className={cn(
+                "text-[14px] font-black uppercase tracking-tighter truncate", 
+                isMe ? "text-secondary" : "text-primary",
+                hasWallpaper && "drop-shadow-md text-white/90"
+              )}>
+                {isMe ? "ME" : sender?.username}
+              </span>
+            )}
             <span className={cn(
               "text-[9px] font-black opacity-60 uppercase shrink-0",
-              hasWallpaper ? "text-white/70" : "text-muted-foreground"
+              hasWallpaper ? "text-white/70" : "text-muted-foreground",
+              !showAvatar && "mt-1"
             )}>{timeStr}</span>
             {msg.isEdited && <span className="text-[8px] text-muted-foreground font-bold uppercase italic opacity-40 shrink-0">Edited</span>}
           </div>
@@ -595,7 +604,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               <div className="p-8 space-y-8 h-full overflow-y-auto scrollbar-hide">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between px-2">
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Chat Wallpaper</h4>
+                    <h4 className="text-[10px] font-black uppercase tracking-custom text-muted-foreground">Chat Wallpaper</h4>
                     <button 
                       onClick={() => wallpaperInputRef.current?.click()}
                       className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-primary hover:opacity-80"
@@ -631,7 +640,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Privacy Settings</h4>
+                  <h4 className="text-[10px] font-black uppercase tracking-custom text-muted-foreground ml-2">Privacy Settings</h4>
                   <div className="flex items-center justify-between p-4 bg-muted/50 rounded-[2rem] border border-border/50">
                     <div className="flex items-center gap-4">
                       <Clock className="h-5 w-5 text-primary" />
@@ -666,8 +675,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   </AlertDialog>
 
                   <div className="text-center py-4 opacity-30">
-                    <p className="text-[9px] font-black uppercase tracking-[0.3em]">kith &copy; 2026</p>
-                    <p className="text-[7px] font-black uppercase tracking-[0.5em] text-primary">Made by Himanshu</p>
+                    <p className="text-[9px] font-black uppercase tracking-custom">kith &copy; 2026</p>
+                    <p className="text-[7px] font-black uppercase tracking-widest text-primary">Made by Himanshu</p>
                   </div>
                 </div>
               </div>
@@ -691,6 +700,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             const prevMsgDate = prevMsg?.createdAt?.toDate ? prevMsg.createdAt.toDate() : null;
             const showDate = !prevMsgDate || !isSameDay(msgDate, prevMsgDate);
 
+            // Logic to hide avatar/name for consecutive messages from same sender on same day
+            const isSameSenderAsPrev = prevMsg && prevMsg.senderId === msg.senderId;
+            const showAvatar = showDate || !isSameSenderAsPrev;
+
             return (
               <React.Fragment key={msg.id}>
                 {showDate && <DateSeparator date={msgDate} hasWallpaper={!!room?.wallpaperUrl} />}
@@ -701,6 +714,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   currentUserId={user?.uid}
                   otherUserLastRead={otherUserLastRead}
                   hasWallpaper={!!room?.wallpaperUrl}
+                  showAvatar={showAvatar}
                   onAction={(action: string, m: any) => {
                      if (action === 'delete') {
                        updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id), { isDeleted: true });
