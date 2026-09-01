@@ -19,7 +19,8 @@ import {
   MessageSquare,
   SmilePlus,
   Palette,
-  Upload
+  Upload,
+  AlertCircle
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -95,8 +96,23 @@ const MessageItem = memo(({
   currentUserId,
   otherUserLastRead,
   hasWallpaper,
-  showAvatar // New prop to control avatar and name visibility
+  showAvatar
 }: any) => {
+  // Handle screenshot alert system message type
+  if (msg.type === 'screenshot-attempt') {
+    return (
+      <div className="flex justify-center my-4 animate-in-fade w-full">
+        <div className={cn(
+          "flex items-center gap-2 px-4 py-1.5 rounded-full border bg-destructive/5 border-destructive/20 text-destructive text-[10px] font-black uppercase tracking-[0.2em] shadow-sm",
+          hasWallpaper && "bg-black/60 border-white/20 text-white"
+        )}>
+          <AlertCircle className="h-3 w-3" />
+          {isMe ? "You tried to take a screenshot" : `${sender?.username || 'User'} tried to take a screenshot`}
+        </div>
+      </div>
+    );
+  }
+
   const isReadByOthers = useMemo(() => {
     if (!isMe || !otherUserLastRead || !msg.createdAt) return false;
     try {
@@ -136,7 +152,7 @@ const MessageItem = memo(({
               <AvatarFallback className="bg-muted text-[10px] font-black">{sender?.username?.[0]}</AvatarFallback>
             </Avatar>
           ) : (
-            <div className="w-10" /> /* Placeholder to maintain alignment */
+            <div className="w-10" />
           )}
         </div>
 
@@ -311,6 +327,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [lightboxImage, setLightboxImage] = useState<{url: string, id?: string, isViewOnce?: boolean} | null>(null);
   const [messageLimit, setMessageLimit] = useState(25);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isBlurred, setIsBlurred] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -356,6 +373,51 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return query(collection(db, 'users'), where('id', 'in', participantIds));
   }, [db, participantIds]);
   const { data: participants } = useCollection(participantsQuery);
+
+  // Screenshot Detection and Alert Logic
+  useEffect(() => {
+    if (!conversationId || !user || !db) return;
+
+    const handleScreenshotAlert = () => {
+      handleSend('screenshot-attempt', 'Attempted to take a screenshot');
+      toast({
+        variant: "destructive",
+        title: "Screenshot Restricted",
+        description: "Your screenshot attempt has been logged and reported to all participants.",
+      });
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Common screenshot shortcuts
+      if (
+        e.key === 'PrintScreen' || 
+        (e.metaKey && e.shiftKey && (e.key === '4' || e.key === '3')) || // Mac
+        (e.ctrlKey && e.key === 'p') // Potential print shortcut
+      ) {
+        handleScreenshotAlert();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        setIsBlurred(true);
+      } else {
+        setIsBlurred(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', () => setIsBlurred(true));
+    window.addEventListener('focus', () => setIsBlurred(false));
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', () => setIsBlurred(true));
+      window.removeEventListener('focus', () => setIsBlurred(false));
+    };
+  }, [conversationId, user, db]);
 
   useEffect(() => {
     if (roomRef && user && room) {
@@ -429,11 +491,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }, 4000);
   };
 
-  const handleSend = (type: 'text' | 'image' | 'view-once' = 'text', content?: string) => {
+  const handleSend = (type: 'text' | 'image' | 'view-once' | 'screenshot-attempt' = 'text', content?: string) => {
     const finalContent = content || inputValue.trim();
     if (!finalContent || !conversationId || !user) return;
 
-    if (editingMessage) {
+    if (editingMessage && type !== 'screenshot-attempt') {
       const msgRef = doc(db, 'chatRooms', conversationId, 'messages', editingMessage.id);
       updateDocumentNonBlocking(msgRef, {
         content: finalContent,
@@ -457,7 +519,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       reactions: {}
     };
 
-    if (replyingTo) {
+    if (replyingTo && type !== 'screenshot-attempt') {
       messageData.replyTo = replyingTo.id;
       messageData.replyToContent = replyingTo.content;
     }
@@ -467,7 +529,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     addDocumentNonBlocking(collection(db, 'chatRooms', conversationId, 'messages'), messageData);
     
     updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId), {
-      lastMessageText: type === 'image' ? 'Sent a photo' : type === 'view-once' ? 'Sent a Snap' : finalContent,
+      lastMessageText: type === 'image' ? 'Sent a photo' : type === 'view-once' ? 'Sent a Snap' : type === 'screenshot-attempt' ? 'Tried to take a screenshot' : finalContent,
       lastMessageSenderId: user.uid,
       updatedAt: serverTimestamp(),
       readBy: [user.uid],
@@ -475,9 +537,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       [`typing.${user.uid}`]: deleteField()
     });
     
-    setInputValue('');
-    setReplyingTo(null);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (type !== 'screenshot-attempt') {
+      setInputValue('');
+      setReplyingTo(null);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
   };
 
   const handleReact = (messageId: string, emoji: string) => {
@@ -536,7 +600,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden max-w-full">
+    <div className={cn(
+      "flex-1 flex flex-col h-full bg-background relative overflow-hidden max-w-full transition-all duration-300",
+      isBlurred && "blur-xl grayscale pointer-events-none"
+    )}>
       {/* Background layer stays fixed while content scrolls */}
       {room?.wallpaperUrl && (
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -700,7 +767,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
             const prevMsgDate = prevMsg?.createdAt?.toDate ? prevMsg.createdAt.toDate() : null;
             const showDate = !prevMsgDate || !isSameDay(msgDate, prevMsgDate);
 
-            // Logic to hide avatar/name for consecutive messages from same sender on same day
             const isSameSenderAsPrev = prevMsg && prevMsg.senderId === msg.senderId;
             const showAvatar = showDate || !isSameSenderAsPrev;
 
