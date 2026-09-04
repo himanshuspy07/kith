@@ -147,12 +147,12 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       room.memberIds?.forEach((id: string) => { if (id !== user.uid) ids.add(id); });
     });
     return Array.from(ids).slice(0, 30);
-  }, [rooms, user]);
+  }, [rooms, user?.uid]);
 
   const usersQuery = useMemoFirebase(() => {
     if (!db || participantIds.length === 0) return null;
     return query(collection(db, 'users'), where('id', 'in', participantIds));
-  }, [db, participantIds]);
+  }, [db, JSON.stringify(participantIds)]);
   const { data: participantProfiles } = useCollection(usersQuery);
 
   const conversationListData = useMemo(() => {

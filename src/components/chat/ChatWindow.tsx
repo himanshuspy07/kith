@@ -368,12 +368,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const participantIds = useMemo(() => {
     if (!room?.memberIds) return [];
     return room.memberIds.slice(0, 30);
-  }, [room?.memberIds]);
+  }, [JSON.stringify(room?.memberIds)]);
 
   const participantsQuery = useMemoFirebase(() => {
     if (!db || participantIds.length === 0) return null;
     return query(collection(db, 'users'), where('id', 'in', participantIds));
-  }, [db, participantIds]);
+  }, [db, JSON.stringify(participantIds)]);
   const { data: participants } = useCollection(participantsQuery);
 
   useEffect(() => {
@@ -420,13 +420,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [conversationId, user, db, toast]);
 
   useEffect(() => {
-    if (roomRef && user && room) {
+    if (roomRef && user) {
       updateDocumentNonBlocking(roomRef, {
         readBy: arrayUnion(user.uid),
         [`lastRead.${user.uid}`]: serverTimestamp()
       });
     }
-  }, [messages?.length, user?.uid, roomRef, room]);
+  }, [messages?.length, user?.uid, roomRef]);
 
   useEffect(() => {
     if (!messages || messages.length === 0) return;
