@@ -1,7 +1,8 @@
+
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { Search, Plus, MessageSquare, Loader2, UserPlus, Camera } from 'lucide-react';
+import { Search, Plus, MessageSquare, Loader2, UserPlus, Camera, Pin } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -73,9 +74,12 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-baseline gap-2">
-          <h3 className="text-[17px] font-bold text-foreground truncate uppercase tracking-tighter">
-            {room.displayName}
-          </h3>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {room.isPinned && <Pin className="h-3 w-3 text-primary fill-current shrink-0" />}
+            <h3 className="text-[17px] font-bold text-foreground truncate uppercase tracking-tighter">
+              {room.displayName}
+            </h3>
+          </div>
           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter shrink-0">
             {timeDisplay}
           </span>
@@ -93,7 +97,11 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
               {room.lastMessageText || 'New Friend'}
             </p>
           )}
-          {room.isUnread && <div className="h-2 w-2 rounded-full bg-secondary shrink-0" />}
+          {room.isUnread && (
+            <div className="flex items-center justify-center bg-secondary min-w-[1.2rem] h-5 px-1 rounded-full text-[10px] font-black text-secondary-foreground shadow-sm">
+              NEW
+            </div>
+          )}
         </div>
       </div>
 
@@ -138,7 +146,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     rooms.forEach(room => {
       room.memberIds?.forEach((id: string) => { if (id !== user.uid) ids.add(id); });
     });
-    // Slice to Firestore limit for 'in' queries (max 30)
     return Array.from(ids).slice(0, 30);
   }, [rooms, user]);
 
@@ -175,8 +182,11 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                        room.lastMessageSenderId !== user.uid && 
                        roomUpdateTime > userReadTime;
 
-      return { ...room, displayName, displayAvatar, isOnline, isUnread };
+      const isPinned = room.pinned?.[user.uid] || false;
+
+      return { ...room, displayName, displayAvatar, isOnline, isUnread, isPinned };
     }).sort((a, b) => {
+      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : 0;
       const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0;
       return timeB - timeA;

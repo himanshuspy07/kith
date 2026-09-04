@@ -20,7 +20,9 @@ import {
   SmilePlus,
   Palette,
   Upload,
-  AlertCircle
+  AlertCircle,
+  Pin,
+  PinOff
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -69,7 +71,8 @@ import {
   limitToLast,
   deleteField,
   arrayUnion,
-  addDoc
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
 import { 
   addDocumentNonBlocking, 
@@ -98,7 +101,6 @@ const MessageItem = memo(({
   hasWallpaper,
   showAvatar
 }: any) => {
-  // Handle screenshot alert system message type
   if (msg.type === 'screenshot-attempt') {
     return (
       <div className="flex justify-center my-4 animate-in-fade w-full">
@@ -374,7 +376,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [db, participantIds]);
   const { data: participants } = useCollection(participantsQuery);
 
-  // Screenshot Detection and Alert Logic
   useEffect(() => {
     if (!conversationId || !user || !db) return;
 
@@ -388,11 +389,10 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Common screenshot shortcuts
       if (
         e.key === 'PrintScreen' || 
-        (e.metaKey && e.shiftKey && (e.key === '4' || e.key === '3')) || // Mac
-        (e.ctrlKey && e.key === 'p') // Potential print shortcut
+        (e.metaKey && e.shiftKey && (e.key === '4' || e.key === '3')) || 
+        (e.ctrlKey && e.key === 'p') 
       ) {
         handleScreenshotAlert();
       }
@@ -417,7 +417,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       window.removeEventListener('blur', () => setIsBlurred(true));
       window.removeEventListener('focus', () => setIsBlurred(false));
     };
-  }, [conversationId, user, db]);
+  }, [conversationId, user, db, toast]);
 
   useEffect(() => {
     if (roomRef && user && room) {
@@ -426,7 +426,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         [`lastRead.${user.uid}`]: serverTimestamp()
       });
     }
-  }, [messages?.length, user?.uid, roomRef]);
+  }, [messages?.length, user?.uid, roomRef, room]);
 
   useEffect(() => {
     if (!messages || messages.length === 0) return;
@@ -493,7 +493,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const handleSend = (type: 'text' | 'image' | 'view-once' | 'screenshot-attempt' = 'text', content?: string) => {
     const finalContent = content || inputValue.trim();
-    if (!finalContent || !conversationId || !user) return;
+    if (!finalContent && type !== 'screenshot-attempt') return;
+    if (!conversationId || !user) return;
 
     if (editingMessage && type !== 'screenshot-attempt') {
       const msgRef = doc(db, 'chatRooms', conversationId, 'messages', editingMessage.id);
@@ -504,6 +505,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       });
       setEditingMessage(null);
       setInputValue('');
+      updateTypingStatus(false);
       return;
     }
 
@@ -541,6 +543,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       setInputValue('');
       setReplyingTo(null);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      updateTypingStatus(false);
     }
   };
 
@@ -575,6 +578,31 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }
   };
 
+  const togglePinChat = () => {
+    if (!roomRef || !user) return;
+    const isPinned = room?.pinned?.[user.uid];
+    updateDocumentNonBlocking(roomRef, {
+      [`pinned.${user.uid}`]: !isPinned
+    });
+    toast({ title: isPinned ? "Unpinned from top" : "Pinned to top" });
+  };
+
+  const deleteChatHistory = async () => {
+    if (!conversationId || !db) return;
+    const q = query(collection(db, 'chatRooms', conversationId, 'messages'));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId), {
+      lastMessageText: 'Chat history cleared',
+      updatedAt: serverTimestamp()
+    });
+    toast({ title: "Chat history deleted" });
+  };
+
   const otherUser = useMemo(() => {
     if (!room || !participants || !user) return null;
     return participants.find(p => p.id !== user.uid);
@@ -584,6 +612,15 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     if (!room?.lastRead || !otherUser) return null;
     return room.lastRead[otherUser.id];
   }, [room?.lastRead, otherUser]);
+
+  const isTyping = useMemo(() => {
+    if (!room?.typing || !user) return false;
+    return Object.entries(room.typing).some(([id, timestamp]: any) => {
+      if (id === user.uid) return false;
+      const ts = timestamp?.toMillis ? timestamp.toMillis() : 0;
+      return (Date.now() - ts) < 5000;
+    });
+  }, [room?.typing, user]);
 
   const wallpapers = wallpaperData.placeholderImages.filter(img => img.id.startsWith('wallpaper-'));
 
@@ -604,7 +641,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       "flex-1 flex flex-col h-full bg-background relative overflow-hidden max-w-full transition-all duration-300",
       isBlurred && "blur-xl grayscale pointer-events-none"
     )}>
-      {/* Background layer stays fixed while content scrolls */}
       {room?.wallpaperUrl && (
         <div className="absolute inset-0 z-0 pointer-events-none">
           <img 
@@ -619,9 +655,9 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       <header className="h-20 px-6 flex items-center justify-between border-b border-border/40 shrink-0 bg-background/95 backdrop-blur-xl z-30 max-w-full">
         <div className="flex items-center gap-4 min-w-0">
           {onBack && (
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted shrink-0" onClick={onBack}>
+            <button className="h-10 w-10 rounded-full hover:bg-muted flex items-center justify-center shrink-0" onClick={onBack}>
               <ChevronLeft className="h-6 w-6" />
-            </Button>
+            </button>
           )}
           <div className="flex items-center gap-3 min-w-0">
             <div className={cn(
@@ -634,9 +670,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               </Avatar>
             </div>
             <div className="flex flex-col min-w-0">
-              <h3 className="text-[17px] font-black uppercase tracking-tighter leading-none truncate">{room?.isGroupChat ? room.name : otherUser?.username}</h3>
-              <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", otherUser?.onlineStatus ? "text-accent" : "text-muted-foreground opacity-50")}>
-                {otherUser?.onlineStatus ? "Active Now" : "Away"}
+              <div className="flex items-center gap-2">
+                <h3 className="text-[17px] font-black uppercase tracking-tighter leading-none truncate">{room?.isGroupChat ? room.name : otherUser?.username}</h3>
+                {room?.pinned?.[user?.uid] && <Pin className="h-3 w-3 text-primary fill-current" />}
+              </div>
+              <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", isTyping ? "text-accent animate-pulse" : (otherUser?.onlineStatus ? "text-accent" : "text-muted-foreground opacity-50"))}>
+                {isTyping ? "Typing..." : (otherUser?.onlineStatus ? "Active Now" : "Away")}
               </span>
             </div>
           </div>
@@ -664,6 +703,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                      ) : (
                        <p className="text-sm font-medium text-muted-foreground line-clamp-2 px-4">{otherUser?.bio || "No bio yet"}</p>
                      )}
+                  </div>
+                  <div className="flex gap-4">
+                    <Button variant="outline" size="sm" onClick={togglePinChat} className="rounded-xl gap-2 font-bold uppercase text-[10px] tracking-widest">
+                      {room?.pinned?.[user?.uid] ? <><PinOff className="h-3 w-3" /> Unpin</> : <><Pin className="h-3 w-3" /> Pin Chat</>}
+                    </Button>
                   </div>
                 </div>
               </SheetHeader>
@@ -717,7 +761,27 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   </div>
                 </div>
 
-                <div className="pt-8 border-t border-border/50 space-y-8">
+                <div className="pt-8 border-t border-border/50 space-y-4">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" className="w-full h-14 rounded-[2rem] font-black uppercase tracking-widest border-border hover:bg-muted transition-all">
+                        <MessageSquare className="h-4 w-4 mr-2" /> Clear History
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Clear History?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground font-medium">
+                          All messages in this chat will be deleted for everyone. This cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="gap-2">
+                        <AlertDialogCancel className="rounded-xl font-bold">Cancel</AlertDialogCancel>
+                        <AlertDialogAction className="rounded-xl bg-primary font-black uppercase tracking-widest" onClick={deleteChatHistory}>Clear All</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" className="w-full h-16 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-destructive/20 border border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-white transition-all">
@@ -728,13 +792,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Delete Chat?</AlertDialogTitle>
                         <AlertDialogDescription className="text-muted-foreground font-medium">
-                          This action cannot be undone. All messages will be permanently removed for you.
+                          This will remove you from the conversation and delete all data.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-bold">Cancel</AlertDialogCancel>
                         <AlertDialogAction className="rounded-xl bg-destructive font-black uppercase tracking-widest" onClick={() => {
-                          messages?.forEach(m => deleteDocumentNonBlocking(doc(db, 'chatRooms', conversationId, 'messages', m.id)));
+                          if (roomRef) deleteDocumentNonBlocking(roomRef);
+                          onBack?.();
                           toast({ title: "Chat Deleted" });
                         }}>Delete</AlertDialogAction>
                       </AlertDialogFooter>
@@ -829,7 +894,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-secondary">Editing Message</span>
                 <p className="text-xs font-bold truncate opacity-80">{editingMessage.content}</p>
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-secondary/20" onClick={() => { setEditingMessage(null); setInputValue(''); }}>
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-secondary/20" onClick={() => { setEditingMessage(null); setInputValue(''); updateTypingStatus(false); }}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
