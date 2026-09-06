@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, memo } from 'react';
@@ -22,7 +21,10 @@ import {
   Upload,
   AlertCircle,
   Pin,
-  PinOff
+  PinOff,
+  ArrowDown,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -58,7 +60,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { 
@@ -84,10 +86,40 @@ import wallpaperData from '@/app/lib/placeholder-images.json';
 
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
 interface ChatWindowProps {
   conversationId?: string;
   onBack?: () => void;
 }
+
+const MessageContent = ({ content, hasWallpaper }: { content: string, hasWallpaper: boolean }) => {
+  const parts = content.split(URL_REGEX);
+  
+  return (
+    <p className={cn(
+      "text-[16px] font-medium leading-normal break-words py-1", 
+      hasWallpaper ? "text-white drop-shadow-md" : "text-foreground"
+    )}>
+      {parts.map((part, i) => {
+        if (part.match(URL_REGEX)) {
+          return (
+            <a 
+              key={i} 
+              href={part} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-primary hover:underline inline-flex items-center gap-1 font-bold decoration-2 underline-offset-4"
+            >
+              {part} <ExternalLink className="h-3 w-3" />
+            </a>
+          );
+        }
+        return part;
+      })}
+    </p>
+  );
+};
 
 const MessageItem = memo(({ 
   msg, 
@@ -212,13 +244,11 @@ const MessageItem = memo(({
               </div>
             ) : (
               <div className="relative max-w-full">
-                <p className={cn(
-                  "text-[16px] font-medium leading-normal break-words py-1", 
-                  msg.isDeleted && "italic opacity-50 line-through",
-                  hasWallpaper ? "text-white drop-shadow-md" : "text-foreground"
-                )}>
-                  {msg.isDeleted ? "Message deleted" : msg.content}
-                </p>
+                {msg.isDeleted ? (
+                  <p className="text-[16px] italic opacity-50 line-through py-1">Message deleted</p>
+                ) : (
+                  <MessageContent content={msg.content} hasWallpaper={hasWallpaper} />
+                )}
               </div>
             )}
 
@@ -328,6 +358,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [messageLimit, setMessageLimit] = useState(25);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isBlurred, setIsBlurred] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -366,12 +397,12 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const participantIds = useMemo(() => {
     if (!room?.memberIds) return [];
     return room.memberIds;
-  }, [room?.memberIds?.join(',')]);
+  }, [room?.memberIds ? JSON.stringify(room.memberIds) : '']);
 
   const participantsQuery = useMemoFirebase(() => {
     if (!db || participantIds.length === 0) return null;
     return query(collection(db, 'users'), where('id', 'in', participantIds.slice(0, 30)));
-  }, [db, participantIds?.join(',')]);
+  }, [db, participantIds ? JSON.stringify(participantIds) : '']);
   const { data: participants } = useCollection(participantsQuery);
 
   useEffect(() => {
@@ -420,7 +451,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         [`lastRead.${user.uid}`]: serverTimestamp()
       });
     }
-  }, [messages?.length, user?.uid]);
+  }, [messages?.length, user?.uid, !!roomRef]);
 
   useEffect(() => {
     if (!messages || messages.length === 0) return;
@@ -445,7 +476,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       }
       lastMessageIdRef.current = currentLastMessageId;
     }
-  }, [messages, user?.uid]);
+  }, [messages, user?.uid, isInitialLoad]);
 
   useEffect(() => {
     if (!topSentinelRef.current || !scrollContainerRef.current) return;
@@ -465,7 +496,20 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     }, { threshold: 0.1, root: scrollContainerRef.current });
 
     observer.observe(topSentinelRef.current);
-    return () => observer.disconnect();
+
+    const handleScroll = () => {
+      if (scrollContainerRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+        setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 600);
+      }
+    };
+    const container = scrollContainerRef.current;
+    container.addEventListener('scroll', handleScroll);
+
+    return () => {
+      observer.disconnect();
+      container.removeEventListener('scroll', handleScroll);
+    };
   }, [messages?.length, messageLimit]);
 
   const updateTypingStatus = (isTyping: boolean) => {
@@ -497,7 +541,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         updatedAt: serverTimestamp(),
         isEdited: true
       });
-      // Also update parent room to reflect the edited message in sidebar
       updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId), {
         lastMessageText: finalContent,
         updatedAt: serverTimestamp()
@@ -619,6 +662,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return otherUser.onlineStatus === true && (now - lastActive) < 180000;
   }, [otherUser, otherUser?.lastActiveAt]);
 
+  const lastSeenDisplay = useMemo(() => {
+    if (isOtherUserOnline) return "Active Now";
+    if (!otherUser?.lastActiveAt?.toDate) return "Away";
+    const date = otherUser.lastActiveAt.toDate();
+    return `Last seen ${formatDistanceToNow(date, { addSuffix: true })}`;
+  }, [isOtherUserOnline, otherUser?.lastActiveAt]);
+
   const isTyping = useMemo(() => {
     if (!room?.typing || !user) return false;
     return Object.entries(room.typing).some(([id, timestamp]: any) => {
@@ -629,6 +679,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   }, [room?.typing, user?.uid]);
 
   const wallpapers = wallpaperData.placeholderImages.filter(img => img.id.startsWith('wallpaper-'));
+
+  const handleDownload = (url: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kith-shared-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({ title: "Download started" });
+  };
 
   if (!conversationId) {
     return (
@@ -681,7 +741,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 {room?.pinned?.[user?.uid] && <Pin className="h-3 w-3 text-primary fill-current" />}
               </div>
               <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", isTyping ? "text-accent animate-pulse" : (isOtherUserOnline ? "text-accent" : "text-muted-foreground opacity-50"))}>
-                {isTyping ? "Typing..." : (isOtherUserOnline ? "Active Now" : "Away")}
+                {isTyping ? "Typing..." : lastSeenDisplay}
               </span>
             </div>
           </div>
@@ -864,6 +924,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       </div>
 
+      {showScrollBottom && (
+        <Button 
+          size="icon" 
+          onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          className="fixed bottom-24 right-6 md:bottom-28 md:right-10 z-[40] h-12 w-12 rounded-full bg-primary shadow-2xl hover:scale-110 active:scale-95 transition-all animate-in zoom-in-50"
+        >
+          <ArrowDown className="h-6 w-6" />
+        </Button>
+      )}
+
       <footer className="p-4 md:p-6 bg-background border-t border-border/40 shrink-0 z-30 max-w-full">
         <div className="max-w-4xl mx-auto space-y-3">
           {replyingTo && (
@@ -940,8 +1010,29 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <DialogContent className="max-w-full h-svh p-0 border-none bg-black rounded-none">
           <DialogTitle className="sr-only">Image Preview</DialogTitle>
           <div className="relative w-full h-full flex items-center justify-center p-4">
-            {lightboxImage && <img src={lightboxImage.url} alt="Snap" className="max-w-full max-h-full object-contain rounded-[2rem] shadow-2xl" />}
-            <Button variant="ghost" size="icon" className="absolute top-6 right-6 text-white bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-xl h-12 w-12" onClick={() => setLightboxImage(null)}>
+            {lightboxImage && (
+              <div className="relative group/img">
+                <img 
+                  src={lightboxImage.url} 
+                  alt="Snap" 
+                  className="max-w-full max-h-full object-contain rounded-[2rem] shadow-2xl" 
+                />
+                {!lightboxImage.isViewOnce && (
+                  <Button 
+                    onClick={() => handleDownload(lightboxImage.url)}
+                    className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/10 hover:bg-white/20 backdrop-blur-xl rounded-full px-6 h-12 font-bold uppercase tracking-widest gap-2 animate-in slide-in-from-bottom-4"
+                  >
+                    <Download className="h-4 w-4" /> Save to Device
+                  </Button>
+                )}
+              </div>
+            )}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute top-6 right-6 text-white bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-xl h-12 w-12" 
+              onClick={() => setLightboxImage(null)}
+            >
               <X className="h-6 w-6" />
             </Button>
           </div>

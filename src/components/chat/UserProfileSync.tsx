@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef } from 'react';
@@ -61,7 +60,7 @@ export default function UserProfileSync() {
 
     syncProfile();
 
-    // Heartbeat every 30 seconds
+    // Heartbeat every 1 minute (Updated as requested)
     heartbeatIntervalRef.current = setInterval(() => {
       if (document.visibilityState === 'visible') {
         updateDocumentNonBlocking(userRef, {
@@ -69,7 +68,7 @@ export default function UserProfileSync() {
           onlineStatus: true
         });
       }
-    }, 1000 * 30);
+    }, 1000 * 60);
 
     // Handle visibility changes aggressively
     const handleVisibilityChange = () => {
