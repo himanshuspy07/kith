@@ -143,7 +143,7 @@ const MessageItem = memo(({
 
   return (
     <div className={cn(
-      "flex flex-col animate-in-fade px-6 group transition-colors w-full", 
+      "flex flex-col animate-in-fade px-6 group relative transition-colors w-full", 
       showAvatar ? "mt-4 mb-1" : "mt-0.5 mb-0.5"
     )}>
       <div className="flex items-start gap-4 max-w-full relative">
@@ -151,14 +151,14 @@ const MessageItem = memo(({
           {showAvatar ? (
             <Avatar className="h-10 w-10 mt-1">
               <AvatarImage src={sender?.profilePictureUrl} className="object-cover" />
-              <AvatarFallback className="bg-muted text-[10px] font-black">{sender?.username?.[0]}</AvatarFallback>
+              <AvatarFallback className="bg-muted text-[10px] font-black">{sender?.username?.[0] || '?'}</AvatarFallback>
             </Avatar>
           ) : (
             <div className="w-10" />
           )}
         </div>
 
-        <div className="flex flex-col min-w-0 max-w-[85%] md:max-w-[70%]">
+        <div className="flex flex-col min-w-0 max-w-[85%] md:max-w-[70%] relative">
           <div className="flex items-center gap-2">
             {showAvatar && (
               <span className={cn(
@@ -253,14 +253,12 @@ const MessageItem = memo(({
               </div>
             )}
           </div>
-        </div>
 
-        {!msg.isDeleted && (
-          <div className="absolute -right-2 top-1/2 -translate-y-1/2 translate-x-full opacity-0 group-hover:opacity-100 flex items-center gap-2 pl-4 transition-all pointer-events-none group-hover:pointer-events-auto z-10">
-            <Popover>
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 opacity-0 group-hover:opacity-100 flex items-center gap-1.5 transition-all z-20">
+             <Popover>
               <PopoverTrigger asChild>
-                <button className="h-8 w-8 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-primary transition-colors border border-border/50">
-                  <SmilePlus className="h-4 w-4" />
+                <button className="h-7 w-7 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-primary transition-colors border border-border/50">
+                  <SmilePlus className="h-3.5 w-3.5" />
                 </button>
               </PopoverTrigger>
               <PopoverContent side="top" align="center" className="w-fit p-1.5 flex gap-1 rounded-full bg-card/95 backdrop-blur shadow-2xl border-border/50">
@@ -279,13 +277,13 @@ const MessageItem = memo(({
               </PopoverContent>
             </Popover>
 
-            <button onClick={() => onAction('reply', msg)} className="h-8 w-8 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-primary transition-colors border border-border/50">
-              <Reply className="h-4 w-4" />
+            <button onClick={() => onAction('reply', msg)} className="h-7 w-7 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-primary transition-colors border border-border/50">
+              <Reply className="h-3.5 w-3.5" />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="h-8 w-8 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-foreground transition-colors border border-border/50">
-                  <MoreHorizontal className="h-4 w-4" />
+                <button className="h-7 w-7 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-foreground transition-colors border border-border/50">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl border-border/50">
@@ -294,7 +292,7 @@ const MessageItem = memo(({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -367,13 +365,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
   const participantIds = useMemo(() => {
     if (!room?.memberIds) return [];
-    return room.memberIds.slice(0, 30);
-  }, [JSON.stringify(room?.memberIds)]);
+    return room.memberIds;
+  }, [room?.memberIds?.join(',')]);
 
   const participantsQuery = useMemoFirebase(() => {
     if (!db || participantIds.length === 0) return null;
-    return query(collection(db, 'users'), where('id', 'in', participantIds));
-  }, [db, JSON.stringify(participantIds)]);
+    return query(collection(db, 'users'), where('id', 'in', participantIds.slice(0, 30)));
+  }, [db, participantIds?.join(',')]);
   const { data: participants } = useCollection(participantsQuery);
 
   useEffect(() => {
@@ -399,11 +397,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        setIsBlurred(true);
-      } else {
-        setIsBlurred(false);
-      }
+      setIsBlurred(document.visibilityState === 'hidden');
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -417,7 +411,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       window.removeEventListener('blur', () => setIsBlurred(true));
       window.removeEventListener('focus', () => setIsBlurred(false));
     };
-  }, [conversationId, user, db, toast]);
+  }, [conversationId, user?.uid]);
 
   useEffect(() => {
     if (roomRef && user) {
@@ -426,7 +420,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         [`lastRead.${user.uid}`]: serverTimestamp()
       });
     }
-  }, [messages?.length, user?.uid, roomRef]);
+  }, [messages?.length, user?.uid]);
 
   useEffect(() => {
     if (!messages || messages.length === 0) return;
@@ -442,7 +436,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     } else if (isNewMessageAtEnd) {
       const container = scrollContainerRef.current;
       if (container) {
-        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 300;
         const isFromMe = currentLastMessage.senderId === user?.uid;
         
         if (isNearBottom || isFromMe) {
@@ -451,7 +445,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       }
       lastMessageIdRef.current = currentLastMessageId;
     }
-  }, [messages, isInitialLoad, user?.uid]);
+  }, [messages, user?.uid]);
 
   useEffect(() => {
     if (!topSentinelRef.current || !scrollContainerRef.current) return;
@@ -472,7 +466,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
     observer.observe(topSentinelRef.current);
     return () => observer.disconnect();
-  }, [messages, messageLimit]);
+  }, [messages?.length, messageLimit]);
 
   const updateTypingStatus = (isTyping: boolean) => {
     if (!roomRef || !user) return;
@@ -502,6 +496,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         content: finalContent,
         updatedAt: serverTimestamp(),
         isEdited: true
+      });
+      // Also update parent room to reflect the edited message in sidebar
+      updateDocumentNonBlocking(doc(db, 'chatRooms', conversationId), {
+        lastMessageText: finalContent,
+        updatedAt: serverTimestamp()
       });
       setEditingMessage(null);
       setInputValue('');
@@ -613,6 +612,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return room.lastRead[otherUser.id];
   }, [room?.lastRead, otherUser]);
 
+  const isOtherUserOnline = useMemo(() => {
+    if (!otherUser) return false;
+    const now = Date.now();
+    const lastActive = otherUser.lastActiveAt?.toDate?.()?.getTime() || 0;
+    return otherUser.onlineStatus === true && (now - lastActive) < 180000;
+  }, [otherUser, otherUser?.lastActiveAt]);
+
   const isTyping = useMemo(() => {
     if (!room?.typing || !user) return false;
     return Object.entries(room.typing).some(([id, timestamp]: any) => {
@@ -620,7 +626,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       const ts = timestamp?.toMillis ? timestamp.toMillis() : 0;
       return (Date.now() - ts) < 5000;
     });
-  }, [room?.typing, user]);
+  }, [room?.typing, user?.uid]);
 
   const wallpapers = wallpaperData.placeholderImages.filter(img => img.id.startsWith('wallpaper-'));
 
@@ -662,11 +668,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
           <div className="flex items-center gap-3 min-w-0">
             <div className={cn(
               "p-0.5 rounded-full ring-2 ring-offset-2 ring-offset-background shrink-0",
-              otherUser?.onlineStatus ? "ring-accent" : "ring-transparent"
+              isOtherUserOnline ? "ring-accent" : "ring-transparent"
             )}>
               <Avatar className="h-10 w-10">
                 <AvatarImage src={otherUser?.profilePictureUrl} />
-                <AvatarFallback className="font-bold">{otherUser?.username?.[0]}</AvatarFallback>
+                <AvatarFallback className="font-bold">{otherUser?.username?.[0] || '?'}</AvatarFallback>
               </Avatar>
             </div>
             <div className="flex flex-col min-w-0">
@@ -674,8 +680,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 <h3 className="text-[17px] font-black uppercase tracking-tighter leading-none truncate">{room?.isGroupChat ? room.name : otherUser?.username}</h3>
                 {room?.pinned?.[user?.uid] && <Pin className="h-3 w-3 text-primary fill-current" />}
               </div>
-              <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", isTyping ? "text-accent animate-pulse" : (otherUser?.onlineStatus ? "text-accent" : "text-muted-foreground opacity-50"))}>
-                {isTyping ? "Typing..." : (otherUser?.onlineStatus ? "Active Now" : "Away")}
+              <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] mt-1.5", isTyping ? "text-accent animate-pulse" : (isOtherUserOnline ? "text-accent" : "text-muted-foreground opacity-50"))}>
+                {isTyping ? "Typing..." : (isOtherUserOnline ? "Active Now" : "Away")}
               </span>
             </div>
           </div>
@@ -693,11 +699,11 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 <SheetTitle className="sr-only">Conversation Info</SheetTitle>
                 <div className="flex flex-col items-center gap-6">
                   <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-4 ring-primary/20">
-                    <AvatarImage src={room?.isGroupChat ? room.groupImageUrl : otherUser?.profilePictureUrl} />
-                    <AvatarFallback className="text-4xl font-black bg-muted text-primary">{room?.name?.[0] || otherUser?.username?.[0]}</AvatarFallback>
+                    <AvatarImage src={room?.isGroupChat ? room?.groupImageUrl : otherUser?.profilePictureUrl} />
+                    <AvatarFallback className="text-4xl font-black bg-muted text-primary">{room?.name?.[0] || otherUser?.username?.[0] || '?'}</AvatarFallback>
                   </Avatar>
                   <div className="text-center space-y-1">
-                     <h2 className="text-2xl font-black uppercase italic tracking-tighter">{room?.isGroupChat ? room.name : (otherUser?.username || "Friend")}</h2>
+                     <h2 className="text-2xl font-black uppercase italic tracking-tighter">{room?.isGroupChat ? room?.name : (otherUser?.username || "Friend")}</h2>
                      {room?.isGroupChat ? (
                        <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Created {room?.createdAt?.toDate ? format(room.createdAt.toDate(), 'MMM yyyy') : ''}</p>
                      ) : (
@@ -750,18 +756,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <h4 className="text-[10px] font-black uppercase tracking-custom text-muted-foreground ml-2">Privacy Settings</h4>
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-[2rem] border border-border/50">
-                    <div className="flex items-center gap-4">
-                      <Clock className="h-5 w-5 text-primary" />
-                      <span className="text-xs font-black uppercase tracking-widest">Vanish Mode</span>
-                    </div>
-                    <Switch checked={room?.vanishMode || false} onCheckedChange={(v) => roomRef && updateDocumentNonBlocking(roomRef, { vanishMode: v })} />
-                  </div>
-                </div>
-
-                <div className="pt-8 border-t border-border/50 space-y-4">
+                <div className="pt-8 border-t border-border/50 space-y-4 pb-20">
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" className="w-full h-14 rounded-[2rem] font-black uppercase tracking-widest border-border hover:bg-muted transition-all">
@@ -805,11 +800,6 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-
-                  <div className="text-center py-4 opacity-30">
-                    <p className="text-[9px] font-black uppercase tracking-custom">kith &copy; 2026</p>
-                    <p className="text-[7px] font-black uppercase tracking-widest text-primary">Made by Himanshu</p>
-                  </div>
                 </div>
               </div>
             </SheetContent>

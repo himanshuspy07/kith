@@ -64,7 +64,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
         )}>
           <Avatar className="h-14 w-14">
             <AvatarImage src={room.displayAvatar || undefined} className="object-cover" />
-            <AvatarFallback className="bg-muted text-muted-foreground text-lg font-bold">{room.displayName?.[0]}</AvatarFallback>
+            <AvatarFallback className="bg-muted text-muted-foreground text-lg font-bold">{room.displayName?.[0] || '?'}</AvatarFallback>
           </Avatar>
         </div>
         {room.isOnline && (
@@ -146,12 +146,12 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     rooms.forEach(room => {
       room.memberIds?.forEach((id: string) => { if (id !== user.uid) ids.add(id); });
     });
-    return Array.from(ids).slice(0, 30);
-  }, [rooms, user?.uid]);
+    return Array.from(ids);
+  }, [JSON.stringify(rooms?.map(r => r.id))]);
 
   const usersQuery = useMemoFirebase(() => {
     if (!db || participantIds.length === 0) return null;
-    return query(collection(db, 'users'), where('id', 'in', participantIds));
+    return query(collection(db, 'users'), where('id', 'in', participantIds.slice(0, 30)));
   }, [db, JSON.stringify(participantIds)]);
   const { data: participantProfiles } = useCollection(usersQuery);
 
@@ -191,7 +191,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0;
       return timeB - timeA;
     });
-  }, [rooms, participantProfiles, user, ticker, mounted]);
+  }, [rooms, participantProfiles, user?.uid, ticker, mounted]);
 
   const filteredConversations = conversationListData.filter(c => 
     c.displayName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -201,7 +201,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
     if (!currentUserData?.lastActiveAt || !mounted) return true;
     const lastActive = currentUserData.lastActiveAt.toDate();
     return (Date.now() - lastActive.getTime()) < 180000;
-  }, [currentUserData, ticker, mounted]);
+  }, [currentUserData?.lastActiveAt, ticker, mounted]);
 
   if (!mounted) return <div className={cn("h-full flex flex-col bg-background max-w-full", className)} />;
 
