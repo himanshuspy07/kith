@@ -60,7 +60,7 @@ export default function UserProfileSync() {
 
     syncProfile();
 
-    // Heartbeat every 1 minute (Updated as requested)
+    // Heartbeat every 30 seconds (Updated for higher precision real-time status)
     heartbeatIntervalRef.current = setInterval(() => {
       if (document.visibilityState === 'visible') {
         updateDocumentNonBlocking(userRef, {
@@ -68,7 +68,7 @@ export default function UserProfileSync() {
           onlineStatus: true
         });
       }
-    }, 1000 * 60);
+    }, 1000 * 30);
 
     // Handle visibility changes aggressively
     const handleVisibilityChange = () => {
