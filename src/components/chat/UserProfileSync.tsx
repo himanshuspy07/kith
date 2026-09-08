@@ -10,6 +10,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 /**
  * Handles initializing and updating the user's Firestore profile.
  * Updates online status and last active timestamp.
+ * Also ensures the "Saved Messages" room exists for the user.
  */
 export default function UserProfileSync() {
   const { user } = useUser();
@@ -22,8 +23,11 @@ export default function UserProfileSync() {
     syncInitiatedRef.current = true;
 
     const userRef = doc(db, 'users', user.uid);
+    const savedMessagesRoomId = `saved_${user.uid}`;
+    const savedMessagesRef = doc(db, 'chatRooms', savedMessagesRoomId);
     
     const syncProfile = async () => {
+      // 1. Sync User Profile
       getDoc(userRef)
         .then((docSnap) => {
           if (!docSnap.exists()) {
@@ -38,6 +42,7 @@ export default function UserProfileSync() {
               bio: '',
               onlineStatus: true,
               hasSeenTutorial: false,
+              blockedUserIds: [],
               lastActiveAt: serverTimestamp(),
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
@@ -56,11 +61,30 @@ export default function UserProfileSync() {
             operation: 'get',
           }));
         });
+
+      // 2. Ensure "Saved Messages" exists
+      getDoc(savedMessagesRef).then((snap) => {
+        if (!snap.exists()) {
+          setDocumentNonBlocking(savedMessagesRef, {
+            id: savedMessagesRoomId,
+            name: "Saved Messages",
+            nameLowercase: "saved messages",
+            isGroupChat: false,
+            isSavedMessages: true,
+            memberIds: [user.uid],
+            members: { [user.uid]: true },
+            createdBy: user.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            lastMessageText: 'Your personal space for notes.',
+          }, { merge: true });
+        }
+      });
     };
 
     syncProfile();
 
-    // Heartbeat every 30 seconds (Updated for higher precision real-time status)
+    // Heartbeat every 30 seconds
     heartbeatIntervalRef.current = setInterval(() => {
       if (document.visibilityState === 'visible') {
         updateDocumentNonBlocking(userRef, {
@@ -70,7 +94,6 @@ export default function UserProfileSync() {
       }
     }, 1000 * 30);
 
-    // Handle visibility changes aggressively
     const handleVisibilityChange = () => {
       const isVisible = document.visibilityState === 'visible';
       updateDocumentNonBlocking(userRef, {
@@ -87,7 +110,6 @@ export default function UserProfileSync() {
     return () => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      // Try to mark offline on unmount
       updateDoc(userRef, {
         onlineStatus: false,
         lastActiveAt: serverTimestamp()

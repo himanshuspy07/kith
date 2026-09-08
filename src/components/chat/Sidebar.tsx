@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { Search, Plus, MessageSquare, Loader2, UserPlus, Camera, Pin, ShieldAlert } from 'lucide-react';
+import { Search, Plus, MessageSquare, Loader2, UserPlus, Camera, Pin, ShieldAlert, Bookmark } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ interface SidebarProps {
   className?: string;
 }
 
-const ConversationItem = memo(({ room, isSelected, onClick, currentUserId, isBlocked }: any) => {
+const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any) => {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -53,8 +53,7 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId, isBlo
       onClick={() => onClick(room.id)}
       className={cn(
         "p-4 flex items-center gap-4 cursor-pointer transition-all active:bg-muted/50 border-b border-border/40 min-w-0",
-        isSelected ? "bg-muted shadow-inner" : "hover:bg-muted/20",
-        isBlocked && "opacity-60"
+        isSelected ? "bg-muted shadow-inner" : "hover:bg-muted/20"
       )}
     >
       <div className="relative shrink-0 p-0.5">
@@ -64,7 +63,9 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId, isBlo
         )}>
           <Avatar className="h-14 w-14">
             <AvatarImage src={room.displayAvatar || undefined} className="object-cover" />
-            <AvatarFallback className="bg-muted text-muted-foreground text-lg font-bold">{room.displayName?.[0] || '?'}</AvatarFallback>
+            <AvatarFallback className={cn("bg-muted text-lg font-bold", room.isSavedMessages ? "text-primary" : "text-muted-foreground")}>
+              {room.isSavedMessages ? <Bookmark className="h-6 w-6" /> : (room.displayName?.[0] || '?')}
+            </AvatarFallback>
           </Avatar>
         </div>
         {room.isOnline && (
@@ -76,13 +77,9 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId, isBlo
         <div className="flex justify-between items-baseline gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             {room.isPinned && <Pin className="h-3 w-3 text-primary fill-current shrink-0" />}
-            <h3 className={cn(
-              "text-[17px] font-bold truncate uppercase tracking-tighter",
-              isBlocked ? "text-muted-foreground line-through" : "text-foreground"
-            )}>
+            <h3 className="text-[17px] font-bold truncate uppercase tracking-tighter text-foreground">
               {room.displayName}
             </h3>
-            {isBlocked && <ShieldAlert className="h-3 w-3 text-destructive shrink-0" />}
           </div>
           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter shrink-0">
             {timeDisplay}
@@ -98,10 +95,10 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId, isBlo
               "text-[14px] truncate flex-1",
               room.isUnread ? "text-secondary font-black" : "text-muted-foreground font-medium"
             )}>
-              {isBlocked ? 'Blocked User' : (room.lastMessageText || 'New Friend')}
+              {room.lastMessageText || 'New Friend'}
             </p>
           )}
-          {room.isUnread && !isBlocked && (
+          {room.isUnread && (
             <div className="flex items-center justify-center bg-secondary min-w-[1.2rem] h-5 px-1 rounded-full text-[10px] font-black text-secondary-foreground shadow-sm">
               NEW
             </div>
@@ -109,11 +106,13 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId, isBlo
         </div>
       </div>
 
-      <div className="flex items-center gap-3 shrink-0">
-        <button className="h-10 w-10 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
-          <Camera className="h-5 w-5" />
-        </button>
-      </div>
+      {!room.isSavedMessages && (
+        <div className="flex items-center gap-3 shrink-0">
+          <button className="h-10 w-10 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
+            <Camera className="h-5 w-5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 });
@@ -162,13 +161,17 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
   const conversationListData = useMemo(() => {
     if (!rooms || !user || !mounted) return [];
     const now = new Date();
+    const blockedIds = currentUserData?.blockedUserIds || [];
+
     return rooms.map(room => {
       let displayName = room.name || 'Friend';
       let displayAvatar = room.isGroupChat ? room.groupImageUrl : null;
       let isOnline = false;
-      let isBlocked = false;
+      let isBlockedByMe = false;
 
-      if (!room.isGroupChat && participantProfiles) {
+      if (room.isSavedMessages) {
+        displayName = "Saved Messages";
+      } else if (!room.isGroupChat && participantProfiles) {
         const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
         const otherUserProfile = participantProfiles.find(u => u.id === otherUserId);
         if (otherUserProfile) {
@@ -176,7 +179,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           displayAvatar = otherUserProfile.profilePictureUrl;
           const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
           isOnline = otherUserProfile.onlineStatus === true && (now.getTime() - lastActive.getTime()) < 180000;
-          isBlocked = currentUserData?.blockedUserIds?.includes(otherUserProfile.id) || false;
+          isBlockedByMe = blockedIds.includes(otherUserProfile.id);
         }
       }
 
@@ -190,8 +193,10 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
       const isPinned = room.pinned?.[user.uid] || false;
 
-      return { ...room, displayName, displayAvatar, isOnline, isUnread, isPinned, isBlocked };
-    }).sort((a, b) => {
+      return { ...room, displayName, displayAvatar, isOnline, isUnread, isPinned, isBlockedByMe };
+    })
+    .filter(room => !room.isBlockedByMe) // Remove blocked users from sidebar
+    .sort((a, b) => {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : 0;
       const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0;
@@ -228,7 +233,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           <div className="relative group flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input 
-              placeholder="Search Friends" 
+              placeholder="Search Conversations" 
               className="bg-muted/80 border-none h-10 rounded-full pl-10 w-full font-bold focus-visible:ring-2 ring-primary/30 text-xs" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -252,7 +257,6 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                 isSelected={selectedConversationId === room.id}
                 onClick={onSelectConversation}
                 currentUserId={user?.uid}
-                isBlocked={room.isBlocked}
               />
             ))}
           </div>
@@ -261,8 +265,8 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
             <div className="h-20 w-20 bg-muted/30 rounded-[2rem] flex items-center justify-center mb-6">
               <UserPlus className="h-10 w-10 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-bold uppercase tracking-tighter italic">No Friends Yet</h3>
-            <p className="text-muted-foreground mt-2 font-medium text-sm max-w-[200px]">Start a conversation to see your friends here.</p>
+            <h3 className="text-xl font-bold uppercase tracking-tighter italic">No Conversations</h3>
+            <p className="text-muted-foreground mt-2 font-medium text-sm max-w-[200px]">Start a conversation to see it here.</p>
           </div>
         )}
       </div>

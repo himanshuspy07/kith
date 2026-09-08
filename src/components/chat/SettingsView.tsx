@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { doc, serverTimestamp } from 'firebase/firestore';
+import { doc, serverTimestamp, query, collection, where, arrayRemove } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Bell, 
   Shield, 
@@ -17,12 +18,13 @@ import {
   ChevronRight, 
   Moon, 
   Smartphone,
-  Info,
   Lock,
   Key,
-  Volume2,
-  Eye,
-  Trash2
+  Trash2,
+  UserX,
+  Check,
+  X,
+  Loader2
 } from 'lucide-react';
 import { 
   AlertDialog,
@@ -55,6 +57,16 @@ export default function SettingsView() {
   const [notifications, setNotifications] = useState(true);
   const [isPinVisible, setIsPinVisible] = useState(false);
   const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [isConfirmingPin, setIsConfirmingPin] = useState(false);
+
+  // Blocked users management
+  const blockedIds = useMemo(() => userData?.blockedUserIds || [], [userData?.blockedUserIds]);
+  const blockedQuery = useMemoFirebase(() => {
+    if (!db || blockedIds.length === 0) return null;
+    return query(collection(db, 'users'), where('id', 'in', blockedIds.slice(0, 30)));
+  }, [db, JSON.stringify(blockedIds)]);
+  const { data: blockedUsers, isLoading: isBlockedLoading } = useCollection(blockedQuery);
 
   useEffect(() => {
     if (userData) {
@@ -79,12 +91,10 @@ export default function SettingsView() {
     if (!userRef) return;
     
     if (!enabled) {
-      // Turning off is immediate
       updateDocumentNonBlocking(userRef, { appLockEnabled: false });
       setIsPinVisible(false);
       toast({ title: "App Lock Disabled" });
     } else {
-      // Turning on just shows the input field; we don't enable in DB until PIN is 4 digits
       setIsPinVisible(true);
       if (!userData?.appLockPin || userData.appLockPin.length < 4) {
         toast({ title: "Please set a 4-digit PIN to enable lock" });
@@ -95,43 +105,47 @@ export default function SettingsView() {
     }
   };
 
-  const handleUpdatePin = (newPin: string) => {
-    const cleanPin = newPin.replace(/\D/g, '').slice(0, 4);
-    setPin(cleanPin);
-    if (cleanPin.length === 4 && userRef) {
+  const handleSavePin = () => {
+    if (pin.length !== 4) {
+      toast({ variant: "destructive", title: "Invalid PIN", description: "PIN must be 4 digits." });
+      return;
+    }
+
+    if (pin !== confirmPin) {
+      toast({ variant: "destructive", title: "PIN Mismatch", description: "The PINs you entered do not match." });
+      return;
+    }
+
+    if (userRef) {
       updateDocumentNonBlocking(userRef, { 
-        appLockPin: cleanPin,
-        appLockEnabled: true // Auto-enable once a valid PIN is set
+        appLockPin: pin,
+        appLockEnabled: true
       });
-      toast({ title: "PIN Updated & Lock Enabled" });
+      setIsConfirmingPin(false);
+      setConfirmPin('');
+      toast({ title: "Security Updated", description: "Your PIN is now active." });
     }
   };
 
-  const SettingsItem = ({ icon: Icon, label, color = "text-muted-foreground", action }: any) => (
-    <div 
-      onClick={action}
-      className="flex items-center justify-between p-4 bg-card rounded-2xl hover:bg-muted/50 transition-colors cursor-pointer border border-border/50 group"
-    >
-      <div className="flex items-center gap-3">
-        <div className={cn("h-10 w-10 rounded-xl bg-muted flex items-center justify-center group-hover:scale-110 transition-transform", color)}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <span className="text-sm font-black uppercase tracking-widest">{label}</span>
-      </div>
-      <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
-    </div>
-  );
+  const handleUnblock = (targetId: string) => {
+    if (userRef) {
+      updateDocumentNonBlocking(userRef, {
+        blockedUserIds: arrayRemove(targetId)
+      });
+      toast({ title: "User Unblocked" });
+    }
+  };
 
   return (
     <div className="h-full flex flex-col bg-background animate-in-fade overflow-y-auto scrollbar-hide">
       <header className="p-6 border-b border-border/50 sticky top-0 bg-background/80 backdrop-blur-xl z-10">
-        <h2 className="text-2xl font-black tracking-tighter uppercase italic">App Settings</h2>
-        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1 opacity-50">Stable Build v2.5.0</p>
+        <h2 className="text-2xl font-black tracking-tighter uppercase italic">Settings</h2>
+        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1 opacity-50">Privacy & Personalization</p>
       </header>
 
       <div className="flex-1 p-6 space-y-10 pb-32">
         <section className="space-y-4">
-          <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Appearance</h4>
+          <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Display</h4>
           <div className="grid grid-cols-3 gap-2">
             {(['light', 'dark', 'system'] as const).map(m => (
               <button 
@@ -139,7 +153,7 @@ export default function SettingsView() {
                 onClick={() => handleThemeChange(m)}
                 className={cn(
                   "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all",
-                  theme === m ? "border-primary bg-primary/5 scale-95" : "border-border/50 bg-card hover:border-primary/50"
+                  theme === m ? "border-primary bg-primary/5 scale-95 shadow-lg" : "border-border/50 bg-card hover:border-primary/30"
                 )}
               >
                 {m === 'light' ? <Palette className="h-5 w-5" /> : m === 'dark' ? <Moon className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
@@ -159,47 +173,96 @@ export default function SettingsView() {
                 </div>
                 <div>
                   <p className="text-sm font-black uppercase tracking-widest">App Lock</p>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">Require 4-digit PIN</p>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">Secure with 4-digit PIN</p>
                 </div>
               </div>
               <Switch checked={userData?.appLockEnabled || false} onCheckedChange={handleToggleLock} />
             </div>
 
             {isPinVisible && (
-              <div className="p-4 bg-primary/5 rounded-2xl border border-primary/20 space-y-4 animate-in slide-in-from-top-2">
-                <div className="flex items-center gap-2">
-                  <Key className="h-4 w-4 text-primary" />
-                  <Label className="text-[10px] font-black uppercase tracking-widest">Set 4-Digit PIN</Label>
+              <div className="p-6 bg-primary/5 rounded-[2.5rem] border border-primary/20 space-y-6 animate-in slide-in-from-top-2">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Key className="h-4 w-4 text-primary" />
+                    <Label className="text-[10px] font-black uppercase tracking-widest">{isConfirmingPin ? "Confirm Your PIN" : "Enter New PIN"}</Label>
+                  </div>
+                  
+                  {!isConfirmingPin ? (
+                    <div className="space-y-4">
+                      <Input 
+                        type="password" maxLength={4} value={pin}
+                        onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        placeholder="••••"
+                        className="h-14 bg-background border-none text-center text-2xl tracking-[1.5em] rounded-xl font-black"
+                      />
+                      <Button 
+                        onClick={() => pin.length === 4 && setIsConfirmingPin(true)} 
+                        disabled={pin.length !== 4}
+                        className="w-full h-12 rounded-xl bg-primary text-white font-bold uppercase tracking-widest"
+                      >
+                        Next Step
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 animate-in slide-in-from-right-4">
+                      <Input 
+                        type="password" maxLength={4} value={confirmPin}
+                        onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        placeholder="••••"
+                        className="h-14 bg-background border-none text-center text-2xl tracking-[1.5em] rounded-xl font-black ring-2 ring-primary/20"
+                      />
+                      <div className="flex gap-2">
+                         <Button variant="ghost" onClick={() => { setIsConfirmingPin(false); setConfirmPin(''); }} className="flex-1 h-12 rounded-xl font-bold uppercase tracking-widest">Back</Button>
+                         <Button onClick={handleSavePin} className="flex-[2] h-12 rounded-xl bg-primary text-white font-black uppercase tracking-widest shadow-lg shadow-primary/20">Confirm PIN</Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <Input 
-                  type="password" 
-                  maxLength={4} 
-                  value={pin}
-                  onChange={(e) => handleUpdatePin(e.target.value)}
-                  placeholder="••••"
-                  className="h-14 bg-background border-none text-center text-2xl tracking-[1.5em] rounded-xl font-black"
-                />
-                <p className="text-[9px] text-center text-primary/60 font-bold uppercase">Lock activates after setting a 4-digit PIN</p>
               </div>
             )}
-            
-            <SettingsItem icon={Eye} label="Vanish Mode Defaults" color="text-accent" />
+
+            <div className="p-4 bg-card rounded-2xl border border-border/50">
+               <div className="flex items-center justify-between mb-4">
+                 <div className="flex items-center gap-3">
+                   <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center text-destructive">
+                     <UserX className="h-5 w-5" />
+                   </div>
+                   <span className="text-sm font-black uppercase tracking-widest">Blocked Users</span>
+                 </div>
+                 <span className="text-[10px] font-bold bg-muted px-2 py-0.5 rounded-full">{blockedIds.length}</span>
+               </div>
+               
+               <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-hide">
+                 {isBlockedLoading ? (
+                   <Loader2 className="h-4 w-4 animate-spin mx-auto opacity-20" />
+                 ) : blockedUsers && blockedUsers.length > 0 ? (
+                   blockedUsers.map(u => (
+                     <div key={u.id} className="flex items-center justify-between p-2 rounded-xl bg-muted/30">
+                       <div className="flex items-center gap-2">
+                         <Avatar className="h-7 w-7"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
+                         <span className="text-xs font-bold">{u.username}</span>
+                       </div>
+                       <Button variant="ghost" size="sm" onClick={() => handleUnblock(u.id)} className="h-7 text-[9px] font-black uppercase text-primary tracking-widest hover:bg-primary/10">Unblock</Button>
+                     </div>
+                   ))
+                 ) : (
+                   <p className="text-[9px] text-center text-muted-foreground uppercase font-bold tracking-widest py-4 opacity-50">No users blocked</p>
+                 )}
+               </div>
+            </div>
           </div>
         </section>
 
         <section className="space-y-4">
           <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Notifications</h4>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 bg-card rounded-2xl border border-border/50">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center text-secondary">
-                  <Bell className="h-5 w-5" />
-                </div>
-                <span className="text-sm font-black uppercase tracking-widest">Push Alerts</span>
+          <div className="flex items-center justify-between p-4 bg-card rounded-2xl border border-border/50">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center text-secondary">
+                <Bell className="h-5 w-5" />
               </div>
-              <Switch checked={notifications} onCheckedChange={setNotifications} />
+              <span className="text-sm font-black uppercase tracking-widest">Push Alerts</span>
             </div>
-            <SettingsItem icon={Volume2} label="Notification Sounds" color="text-purple-500" />
+            <Switch checked={notifications} onCheckedChange={setNotifications} />
           </div>
         </section>
 
