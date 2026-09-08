@@ -31,7 +31,8 @@ import {
   ShieldAlert,
   Crown,
   Search,
-  Loader2
+  Loader2,
+  Plus
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -105,7 +106,7 @@ const MessageContent = ({ content, hasWallpaper }: { content: string, hasWallpap
   const parts = content.split(URL_REGEX);
   
   return (
-    <p className={cn(
+    <div className={cn(
       "text-[16px] font-medium leading-normal break-words py-1", 
       hasWallpaper ? "text-white drop-shadow-md" : "text-foreground"
     )}>
@@ -125,7 +126,7 @@ const MessageContent = ({ content, hasWallpaper }: { content: string, hasWallpap
         }
         return part;
       })}
-    </p>
+    </div>
   );
 };
 
@@ -970,7 +971,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                     >
                       <Upload className="h-3 w-3" /> Upload
                     </button>
-                    <input type="file" id="custom-wallpaper" border-none ref={wallpaperInputRef} className="hidden" accept="image/*" onChange={handleCustomWallpaperUpload} />
+                    <input type="file" id="custom-wallpaper" ref={wallpaperInputRef} className="hidden" accept="image/*" onChange={handleCustomWallpaperUpload} />
                   </div>
                   <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
                     <button 
