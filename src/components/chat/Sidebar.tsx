@@ -1,8 +1,7 @@
-
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { Search, Plus, MessageSquare, Loader2, UserPlus, Camera, Pin } from 'lucide-react';
+import { Search, Plus, MessageSquare, Loader2, UserPlus, Camera, Pin, ShieldAlert } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,7 +17,7 @@ interface SidebarProps {
   className?: string;
 }
 
-const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any) => {
+const ConversationItem = memo(({ room, isSelected, onClick, currentUserId, isBlocked }: any) => {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -54,7 +53,8 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
       onClick={() => onClick(room.id)}
       className={cn(
         "p-4 flex items-center gap-4 cursor-pointer transition-all active:bg-muted/50 border-b border-border/40 min-w-0",
-        isSelected ? "bg-muted shadow-inner" : "hover:bg-muted/20"
+        isSelected ? "bg-muted shadow-inner" : "hover:bg-muted/20",
+        isBlocked && "opacity-60"
       )}
     >
       <div className="relative shrink-0 p-0.5">
@@ -76,9 +76,13 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
         <div className="flex justify-between items-baseline gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             {room.isPinned && <Pin className="h-3 w-3 text-primary fill-current shrink-0" />}
-            <h3 className="text-[17px] font-bold text-foreground truncate uppercase tracking-tighter">
+            <h3 className={cn(
+              "text-[17px] font-bold truncate uppercase tracking-tighter",
+              isBlocked ? "text-muted-foreground line-through" : "text-foreground"
+            )}>
               {room.displayName}
             </h3>
+            {isBlocked && <ShieldAlert className="h-3 w-3 text-destructive shrink-0" />}
           </div>
           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter shrink-0">
             {timeDisplay}
@@ -94,10 +98,10 @@ const ConversationItem = memo(({ room, isSelected, onClick, currentUserId }: any
               "text-[14px] truncate flex-1",
               room.isUnread ? "text-secondary font-black" : "text-muted-foreground font-medium"
             )}>
-              {room.lastMessageText || 'New Friend'}
+              {isBlocked ? 'Blocked User' : (room.lastMessageText || 'New Friend')}
             </p>
           )}
-          {room.isUnread && (
+          {room.isUnread && !isBlocked && (
             <div className="flex items-center justify-center bg-secondary min-w-[1.2rem] h-5 px-1 rounded-full text-[10px] font-black text-secondary-foreground shadow-sm">
               NEW
             </div>
@@ -162,6 +166,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
       let displayName = room.name || 'Friend';
       let displayAvatar = room.isGroupChat ? room.groupImageUrl : null;
       let isOnline = false;
+      let isBlocked = false;
 
       if (!room.isGroupChat && participantProfiles) {
         const otherUserId = room.memberIds?.find((id: string) => id !== user.uid);
@@ -171,6 +176,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
           displayAvatar = otherUserProfile.profilePictureUrl;
           const lastActive = otherUserProfile.lastActiveAt?.toDate?.() || new Date(0);
           isOnline = otherUserProfile.onlineStatus === true && (now.getTime() - lastActive.getTime()) < 180000;
+          isBlocked = currentUserData?.blockedUserIds?.includes(otherUserProfile.id) || false;
         }
       }
 
@@ -184,14 +190,14 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
       const isPinned = room.pinned?.[user.uid] || false;
 
-      return { ...room, displayName, displayAvatar, isOnline, isUnread, isPinned };
+      return { ...room, displayName, displayAvatar, isOnline, isUnread, isPinned, isBlocked };
     }).sort((a, b) => {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : 0;
       const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0;
       return timeB - timeA;
     });
-  }, [rooms, participantProfiles, user?.uid, ticker, mounted]);
+  }, [rooms, participantProfiles, user?.uid, ticker, mounted, currentUserData?.blockedUserIds]);
 
   const filteredConversations = conversationListData.filter(c => 
     c.displayName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -246,6 +252,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
                 isSelected={selectedConversationId === room.id}
                 onClick={onSelectConversation}
                 currentUserId={user?.uid}
+                isBlocked={room.isBlocked}
               />
             ))}
           </div>

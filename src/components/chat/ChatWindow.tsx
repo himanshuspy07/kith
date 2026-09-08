@@ -24,11 +24,19 @@ import {
   PinOff,
   ArrowDown,
   Download,
-  ExternalLink
+  ExternalLink,
+  UserMinus,
+  UserPlus,
+  LogOut,
+  ShieldAlert,
+  Crown,
+  Search,
+  Loader2
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { 
   Sheet, 
   SheetContent, 
@@ -73,6 +81,7 @@ import {
   limitToLast,
   deleteField,
   arrayUnion,
+  arrayRemove,
   getDocs,
   writeBatch
 } from 'firebase/firestore';
@@ -85,7 +94,6 @@ import { useToast } from '@/hooks/use-toast';
 import wallpaperData from '@/app/lib/placeholder-images.json';
 
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
-
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
 interface ChatWindowProps {
@@ -284,14 +292,14 @@ const MessageItem = memo(({
             )}
           </div>
 
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 opacity-0 group-hover:opacity-100 flex items-center gap-1.5 transition-all z-20">
+          <div className="absolute -right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all z-20 pointer-events-none group-hover:pointer-events-auto">
              <Popover>
               <PopoverTrigger asChild>
-                <button className="h-7 w-7 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-primary transition-colors border border-border/50">
+                <button className="h-7 w-7 rounded-full bg-card shadow-xl flex items-center justify-center hover:text-primary transition-colors border border-border/50 shrink-0">
                   <SmilePlus className="h-3.5 w-3.5" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="top" align="center" className="w-fit p-1.5 flex gap-1 rounded-full bg-card/95 backdrop-blur shadow-2xl border-border/50">
+              <PopoverContent side="top" align="center" className="w-fit p-1 flex gap-1 rounded-full bg-card/95 backdrop-blur shadow-2xl border-border/50">
                 {REACTION_EMOJIS.map(emoji => (
                   <button
                     key={emoji}
@@ -307,18 +315,18 @@ const MessageItem = memo(({
               </PopoverContent>
             </Popover>
 
-            <button onClick={() => onAction('reply', msg)} className="h-7 w-7 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-primary transition-colors border border-border/50">
+            <button onClick={() => onAction('reply', msg)} className="h-7 w-7 rounded-full bg-card shadow-xl flex items-center justify-center hover:text-primary transition-colors border border-border/50 shrink-0">
               <Reply className="h-3.5 w-3.5" />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="h-7 w-7 rounded-full bg-card shadow-lg flex items-center justify-center hover:text-foreground transition-colors border border-border/50">
+                <button className="h-7 w-7 rounded-full bg-card shadow-xl flex items-center justify-center hover:text-foreground transition-colors border border-border/50 shrink-0">
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-xl border-border/50">
-                {isMe && !isViewOnce && <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2 font-bold uppercase text-[10px] tracking-widest"><Edit2 className="h-3 w-3" /> Edit</DropdownMenuItem>}
-                <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 font-bold uppercase text-[10px] tracking-widest text-destructive"><Trash2 className="h-3 w-3" /> Delete</DropdownMenuItem>
+              <DropdownMenuContent align="end" className="rounded-xl border-border/50 min-w-[100px]">
+                {isMe && !isViewOnce && <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2 font-bold uppercase text-[9px] tracking-widest"><Edit2 className="h-3 w-3" /> Edit</DropdownMenuItem>}
+                <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 font-bold uppercase text-[9px] tracking-widest text-destructive"><Trash2 className="h-3 w-3" /> Delete</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -359,12 +367,16 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isBlurred, setIsBlurred] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [isEditingGroupName, setIsEditingGroupName] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const groupImageInputRef = useRef<HTMLInputElement>(null);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
   const lastMessageIdRef = useRef<string | null>(null);
 
@@ -404,6 +416,24 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     return query(collection(db, 'users'), where('id', 'in', participantIds.slice(0, 30)));
   }, [db, participantIds ? JSON.stringify(participantIds) : '']);
   const { data: participants } = useCollection(participantsQuery);
+
+  const userSearchQuery = useMemoFirebase(() => {
+    if (!db || !memberSearchTerm || memberSearchTerm.length < 2) return null;
+    const lower = memberSearchTerm.toLowerCase();
+    return query(
+      collection(db, 'users'),
+      where('usernameLowercase', '>=', lower),
+      where('usernameLowercase', '<=', lower + '\uf8ff')
+    );
+  }, [db, memberSearchTerm]);
+  const { data: userSearchResults, isLoading: isSearchingUsers } = useCollection(userSearchQuery);
+
+  const isAdmin = room?.isGroupChat && room?.createdBy === user?.uid;
+  const isBlocked = useMemo(() => {
+    if (!room || room.isGroupChat || !currentUserData?.blockedUserIds || !participants) return false;
+    const otherUser = participants.find(p => p.id !== user?.uid);
+    return otherUser && currentUserData.blockedUserIds.includes(otherUser.id);
+  }, [room, currentUserData?.blockedUserIds, participants, user?.uid]);
 
   useEffect(() => {
     if (!conversationId || !user || !db) return;
@@ -532,7 +562,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const handleSend = (type: 'text' | 'image' | 'view-once' | 'screenshot-attempt' = 'text', content?: string) => {
     const finalContent = content || inputValue.trim();
     if (!finalContent && type !== 'screenshot-attempt') return;
-    if (!conversationId || !user) return;
+    if (!conversationId || !user || isBlocked) return;
 
     if (editingMessage && type !== 'screenshot-attempt') {
       const msgRef = doc(db, 'chatRooms', conversationId, 'messages', editingMessage.id);
@@ -678,6 +708,66 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     });
   }, [room?.typing, user?.uid]);
 
+  const handleGroupAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && roomRef) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        updateDocumentNonBlocking(roomRef, { groupImageUrl: reader.result as string });
+        toast({ title: "Group photo updated" });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const updateGroupName = () => {
+    if (!roomRef || !newGroupName.trim()) return;
+    updateDocumentNonBlocking(roomRef, { 
+      name: newGroupName.trim(),
+      nameLowercase: newGroupName.trim().toLowerCase()
+    });
+    setIsEditingGroupName(false);
+    toast({ title: "Group name updated" });
+  };
+
+  const removeMember = (memberId: string) => {
+    if (!roomRef) return;
+    updateDocumentNonBlocking(roomRef, {
+      memberIds: arrayRemove(memberId),
+      [`members.${memberId}`]: deleteField()
+    });
+    toast({ title: "Member removed" });
+  };
+
+  const addMember = (targetUser: any) => {
+    if (!roomRef) return;
+    updateDocumentNonBlocking(roomRef, {
+      memberIds: arrayUnion(targetUser.id),
+      [`members.${targetUser.id}`]: true
+    });
+    setMemberSearchTerm('');
+    toast({ title: "Member added" });
+  };
+
+  const leaveGroup = () => {
+    if (!roomRef || !user) return;
+    updateDocumentNonBlocking(roomRef, {
+      memberIds: arrayRemove(user.uid),
+      [`members.${user.uid}`]: deleteField()
+    });
+    onBack?.();
+    toast({ title: "Left the group" });
+  };
+
+  const toggleBlockUser = () => {
+    if (!currentUserRef || !otherUser) return;
+    const alreadyBlocked = currentUserData?.blockedUserIds?.includes(otherUser.id);
+    updateDocumentNonBlocking(currentUserRef, {
+      blockedUserIds: alreadyBlocked ? arrayRemove(otherUser.id) : arrayUnion(otherUser.id)
+    });
+    toast({ title: alreadyBlocked ? "User Unblocked" : "User Blocked" });
+  };
+
   const wallpapers = wallpaperData.placeholderImages.filter(img => img.id.startsWith('wallpaper-'));
 
   const handleDownload = (url: string) => {
@@ -731,8 +821,8 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
               isOtherUserOnline ? "ring-accent" : "ring-transparent"
             )}>
               <Avatar className="h-10 w-10">
-                <AvatarImage src={otherUser?.profilePictureUrl} />
-                <AvatarFallback className="font-bold">{otherUser?.username?.[0] || '?'}</AvatarFallback>
+                <AvatarImage src={room?.isGroupChat ? room?.groupImageUrl : otherUser?.profilePictureUrl} className="object-cover" />
+                <AvatarFallback className="font-bold">{room?.name?.[0] || otherUser?.username?.[0] || '?'}</AvatarFallback>
               </Avatar>
             </div>
             <div className="flex flex-col min-w-0">
@@ -754,31 +844,123 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 <Info className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent className="sm:max-w-md bg-card/98 backdrop-blur-2xl border-l border-border/50 shadow-2xl p-0">
-              <SheetHeader className="p-10 border-b border-border/50 bg-muted/20">
+            <SheetContent className="sm:max-w-md bg-card/98 backdrop-blur-2xl border-l border-border/50 shadow-2xl p-0 flex flex-col">
+              <SheetHeader className="p-10 border-b border-border/50 bg-muted/20 shrink-0">
                 <SheetTitle className="sr-only">Conversation Info</SheetTitle>
                 <div className="flex flex-col items-center gap-6">
-                  <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-4 ring-primary/20">
-                    <AvatarImage src={room?.isGroupChat ? room?.groupImageUrl : otherUser?.profilePictureUrl} />
-                    <AvatarFallback className="text-4xl font-black bg-muted text-primary">{room?.name?.[0] || otherUser?.username?.[0] || '?'}</AvatarFallback>
-                  </Avatar>
-                  <div className="text-center space-y-1">
-                     <h2 className="text-2xl font-black uppercase italic tracking-tighter">{room?.isGroupChat ? room?.name : (otherUser?.username || "Friend")}</h2>
+                  <div className="relative group">
+                    <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-4 ring-primary/20">
+                      <AvatarImage src={room?.isGroupChat ? room?.groupImageUrl : otherUser?.profilePictureUrl} className="object-cover" />
+                      <AvatarFallback className="text-4xl font-black bg-muted text-primary">{room?.name?.[0] || otherUser?.username?.[0] || '?'}</AvatarFallback>
+                    </Avatar>
+                    {isAdmin && (
+                      <>
+                        <button onClick={() => groupImageInputRef.current?.click()} className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                          <Camera className="h-8 w-8 text-white" />
+                        </button>
+                        <input type="file" ref={groupImageInputRef} className="hidden" accept="image/*" onChange={handleGroupAvatarChange} />
+                      </>
+                    )}
+                  </div>
+                  <div className="text-center space-y-1 w-full max-w-xs">
+                     {isEditingGroupName ? (
+                       <div className="flex items-center gap-2">
+                         <Input 
+                           value={newGroupName} 
+                           onChange={(e) => setNewGroupName(e.target.value)}
+                           className="bg-background border-primary/20 h-10 rounded-xl"
+                           autoFocus
+                         />
+                         <Button size="icon" className="shrink-0 h-10 w-10 rounded-xl" onClick={updateGroupName}><Check className="h-4 w-4" /></Button>
+                         <Button size="icon" variant="ghost" className="shrink-0 h-10 w-10 rounded-xl" onClick={() => setIsEditingGroupName(false)}><X className="h-4 w-4" /></Button>
+                       </div>
+                     ) : (
+                       <div className="flex items-center justify-center gap-2">
+                         <h2 className="text-2xl font-black uppercase italic tracking-tighter truncate">{room?.isGroupChat ? room?.name : (otherUser?.username || "Friend")}</h2>
+                         {isAdmin && <button onClick={() => { setIsEditingGroupName(true); setNewGroupName(room?.name || ''); }} className="text-muted-foreground hover:text-primary"><Edit2 className="h-4 w-4" /></button>}
+                       </div>
+                     )}
+                     
                      {room?.isGroupChat ? (
                        <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Created {room?.createdAt?.toDate ? format(room.createdAt.toDate(), 'MMM yyyy') : ''}</p>
                      ) : (
                        <p className="text-sm font-medium text-muted-foreground line-clamp-2 px-4">{otherUser?.bio || "No bio yet"}</p>
                      )}
                   </div>
-                  <div className="flex gap-4">
-                    <Button variant="outline" size="sm" onClick={togglePinChat} className="rounded-xl gap-2 font-bold uppercase text-[10px] tracking-widest">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button variant="outline" size="sm" onClick={togglePinChat} className="rounded-xl gap-2 font-bold uppercase text-[9px] tracking-widest h-9">
                       {room?.pinned?.[user?.uid] ? <><PinOff className="h-3 w-3" /> Unpin</> : <><Pin className="h-3 w-3" /> Pin Chat</>}
                     </Button>
+                    {!room?.isGroupChat && (
+                      <Button variant="outline" size="sm" onClick={toggleBlockUser} className={cn("rounded-xl gap-2 font-bold uppercase text-[9px] tracking-widest h-9", isBlocked && "text-destructive border-destructive/20")}>
+                        <ShieldAlert className="h-3 w-3" /> {isBlocked ? "Unblock" : "Block User"}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </SheetHeader>
               
-              <div className="p-8 space-y-8 h-full overflow-y-auto scrollbar-hide">
+              <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-hide">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between px-2">
+                    <h4 className="text-[10px] font-black uppercase tracking-custom text-muted-foreground">Participants</h4>
+                    {isAdmin && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-primary hover:opacity-80">
+                            <UserPlus className="h-3 w-3" /> Add
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent side="bottom" align="end" className="w-64 p-3 bg-card rounded-2xl shadow-2xl border-border/50">
+                          <div className="relative mb-3">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input 
+                              placeholder="Search username..." 
+                              value={memberSearchTerm} 
+                              onChange={(e) => setMemberSearchTerm(e.target.value)}
+                              className="pl-8 h-9 text-xs rounded-lg border-none bg-muted"
+                            />
+                          </div>
+                          <div className="max-h-40 overflow-y-auto space-y-1 scrollbar-hide">
+                            {isSearchingUsers ? (
+                              <div className="flex justify-center p-4"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div>
+                            ) : userSearchResults?.filter(u => !room?.memberIds?.includes(u.id))?.map(u => (
+                              <button key={u.id} onClick={() => addMember(u)} className="w-full flex items-center gap-2 p-2 hover:bg-muted rounded-lg transition-colors">
+                                <Avatar className="h-6 w-6"><AvatarImage src={u.profilePictureUrl} /><AvatarFallback>{u.username?.[0]}</AvatarFallback></Avatar>
+                                <span className="text-xs font-bold truncate">{u.username}</span>
+                                <Plus className="h-3 w-3 ml-auto text-primary" />
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {participants?.map(p => (
+                      <div key={p.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <Avatar className="h-8 w-8 shrink-0"><AvatarImage src={p.profilePictureUrl} /><AvatarFallback>{p.username?.[0]}</AvatarFallback></Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold truncate">{p.username}</span>
+                              {p.id === room?.createdBy && (
+                                <span className="bg-primary/10 text-primary text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1"><Crown className="h-2 w-2" /> Admin</span>
+                              )}
+                            </div>
+                            <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-widest">{p.id === user?.uid ? "You" : (p.onlineStatus ? "Online" : "Away")}</span>
+                          </div>
+                        </div>
+                        {isAdmin && p.id !== user?.uid && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive" onClick={() => removeMember(p.id)}>
+                            <UserMinus className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <div className="flex items-center justify-between px-2">
                     <h4 className="text-[10px] font-black uppercase tracking-custom text-muted-foreground">Chat Wallpaper</h4>
@@ -817,6 +999,28 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 </div>
 
                 <div className="pt-8 border-t border-border/50 space-y-4 pb-20">
+                  {room?.isGroupChat && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" className="w-full h-14 rounded-[2rem] font-black uppercase tracking-widest border-border hover:bg-muted transition-all">
+                          <LogOut className="h-4 w-4 mr-2" /> Leave Group
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Leave Group?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-muted-foreground font-medium">
+                            You will no longer receive messages or be able to participate in this conversation.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="gap-2">
+                          <AlertDialogCancel className="rounded-xl font-bold">Cancel</AlertDialogCancel>
+                          <AlertDialogAction className="rounded-xl bg-destructive font-black uppercase tracking-widest" onClick={leaveGroup}>Leave</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" className="w-full h-14 rounded-[2rem] font-black uppercase tracking-widest border-border hover:bg-muted transition-all">
@@ -840,14 +1044,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" className="w-full h-16 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-destructive/20 border border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-white transition-all">
-                        <Trash2 className="h-5 w-5 mr-2" /> Delete Chat
+                        <Trash2 className="h-5 w-5 mr-2" /> {isAdmin ? "Delete Group" : "Delete Chat"}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl">
                       <AlertDialogHeader>
-                        <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Delete Chat?</AlertDialogTitle>
+                        <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Confirm Deletion?</AlertDialogTitle>
                         <AlertDialogDescription className="text-muted-foreground font-medium">
-                          This will remove you from the conversation and delete all data.
+                          {isAdmin ? "This will permanently delete the group and all its data for everyone." : "This will remove you from the conversation and delete all data."}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter className="gap-2">
@@ -855,7 +1059,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         <AlertDialogAction className="rounded-xl bg-destructive font-black uppercase tracking-widest" onClick={() => {
                           if (roomRef) deleteDocumentNonBlocking(roomRef);
                           onBack?.();
-                          toast({ title: "Chat Deleted" });
+                          toast({ title: isAdmin ? "Group Deleted" : "Chat Deleted" });
                         }}>Delete</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -936,73 +1140,81 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
 
       <footer className="p-4 md:p-6 bg-background border-t border-border/40 shrink-0 z-30 max-w-full">
         <div className="max-w-4xl mx-auto space-y-3">
-          {replyingTo && (
-            <div className="px-6 py-2.5 bg-primary/10 rounded-[1.5rem] flex items-center justify-between border border-primary/20 animate-in slide-in-from-bottom-2">
-              <div className="flex flex-col gap-0.5 overflow-hidden">
-                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Replying</span>
-                <p className="text-xs font-bold truncate opacity-80">{replyingTo.content}</p>
+          {isBlocked ? (
+             <div className="px-6 py-4 bg-destructive/5 rounded-[2rem] flex items-center justify-center border border-destructive/20 animate-in-fade">
+               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-destructive">User Blocked • Unblock to start a chat</p>
+             </div>
+          ) : (
+            <>
+              {replyingTo && (
+                <div className="px-6 py-2.5 bg-primary/10 rounded-[1.5rem] flex items-center justify-between border border-primary/20 animate-in slide-in-from-bottom-2">
+                  <div className="flex flex-col gap-0.5 overflow-hidden">
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Replying</span>
+                    <p className="text-xs font-bold truncate opacity-80">{replyingTo.content}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-primary/20" onClick={() => setReplyingTo(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              {editingMessage && (
+                <div className="px-6 py-2.5 bg-secondary/10 rounded-[1.5rem] flex items-center justify-between border border-secondary/20 animate-in slide-in-from-bottom-2">
+                  <div className="flex flex-col gap-0.5 overflow-hidden">
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-secondary">Editing Message</span>
+                    <p className="text-xs font-bold truncate opacity-80">{editingMessage.content}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-secondary/20" onClick={() => { setEditingMessage(null); setInputValue(''); updateTypingStatus(false); }}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 bg-muted/60 rounded-[2.5rem] p-1.5 pl-2.5 border border-border/50 shadow-inner focus-within:ring-4 ring-primary/5 transition-all max-w-full">
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-11 w-11 rounded-full flex items-center justify-center text-muted-foreground hover:bg-background hover:text-primary transition-all shadow-sm bg-background/80 shrink-0"
+                >
+                  <Camera className="h-5 w-5" />
+                </button>
+                <input type="file" id="chat-file-input" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
+                   const file = e.target.files?.[0];
+                   if (file) {
+                     const reader = new FileReader();
+                     reader.onloadend = () => handleSend(isViewOnceEnabled ? 'view-once' : 'image', reader.result as string);
+                     reader.readAsDataURL(file);
+                   }
+                }} />
+                
+                <Textarea 
+                  value={inputValue}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
+                  placeholder="Start a Chat..."
+                  className="bg-transparent border-none min-h-[40px] h-[40px] focus-visible:ring-0 text-[15px] font-bold resize-none py-2 px-1 placeholder:opacity-50 flex-1"
+                />
+
+                <div className="flex items-center gap-2 pr-1 shrink-0">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={cn("h-11 w-11 rounded-full transition-all", isViewOnceEnabled && "text-primary bg-primary/10")}
+                    onClick={() => setIsViewOnceEnabled(!isViewOnceEnabled)}
+                    title="View Once"
+                  >
+                    <Eye className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    onClick={() => handleSend()} 
+                    disabled={!inputValue.trim()}
+                    className="h-11 px-4 rounded-full bg-foreground text-background font-black uppercase tracking-widest text-[11px] shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+                  >
+                    {editingMessage ? 'Update' : 'Send'}
+                  </Button>
+                </div>
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-primary/20" onClick={() => setReplyingTo(null)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            </>
           )}
-
-          {editingMessage && (
-            <div className="px-6 py-2.5 bg-secondary/10 rounded-[1.5rem] flex items-center justify-between border border-secondary/20 animate-in slide-in-from-bottom-2">
-              <div className="flex flex-col gap-0.5 overflow-hidden">
-                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-secondary">Editing Message</span>
-                <p className="text-xs font-bold truncate opacity-80">{editingMessage.content}</p>
-              </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-secondary/20" onClick={() => { setEditingMessage(null); setInputValue(''); updateTypingStatus(false); }}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          <div className="flex items-center gap-3 bg-muted/60 rounded-[2.5rem] p-1.5 pl-2.5 border border-border/50 shadow-inner focus-within:ring-4 ring-primary/5 transition-all max-w-full">
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="h-11 w-11 rounded-full flex items-center justify-center text-muted-foreground hover:bg-background hover:text-primary transition-all shadow-sm bg-background/80 shrink-0"
-            >
-              <Camera className="h-5 w-5" />
-            </button>
-            <input type="file" id="chat-file-input" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
-               const file = e.target.files?.[0];
-               if (file) {
-                 const reader = new FileReader();
-                 reader.onloadend = () => handleSend(isViewOnceEnabled ? 'view-once' : 'image', reader.result as string);
-                 reader.readAsDataURL(file);
-               }
-            }} />
-            
-            <Textarea 
-              value={inputValue}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-              placeholder="Start a Chat..."
-              className="bg-transparent border-none min-h-[40px] h-[40px] focus-visible:ring-0 text-[15px] font-bold resize-none py-2 px-1 placeholder:opacity-50 flex-1"
-            />
-
-            <div className="flex items-center gap-2 pr-1 shrink-0">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={cn("h-11 w-11 rounded-full transition-all", isViewOnceEnabled && "text-primary bg-primary/10")}
-                onClick={() => setIsViewOnceEnabled(!isViewOnceEnabled)}
-                title="View Once"
-              >
-                <Eye className="h-5 w-5" />
-              </Button>
-              <Button 
-                onClick={() => handleSend()} 
-                disabled={!inputValue.trim()}
-                className="h-11 px-4 rounded-full bg-foreground text-background font-black uppercase tracking-widest text-[11px] shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
-              >
-                {editingMessage ? 'Update' : 'Send'}
-              </Button>
-            </div>
-          </div>
         </div>
       </footer>
 
