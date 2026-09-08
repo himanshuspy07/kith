@@ -293,11 +293,12 @@ const MessageItem = memo(({
             )}
           </div>
 
-          <div className="absolute -right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all z-20 pointer-events-none group-hover:pointer-events-auto">
+          {/* Fix: Moved outside content wrapper to prevent overlap and added a background */}
+          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all z-30 pointer-events-none group-hover:pointer-events-auto bg-background/90 dark:bg-card/90 backdrop-blur-md p-1 rounded-full shadow-lg border border-border/50 whitespace-nowrap">
              <Popover>
               <PopoverTrigger asChild>
-                <button className="h-7 w-7 rounded-full bg-card shadow-xl flex items-center justify-center hover:text-primary transition-colors border border-border/50 shrink-0">
-                  <SmilePlus className="h-3.5 w-3.5" />
+                <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-primary transition-colors shrink-0">
+                  <SmilePlus className="h-4 w-4" />
                 </button>
               </PopoverTrigger>
               <PopoverContent side="top" align="center" className="w-fit p-1 flex gap-1 rounded-full bg-card/95 backdrop-blur shadow-2xl border-border/50">
@@ -316,13 +317,13 @@ const MessageItem = memo(({
               </PopoverContent>
             </Popover>
 
-            <button onClick={() => onAction('reply', msg)} className="h-7 w-7 rounded-full bg-card shadow-xl flex items-center justify-center hover:text-primary transition-colors border border-border/50 shrink-0">
-              <Reply className="h-3.5 w-3.5" />
+            <button onClick={() => onAction('reply', msg)} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-primary transition-colors shrink-0">
+              <Reply className="h-4 w-4" />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="h-7 w-7 rounded-full bg-card shadow-xl flex items-center justify-center hover:text-foreground transition-colors border border-border/50 shrink-0">
-                  <MoreHorizontal className="h-3.5 w-3.5" />
+                <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-foreground transition-colors shrink-0">
+                  <MoreHorizontal className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl border-border/50 min-w-[100px]">
