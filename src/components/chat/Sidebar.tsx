@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useMemo, memo, useEffect } from 'react';
-import { Search, Plus, MessageSquare, Loader2, UserPlus, Camera, Pin, ShieldAlert, Bookmark } from 'lucide-react';
+import { Search, MessageSquare, Loader2, UserPlus, Camera, Pin, Bookmark } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { useCollection, useDoc, useUser, useFirestore, useMemoFirebase } from '@/firebase';
@@ -127,7 +126,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
   useEffect(() => {
     setMounted(true);
-    const interval = setInterval(() => setTicker(t => t + 1), 60000);
+    const interval = setInterval(() => setTicker(t => t + 1), 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -195,14 +194,14 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
 
       return { ...room, displayName, displayAvatar, isOnline, isUnread, isPinned, isBlockedByMe };
     })
-    .filter(room => !room.isBlockedByMe) // Remove blocked users from sidebar
+    .filter(room => !room.isBlockedByMe) 
     .sort((a, b) => {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : 0;
       const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : 0;
       return timeB - timeA;
     });
-  }, [rooms, participantProfiles, user?.uid, ticker, mounted, currentUserData?.blockedUserIds]);
+  }, [rooms, participantProfiles, user?.uid, ticker, mounted, JSON.stringify(currentUserData?.blockedUserIds)]);
 
   const filteredConversations = conversationListData.filter(c => 
     c.displayName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -263,7 +262,7 @@ export default function Sidebar({ onSelectConversation, selectedConversationId, 
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
             <div className="h-20 w-20 bg-muted/30 rounded-[2rem] flex items-center justify-center mb-6">
-              <UserPlus className="h-10 w-10 text-muted-foreground" />
+              <MessageSquare className="h-10 w-10 text-muted-foreground" />
             </div>
             <h3 className="text-xl font-bold uppercase tracking-tighter italic">No Conversations</h3>
             <p className="text-muted-foreground mt-2 font-medium text-sm max-w-[200px]">Start a conversation to see it here.</p>

@@ -27,44 +27,35 @@ export default function UserProfileSync() {
     const savedMessagesRef = doc(db, 'chatRooms', savedMessagesRoomId);
     
     const syncProfile = async () => {
-      // 1. Sync User Profile
-      getDoc(userRef)
-        .then((docSnap) => {
-          if (!docSnap.exists()) {
-            const username = user.displayName || user.email?.split('@')[0] || 'kith_user';
-            const initialData = {
-              id: user.uid,
-              email: user.email || '',
-              phoneNumber: user.phoneNumber || '',
-              username: username,
-              usernameLowercase: username.toLowerCase(),
-              profilePictureUrl: user.photoURL || '',
-              bio: '',
-              onlineStatus: true,
-              hasSeenTutorial: false,
-              blockedUserIds: [],
-              lastActiveAt: serverTimestamp(),
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            };
-            setDocumentNonBlocking(userRef, initialData, { merge: true });
-          } else {
-            updateDocumentNonBlocking(userRef, {
-              onlineStatus: true,
-              lastActiveAt: serverTimestamp(),
-            });
-          }
-        })
-        .catch((error) => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'get',
-          }));
-        });
+      try {
+        const docSnap = await getDoc(userRef);
+        if (!docSnap.exists()) {
+          const username = user.displayName || user.email?.split('@')[0] || 'kith_user';
+          const initialData = {
+            id: user.uid,
+            email: user.email || '',
+            phoneNumber: user.phoneNumber || '',
+            username: username,
+            usernameLowercase: username.toLowerCase(),
+            profilePictureUrl: user.photoURL || '',
+            bio: '',
+            onlineStatus: true,
+            hasSeenTutorial: false,
+            blockedUserIds: [],
+            lastActiveAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          };
+          setDocumentNonBlocking(userRef, initialData, { merge: true });
+        } else {
+          updateDocumentNonBlocking(userRef, {
+            onlineStatus: true,
+            lastActiveAt: serverTimestamp(),
+          });
+        }
 
-      // 2. Ensure "Saved Messages" exists
-      getDoc(savedMessagesRef).then((snap) => {
-        if (!snap.exists()) {
+        const savedSnap = await getDoc(savedMessagesRef);
+        if (!savedSnap.exists()) {
           setDocumentNonBlocking(savedMessagesRef, {
             id: savedMessagesRoomId,
             name: "Saved Messages",
@@ -79,12 +70,16 @@ export default function UserProfileSync() {
             lastMessageText: 'Your personal space for notes.',
           }, { merge: true });
         }
-      });
+      } catch (error) {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'get',
+        }));
+      }
     };
 
     syncProfile();
 
-    // Heartbeat every 30 seconds
     heartbeatIntervalRef.current = setInterval(() => {
       if (document.visibilityState === 'visible') {
         updateDocumentNonBlocking(userRef, {
@@ -92,7 +87,7 @@ export default function UserProfileSync() {
           onlineStatus: true
         });
       }
-    }, 1000 * 30);
+    }, 30000);
 
     const handleVisibilityChange = () => {
       const isVisible = document.visibilityState === 'visible';
@@ -102,18 +97,22 @@ export default function UserProfileSync() {
       });
     };
 
+    const handleBeforeUnload = () => {
+      // Use standard firestore updateDoc for reliable synchronous-like behavior on unload
+      updateDoc(userRef, { 
+        onlineStatus: false, 
+        lastActiveAt: serverTimestamp() 
+      }).catch(() => {});
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', () => {
-       updateDoc(userRef, { onlineStatus: false, lastActiveAt: serverTimestamp() }).catch(() => {});
-    });
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      updateDoc(userRef, {
-        onlineStatus: false,
-        lastActiveAt: serverTimestamp()
-      }).catch(() => {});
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      handleBeforeUnload();
     };
   }, [user?.uid, db]);
 

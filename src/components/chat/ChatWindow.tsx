@@ -14,7 +14,6 @@ import {
   CheckCheck,
   Eye,
   EyeOff,
-  Clock,
   MessageSquare,
   SmilePlus,
   Palette,
@@ -52,7 +51,6 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -199,7 +197,7 @@ const MessageItem = memo(({
           )}
         </div>
 
-        <div className="flex flex-col min-w-0 max-w-[85%] md:max-w-[70%] relative">
+        <div className="flex flex-col min-w-0 max-w-[80%] md:max-w-[70%] relative">
           <div className="flex items-center gap-2">
             {showAvatar && (
               <span className={cn(
@@ -293,8 +291,7 @@ const MessageItem = memo(({
             )}
           </div>
 
-          {/* Fix: Moved outside content wrapper to prevent overlap and added a background */}
-          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all z-30 pointer-events-none group-hover:pointer-events-auto bg-background/90 dark:bg-card/90 backdrop-blur-md p-1 rounded-full shadow-lg border border-border/50 whitespace-nowrap">
+          <div className="absolute left-full top-2 ml-2 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all z-30 pointer-events-none group-hover:pointer-events-auto bg-background/90 dark:bg-card/90 backdrop-blur-md p-1 rounded-full shadow-lg border border-border/50 whitespace-nowrap">
              <Popover>
               <PopoverTrigger asChild>
                 <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-primary transition-colors shrink-0">
@@ -326,7 +323,7 @@ const MessageItem = memo(({
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-xl border-border/50 min-w-[100px]">
+              <DropdownMenuContent align="start" className="rounded-xl border-border/50 min-w-[100px] z-[100]">
                 {isMe && !isViewOnce && <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2 font-bold uppercase text-[9px] tracking-widest"><Edit2 className="h-3 w-3" /> Edit</DropdownMenuItem>}
                 <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 font-bold uppercase text-[9px] tracking-widest text-destructive"><Trash2 className="h-3 w-3" /> Delete</DropdownMenuItem>
               </DropdownMenuContent>
@@ -416,7 +413,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
   const participantsQuery = useMemoFirebase(() => {
     if (!db || participantIds.length === 0) return null;
     return query(collection(db, 'users'), where('id', 'in', participantIds.slice(0, 30)));
-  }, [db, participantIds ? JSON.stringify(participantIds) : '']);
+  }, [db, JSON.stringify(participantIds)]);
   const { data: participants } = useCollection(participantsQuery);
 
   const userSearchQuery = useMemoFirebase(() => {
@@ -436,6 +433,14 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
     const otherUser = participants.find(p => p.id !== user?.uid);
     return otherUser && currentUserData.blockedUserIds.includes(otherUser.id);
   }, [room, currentUserData?.blockedUserIds, participants, user?.uid]);
+
+  useEffect(() => {
+    setMessageLimit(25);
+    setIsInitialLoad(true);
+    setReplyingTo(null);
+    setEditingMessage(null);
+    setInputValue('');
+  }, [conversationId]);
 
   useEffect(() => {
     if (!conversationId || !user || !db) return;
@@ -810,7 +815,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         </div>
       )}
 
-      <header className="h-20 px-6 flex items-center justify-between border-b border-border/40 shrink-0 bg-background/95 backdrop-blur-xl z-30 max-w-full">
+      <header className="h-20 px-6 flex items-center justify-between border-b border-border/40 shrink-0 bg-background/95 backdrop-blur-xl z-[40] max-w-full">
         <div className="flex items-center gap-4 min-w-0">
           {onBack && (
             <button className="h-10 w-10 rounded-full hover:bg-muted flex items-center justify-center shrink-0" onClick={onBack}>
@@ -846,7 +851,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                 <Info className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent className="sm:max-w-md bg-card/98 backdrop-blur-2xl border-l border-border/50 shadow-2xl p-0 flex flex-col">
+            <SheetContent className="sm:max-w-md bg-card/98 backdrop-blur-2xl border-l border-border/50 shadow-2xl p-0 flex flex-col z-[150]">
               <SheetHeader className="p-10 border-b border-border/50 bg-muted/20 shrink-0">
                 <SheetTitle className="sr-only">Conversation Info</SheetTitle>
                 <div className="flex flex-col items-center gap-6">
@@ -1008,7 +1013,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                           <LogOut className="h-4 w-4 mr-2" /> Leave Group
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl">
+                      <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl z-[200]">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Leave Group?</AlertDialogTitle>
                           <AlertDialogDescription className="text-muted-foreground font-medium">
@@ -1029,7 +1034,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         <MessageSquare className="h-4 w-4 mr-2" /> Clear History
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl">
+                    <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl z-[200]">
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Clear History?</AlertDialogTitle>
                         <AlertDialogDescription className="text-muted-foreground font-medium">
@@ -1049,7 +1054,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
                         <Trash2 className="h-5 w-5 mr-2" /> {isAdmin ? "Delete Group" : "Delete Chat"}
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl">
+                    <AlertDialogContent className="rounded-[2.5rem] border-none bg-card shadow-2xl z-[200]">
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Confirm Deletion?</AlertDialogTitle>
                         <AlertDialogDescription className="text-muted-foreground font-medium">
@@ -1134,13 +1139,13 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
         <Button 
           size="icon" 
           onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          className="fixed bottom-24 right-6 md:bottom-28 md:right-10 z-[40] h-12 w-12 rounded-full bg-primary shadow-2xl hover:scale-110 active:scale-95 transition-all animate-in zoom-in-50"
+          className="fixed bottom-24 right-6 md:bottom-28 md:right-10 z-[50] h-12 w-12 rounded-full bg-primary shadow-2xl hover:scale-110 active:scale-95 transition-all animate-in zoom-in-50"
         >
           <ArrowDown className="h-6 w-6" />
         </Button>
       )}
 
-      <footer className="p-4 md:p-6 bg-background border-t border-border/40 shrink-0 z-30 max-w-full">
+      <footer className="p-4 md:p-6 bg-background border-t border-border/40 shrink-0 z-[40] max-w-full">
         <div className="max-w-4xl mx-auto space-y-3">
           {isBlocked ? (
              <div className="px-6 py-4 bg-destructive/5 rounded-[2rem] flex items-center justify-center border border-destructive/20 animate-in-fade">
@@ -1221,7 +1226,7 @@ export default function ChatWindow({ conversationId, onBack }: ChatWindowProps) 
       </footer>
 
       <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
-        <DialogContent className="max-w-full h-svh p-0 border-none bg-black rounded-none">
+        <DialogContent className="max-w-full h-svh p-0 border-none bg-black rounded-none z-[200]">
           <DialogTitle className="sr-only">Image Preview</DialogTitle>
           <div className="relative w-full h-full flex items-center justify-center p-4">
             {lightboxImage && (
