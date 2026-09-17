@@ -24,7 +24,8 @@ import {
   UserX,
   Check,
   X,
-  Loader2
+  Loader2,
+  Download
 } from 'lucide-react';
 import { 
   AlertDialog,
@@ -134,6 +135,10 @@ export default function SettingsView() {
       });
       toast({ title: "User Unblocked" });
     }
+  };
+
+  const handleDownloadApp = () => {
+    window.open('https://hy-appstore.netlify.app/#kith', '_blank');
   };
 
   return (
@@ -264,6 +269,25 @@ export default function SettingsView() {
             </div>
             <Switch checked={notifications} onCheckedChange={setNotifications} />
           </div>
+        </section>
+
+        <section className="space-y-4">
+          <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Kith Ecosystem</h4>
+          <button 
+            onClick={handleDownloadApp}
+            className="w-full flex items-center justify-between p-4 bg-card rounded-2xl border border-border/50 hover:bg-primary/5 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                <Download className="h-5 w-5" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-black uppercase tracking-widest">Download App</p>
+                <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">Get kith on your mobile device</p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
         </section>
 
         <div className="pt-6 space-y-3">
