@@ -185,6 +185,46 @@ const MessageItem = memo(({
       "flex flex-col animate-in-fade px-6 group relative transition-colors w-full", 
       showAvatar ? "mt-4 mb-1" : "mt-0.5 mb-0.5"
     )}>
+      {/* Redesigned Action Menu: Fixed to the right side of the row to prevent off-screen overflow */}
+      <div className="absolute right-6 top-2 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all z-30 pointer-events-none group-hover:pointer-events-auto bg-background/90 dark:bg-card/90 backdrop-blur-md p-1 rounded-full shadow-lg border border-border/50 whitespace-nowrap">
+          <Popover>
+          <PopoverTrigger asChild>
+            <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-primary transition-colors shrink-0">
+              <SmilePlus className="h-4 w-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="top" align="center" className="w-fit p-1 flex gap-1 rounded-full bg-card/95 backdrop-blur shadow-2xl border-border/50">
+            {REACTION_EMOJIS.map(emoji => (
+              <button
+                key={emoji}
+                onClick={() => onReact(emoji)}
+                className={cn(
+                  "h-8 w-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-lg",
+                  myReaction === emoji && "bg-primary/20"
+                )}
+              >
+                {emoji}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+
+        <button onClick={() => onAction('reply', msg)} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-primary transition-colors shrink-0">
+          <Reply className="h-4 w-4" />
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-foreground transition-colors shrink-0">
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl border-border/50 min-w-[100px] z-[100]">
+            {isMe && !isViewOnce && <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2 font-bold uppercase text-[9px] tracking-widest"><Edit2 className="h-3 w-3" /> Edit</DropdownMenuItem>}
+            <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 font-bold uppercase text-[9px] tracking-widest text-destructive"><Trash2 className="h-3 w-3" /> Delete</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <div className="flex items-start gap-4 max-w-full relative">
         <div className="relative shrink-0">
           {showAvatar ? (
@@ -289,45 +329,6 @@ const MessageItem = memo(({
                 </span>
               </div>
             )}
-          </div>
-
-          <div className="absolute left-full top-2 ml-2 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all z-30 pointer-events-none group-hover:pointer-events-auto bg-background/90 dark:bg-card/90 backdrop-blur-md p-1 rounded-full shadow-lg border border-border/50 whitespace-nowrap">
-             <Popover>
-              <PopoverTrigger asChild>
-                <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-primary transition-colors shrink-0">
-                  <SmilePlus className="h-4 w-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent side="top" align="center" className="w-fit p-1 flex gap-1 rounded-full bg-card/95 backdrop-blur shadow-2xl border-border/50">
-                {REACTION_EMOJIS.map(emoji => (
-                  <button
-                    key={emoji}
-                    onClick={() => onReact(emoji)}
-                    className={cn(
-                      "h-8 w-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-lg",
-                      myReaction === emoji && "bg-primary/20"
-                    )}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
-
-            <button onClick={() => onAction('reply', msg)} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-primary transition-colors shrink-0">
-              <Reply className="h-4 w-4" />
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center hover:text-foreground transition-colors shrink-0">
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="rounded-xl border-border/50 min-w-[100px] z-[100]">
-                {isMe && !isViewOnce && <DropdownMenuItem onClick={() => onAction('edit', msg)} className="gap-2 font-bold uppercase text-[9px] tracking-widest"><Edit2 className="h-3 w-3" /> Edit</DropdownMenuItem>}
-                <DropdownMenuItem onClick={() => onAction('delete', msg)} className="gap-2 font-bold uppercase text-[9px] tracking-widest text-destructive"><Trash2 className="h-3 w-3" /> Delete</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </div>
